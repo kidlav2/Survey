@@ -1,0 +1,278 @@
+export const translations = {
+  en: {
+    welcome: {
+      title: 'User Experience Research Survey',
+      description: 'Thank you for participating in this research survey. Your responses will help us understand user preferences and improve our understanding of the subject matter. All responses are confidential and will be used solely for research purposes.',
+      estimatedTime: 'Estimated Completion Time',
+      timeValue: 'Takes 3–5 minutes',
+      privacy: 'Your participation is voluntary and all responses are confidential. This survey is conducted as part of an academic research project. No personally identifiable information will be shared without your explicit consent.',
+      startButton: 'Start Survey',
+      footer: 'This survey is part of a research project',
+    },
+    questions: {
+      of: 'of',
+      complete: 'complete',
+      next: 'Next',
+      back: 'Back',
+      finish: 'Finish',
+      selectAll: 'Select all that apply',
+      question: 'Question',
+    },
+    questions_list: [
+      {
+        question: 'How frequently do you use digital tools for your daily tasks?',
+        options: ['Daily', 'Weekly', 'Monthly', 'Rarely', 'Never'],
+      },
+      {
+        question: 'Which of the following features do you value most?',
+        options: ['Ease of use', 'Advanced features', 'Customization', 'Speed', 'Reliability'],
+      },
+      {
+        question: 'Have you encountered any challenges with similar systems?',
+        options: ['Yes, frequently', 'Yes, occasionally', 'Rarely', 'Never'],
+      },
+      {
+        question: 'How do you typically learn about new tools or systems?',
+        options: ['Online documentation', 'Video tutorials', 'Peer recommendations', 'Trial and error', 'Professional training'],
+      },
+      {
+        question: 'Would you recommend this type of system to others?',
+        options: ['Definitely yes', 'Probably yes', 'Not sure', 'Probably not', 'Definitely not'],
+      },
+      {
+        question: 'On a scale of 1-5, how important is user interface design to you?',
+        minLabel: 'Not Important',
+        maxLabel: 'Very Important',
+      },
+    ],
+    optIn: {
+      title: 'Stay Connected',
+      description: 'Thank you for completing the survey. Would you like to participate in future research?',
+      checkbox: 'I would like to participate in future surveys',
+      checkboxDetail: 'Receive occasional invitations to participate in related research studies',
+      emailLabel: 'Email Address',
+      emailPlaceholder: 'your.email@example.com',
+      privacyTitle: 'Your Privacy Matters',
+      privacyText: 'Your email will only be used for research purposes and will never be shared with third parties. You can unsubscribe at any time.',
+      submitButton: 'Submit Survey',
+    },
+    thankYou: {
+      title: 'Thank You for Your Participation',
+      description: 'Your responses have been recorded successfully. Your contribution to this research is invaluable and will help improve systems and inform policy recommendations.',
+      nextStepsTitle: 'What Happens Next?',
+      nextSteps: [
+        'Your responses will be analyzed along with other participants\' data',
+        'Results will be compiled into a research report',
+        'Findings may be published in academic journals or presented at conferences',
+      ],
+      footer: 'You may now close this window',
+    },
+  },
+  ru: {
+    welcome: {
+      title: 'Исследовательский опрос пользовательского опыта',
+      description: 'Благодарим вас за участие в этом исследовательском опросе. Ваши ответы помогут нам понять предпочтения пользователей и улучшить наше понимание предмета. Все ответы конфиденциальны и будут использоваться исключительно в исследовательских целях.',
+      estimatedTime: 'Приблизительное время выполнения',
+      timeValue: 'Занимает 3–5 минут',
+      privacy: 'Ваше участие является добровольным, и все ответы конфиденциальны. Этот опрос проводится в рамках академического исследовательского проекта. Никакая личная информация не будет передана без вашего явного согласия.',
+      startButton: 'Начать опрос',
+      footer: 'Этот опрос является частью исследовательского проекта',
+    },
+    questions: {
+      of: 'из',
+      complete: 'завершено',
+      next: 'Далее',
+      back: 'Назад',
+      finish: 'Завершить',
+      selectAll: 'Выберите все подходящие варианты',
+      question: 'Вопрос',
+    },
+    questions_list: [
+      {
+        question: 'Как часто вы используете цифровые инструменты для ежедневных задач?',
+        options: ['Ежедневно', 'Еженедельно', 'Ежемесячно', 'Редко', 'Никогда'],
+      },
+      {
+        question: 'Какие из следующих функций вы цените больше всего?',
+        options: ['Простота использования', 'Расширенные функции', 'Настройка', 'Скорость', 'Надежность'],
+      },
+      {
+        question: 'Сталкивались ли вы с проблемами в похожих системах?',
+        options: ['Да, часто', 'Да, иногда', 'Редко', 'Никогда'],
+      },
+      {
+        question: 'Как вы обычно узнаете о новых инструментах или системах?',
+        options: ['Онлайн-документация', 'Видеоуроки', 'Рекомендации коллег', 'Метод проб и ошибок', 'Профессиональное обучение'],
+      },
+      {
+        question: 'Порекомендовали бы вы такую систему другим?',
+        options: ['Определенно да', 'Вероятно да', 'Не уверен', 'Вероятно нет', 'Определенно нет'],
+      },
+      {
+        question: 'По шкале от 1 до 5, насколько важен для вас дизайн интерфейса?',
+        minLabel: 'Не важно',
+        maxLabel: 'Очень важно',
+      },
+    ],
+    optIn: {
+      title: 'Оставайтесь на связи',
+      description: 'Благодарим вас за прохождение опроса. Хотите ли вы участвовать в будущих исследованиях?',
+      checkbox: 'Я хотел бы участвовать в будущих опросах',
+      checkboxDetail: 'Получать случайные приглашения для участия в связанных исследованиях',
+      emailLabel: 'Адрес электронной почты',
+      emailPlaceholder: 'your.email@example.com',
+      privacyTitle: 'Ваша конфиденциальность важна',
+      privacyText: 'Ваш адрес электронной почты будет использоваться только в исследовательских целях и никогда не будет передан третьим лицам. Вы можете отписаться в любое время.',
+      submitButton: 'Отправить опрос',
+    },
+    thankYou: {
+      title: 'Спасибо за ваше участие',
+      description: 'Ваши ответы успешно записаны. Ваш вклад в это исследование неоценим и поможет улучшить системы и сформировать политические рекомендации.',
+      nextStepsTitle: 'Что будет дальше?',
+      nextSteps: [
+        'Ваши ответы будут проанализированы вместе с данными других участников',
+        'Результаты будут собраны в исследовательский отчет',
+        'Результаты могут быть опубликованы в академических журналах или представлены на конференциях',
+      ],
+      footer: 'Теперь вы можете закрыть это окно',
+    },
+  },
+  fr: {
+    welcome: {
+      title: 'Enquête de recherche sur l\'expérience utilisateur',
+      description: 'Merci de participer à cette enquête de recherche. Vos réponses nous aideront à comprendre les préférences des utilisateurs et à améliorer notre compréhension du sujet. Toutes les réponses sont confidentielles et seront utilisées uniquement à des fins de recherche.',
+      estimatedTime: 'Temps de réalisation estimé',
+      timeValue: 'Prend 3 à 5 minutes',
+      privacy: 'Votre participation est volontaire et toutes les réponses sont confidentielles. Cette enquête est menée dans le cadre d\'un projet de recherche académique. Aucune information personnellement identifiable ne sera partagée sans votre consentement explicite.',
+      startButton: 'Commencer l\'enquête',
+      footer: 'Cette enquête fait partie d\'un projet de recherche',
+    },
+    questions: {
+      of: 'sur',
+      complete: 'terminé',
+      next: 'Suivant',
+      back: 'Retour',
+      finish: 'Terminer',
+      selectAll: 'Sélectionnez toutes les réponses applicables',
+      question: 'Question',
+    },
+    questions_list: [
+      {
+        question: 'À quelle fréquence utilisez-vous des outils numériques pour vos tâches quotidiennes?',
+        options: ['Quotidiennement', 'Hebdomadairement', 'Mensuellement', 'Rarement', 'Jamais'],
+      },
+      {
+        question: 'Lesquelles des fonctionnalités suivantes appréciez-vous le plus?',
+        options: ['Facilité d\'utilisation', 'Fonctions avancées', 'Personnalisation', 'Rapidité', 'Fiabilité'],
+      },
+      {
+        question: 'Avez-vous rencontré des défis avec des systèmes similaires?',
+        options: ['Oui, fréquemment', 'Oui, occasionnellement', 'Rarement', 'Jamais'],
+      },
+      {
+        question: 'Comment apprenez-vous généralement de nouveaux outils ou systèmes?',
+        options: ['Documentation en ligne', 'Tutoriels vidéo', 'Recommandations de pairs', 'Essai et erreur', 'Formation professionnelle'],
+      },
+      {
+        question: 'Recommanderiez-vous ce type de système à d\'autres?',
+        options: ['Certainement oui', 'Probablement oui', 'Pas sûr', 'Probablement non', 'Certainement non'],
+      },
+      {
+        question: 'Sur une échelle de 1 à 5, quelle importance accordez-vous à la conception de l\'interface utilisateur?',
+        minLabel: 'Pas important',
+        maxLabel: 'Très important',
+      },
+    ],
+    optIn: {
+      title: 'Restez connecté',
+      description: 'Merci d\'avoir répondu à l\'enquête. Souhaitez-vous participer à de futures recherches?',
+      checkbox: 'Je souhaite participer à de futures enquêtes',
+      checkboxDetail: 'Recevoir des invitations occasionnelles pour participer à des études de recherche connexes',
+      emailLabel: 'Adresse e-mail',
+      emailPlaceholder: 'votre.email@example.com',
+      privacyTitle: 'Votre confidentialité compte',
+      privacyText: 'Votre e-mail sera uniquement utilisé à des fins de recherche et ne sera jamais partagé avec des tiers. Vous pouvez vous désabonner à tout moment.',
+      submitButton: 'Soumettre l\'enquête',
+    },
+    thankYou: {
+      title: 'Merci pour votre participation',
+      description: 'Vos réponses ont été enregistrées avec succès. Votre contribution à cette recherche est inestimable et aidera à améliorer les systèmes et à éclairer les recommandations politiques.',
+      nextStepsTitle: 'Quelle est la suite?',
+      nextSteps: [
+        'Vos réponses seront analysées avec les données des autres participants',
+        'Les résultats seront compilés dans un rapport de recherche',
+        'Les résultats peuvent être publiés dans des revues académiques ou présentés lors de conférences',
+      ],
+      footer: 'Vous pouvez maintenant fermer cette fenêtre',
+    },
+  },
+  es: {
+    welcome: {
+      title: 'Encuesta de investigación de experiencia de usuario',
+      description: 'Gracias por participar en esta encuesta de investigación. Sus respuestas nos ayudarán a comprender las preferencias de los usuarios y mejorar nuestra comprensión del tema. Todas las respuestas son confidenciales y se utilizarán únicamente con fines de investigación.',
+      estimatedTime: 'Tiempo estimado de finalización',
+      timeValue: 'Toma de 3 a 5 minutos',
+      privacy: 'Su participación es voluntaria y todas las respuestas son confidenciales. Esta encuesta se realiza como parte de un proyecto de investigación académica. No se compartirá información de identificación personal sin su consentimiento explícito.',
+      startButton: 'Comenzar encuesta',
+      footer: 'Esta encuesta es parte de un proyecto de investigación',
+    },
+    questions: {
+      of: 'de',
+      complete: 'completado',
+      next: 'Siguiente',
+      back: 'Atrás',
+      finish: 'Finalizar',
+      selectAll: 'Seleccione todas las que correspondan',
+      question: 'Pregunta',
+    },
+    questions_list: [
+      {
+        question: '¿Con qué frecuencia utiliza herramientas digitales para sus tareas diarias?',
+        options: ['Diariamente', 'Semanalmente', 'Mensualmente', 'Raramente', 'Nunca'],
+      },
+      {
+        question: '¿Cuáles de las siguientes características valora más?',
+        options: ['Facilidad de uso', 'Funciones avanzadas', 'Personalización', 'Velocidad', 'Confiabilidad'],
+      },
+      {
+        question: '¿Ha encontrado desafíos con sistemas similares?',
+        options: ['Sí, frecuentemente', 'Sí, ocasionalmente', 'Raramente', 'Nunca'],
+      },
+      {
+        question: '¿Cómo suele aprender sobre nuevas herramientas o sistemas?',
+        options: ['Documentación en línea', 'Tutoriales en video', 'Recomendaciones de compañeros', 'Prueba y error', 'Capacitación profesional'],
+      },
+      {
+        question: '¿Recomendaría este tipo de sistema a otros?',
+        options: ['Definitivamente sí', 'Probablemente sí', 'No estoy seguro', 'Probablemente no', 'Definitivamente no'],
+      },
+      {
+        question: 'En una escala del 1 al 5, ¿qué tan importante es el diseño de interfaz de usuario para usted?',
+        minLabel: 'No importante',
+        maxLabel: 'Muy importante',
+      },
+    ],
+    optIn: {
+      title: 'Manténgase conectado',
+      description: 'Gracias por completar la encuesta. ¿Le gustaría participar en futuras investigaciones?',
+      checkbox: 'Me gustaría participar en futuras encuestas',
+      checkboxDetail: 'Recibir invitaciones ocasionales para participar en estudios de investigación relacionados',
+      emailLabel: 'Dirección de correo electrónico',
+      emailPlaceholder: 'su.email@ejemplo.com',
+      privacyTitle: 'Su privacidad importa',
+      privacyText: 'Su correo electrónico solo se utilizará con fines de investigación y nunca se compartirá con terceros. Puede darse de baja en cualquier momento.',
+      submitButton: 'Enviar encuesta',
+    },
+    thankYou: {
+      title: 'Gracias por su participación',
+      description: 'Sus respuestas se han registrado correctamente. Su contribución a esta investigación es invaluable y ayudará a mejorar los sistemas e informar recomendaciones de políticas.',
+      nextStepsTitle: '¿Qué sigue?',
+      nextSteps: [
+        'Sus respuestas se analizarán junto con los datos de otros participantes',
+        'Los resultados se compilarán en un informe de investigación',
+        'Los hallazgos pueden publicarse en revistas académicas o presentarse en conferencias',
+      ],
+      footer: 'Ahora puede cerrar esta ventana',
+    },
+  },
+};
