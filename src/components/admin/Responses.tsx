@@ -8,10 +8,12 @@ import Toast from '../common/Toast';
 interface Response {
   id: string;
   created_at: string;
-  email: string | null;
+  respondent_email: string | null;
   survey_id: string;
-  completed: boolean;
-  duration_seconds?: number;
+  answers: Record<string, any> | null;
+  // Optional columns if you add them later
+  completed?: boolean | null;
+  duration_seconds?: number | null;
 }
 
 interface ResponseStats {
@@ -75,7 +77,11 @@ export default function Responses() {
 
       // Calculate stats
       const totalResponses = allResponses?.length || 0;
-      const completedResponses = allResponses?.filter(r => r.completed).length || 0;
+      const completedResponses = allResponses?.filter((r: any) => {
+        if (r.completed === true) return true;
+        const a = r.answers;
+        return a && typeof a === 'object' && Object.keys(a).length > 0;
+      }).length || 0;
       const completionRate = totalResponses > 0 ? Math.round((completedResponses / totalResponses) * 100) : 0;
 
       // Count today
@@ -115,7 +121,7 @@ export default function Responses() {
           ...responses.map(r => [
             r.id,
             new Date(r.created_at).toLocaleString(),
-            r.email || 'Not provided',
+            r.respondent_email || 'Not provided',
             r.completed ? 'Completed' : 'In Progress',
             r.duration_seconds ? `${Math.round(r.duration_seconds / 60)} minutes` : 'N/A'
           ])
@@ -254,16 +260,18 @@ export default function Responses() {
             <>
               {/* Mobile Card View */}
               <div className="block md:hidden">
-                {responses.map((response) => (
+                {responses.map((response) => {
+                  const isCompleted = response.completed === true || (response.answers && typeof response.answers === 'object' && Object.keys(response.answers).length > 0);
+                  return (
                   <div key={response.id} className="p-4 border-b border-gray-200 last:border-b-0">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-medium text-gray-900">Response #{response.id.slice(0, 8)}</span>
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                        response.completed
+                        isCompleted
                           ? 'bg-green-100 text-green-800'
                           : 'bg-yellow-100 text-yellow-800'
                       }`}>
-                        {response.completed ? 'Completed' : 'In Progress'}
+                        {isCompleted ? 'Completed' : 'In Progress'}
                       </span>
                     </div>
                     <div className="space-y-1 text-sm">
@@ -273,7 +281,7 @@ export default function Responses() {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-500">Email:</span>
-                        <span className="text-gray-900">{response.email || 'Not provided'}</span>
+                        <span className="text-gray-900">{response.respondent_email || 'Not provided'}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-500">Duration:</span>
@@ -289,7 +297,8 @@ export default function Responses() {
                       View Details
                     </button>
                   </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Desktop Table View */}
@@ -318,7 +327,9 @@ export default function Responses() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {responses.map((response) => (
+                    {responses.map((response) => {
+                      const isCompleted = response.completed === true || (response.answers && typeof response.answers === 'object' && Object.keys(response.answers).length > 0);
+                      return (
                       <tr key={response.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                           {response.id.slice(0, 8)}
@@ -327,17 +338,17 @@ export default function Responses() {
                           {new Date(response.created_at).toLocaleString()}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                          {response.email || 'Not provided'}
+                          {response.respondent_email || 'Not provided'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span
                             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              response.completed
+                              isCompleted
                                 ? 'bg-green-100 text-green-800'
                                 : 'bg-yellow-100 text-yellow-800'
                             }`}
                           >
-                            {response.completed ? 'Completed' : 'In Progress'}
+                            {isCompleted ? 'Completed' : 'In Progress'}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
@@ -352,7 +363,8 @@ export default function Responses() {
                           </button>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

@@ -14,7 +14,6 @@ interface DashboardMetrics {
 interface ActiveSurvey {
   id: string;
   title: string;
-  status: 'draft' | 'active';
   responses_count: number;
 }
 
@@ -26,6 +25,8 @@ export default function Dashboard() {
   const [metrics, setMetrics] = useState<DashboardMetrics>({ totalResponses: 0, emailsCollected: 0, lastActivity: 'No activity' });
   const [activeSurvey, setActiveSurvey] = useState<ActiveSurvey | null>(null);
   const [loading, setLoading] = useState(true);
+  const [languageCounts, setLanguageCounts] = useState<Record<string, number>>({});
+  const [recentActivity, setRecentActivity] = useState<Array<{ label: string; when: string; tone: 'primary' | 'muted' }>>([]);
 
   useEffect(() => {
     loadDashboardData();
@@ -44,7 +45,6 @@ export default function Dashboard() {
         .from('surveys')
         .select('*')
         .eq('owner_id', user.id)
-        .eq('status', 'active')
         .order('created_at', { ascending: false })
         .limit(1);
 
@@ -66,28 +66,85 @@ export default function Dashboard() {
           .from('responses')
           .select('*', { count: 'exact', head: true })
           .eq('survey_id', survey.id)
-          .not('email', 'is', null);
+          .not('respondent_email', 'is', null);
 
         if (emailsError) throw emailsError;
+
+        // Fetch language codes for breakdown
+        const { data: lngRows, error: lngError } = await supabase
+          .from('responses')
+          .select('*')
+          .eq('survey_id', survey.id);
+
+        if (lngError) throw lngError;
+
+        const counts: Record<string, number> = {};
+        (lngRows || []).forEach((r: any) => {
+          const code = (r?.lng ?? r?.language ?? null) as string | null;
+          if (!code) return;
+          counts[code] = (counts[code] || 0) + 1;
+        });
+        setLanguageCounts(counts);
+
+        // Fetch latest email collected timestamp
+        const { data: lastEmail, error: lastEmailError } = await supabase
+          .from('responses')
+          .select('created_at')
+          .eq('survey_id', survey.id)
+          .not('respondent_email', 'is', null)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (lastEmailError) throw lastEmailError;
+        const lastEmailAt = lastEmail && lastEmail.length > 0 ? (lastEmail[0] as any).created_at : null;
+
+        // Fetch last activity (latest response timestamp)
+        const { data: lastResp, error: lastRespError } = await supabase
+          .from('responses')
+          .select('*')
+          .eq('survey_id', survey.id)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (lastRespError) throw lastRespError;
+
+        const lastCreatedAt = lastResp && lastResp.length > 0 ? (lastResp[0] as any).created_at : null;
 
         setActiveSurvey({
           id: survey.id,
           title: survey.title,
-          status: survey.status,
           responses_count: responsesCount || 0,
         });
 
         setMetrics({
           totalResponses: responsesCount || 0,
           emailsCollected: emailsCount || 0,
-          lastActivity: '2 hours ago', // можно обновить при наличии timestamps
+          lastActivity: relativeTime(lastCreatedAt),
         });
+
+        const activity: Array<{ label: string; when: string; tone: 'primary' | 'muted' }> = [];
+
+        if (lastCreatedAt) {
+          activity.push({ label: 'New response submitted', when: relativeTime(lastCreatedAt), tone: 'primary' });
+        }
+
+        if (lastEmailAt) {
+          activity.push({ label: 'New email collected', when: relativeTime(lastEmailAt), tone: 'primary' });
+        }
+
+        const createdAt = (survey as any).created_at ?? null;
+        if (createdAt) {
+          activity.push({ label: 'Survey created', when: relativeTime(createdAt), tone: 'muted' });
+        }
+
+        setRecentActivity(activity.slice(0, 3));
       }
 
       setLoading(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading dashboard data:', error);
-      setToast({ message: 'Failed to load dashboard data', type: 'error' });
+      const msg = error?.message || error?.error_description || 'Failed to load dashboard data';
+      setToast({ message: msg, type: 'error' });
       setLoading(false);
     }
   };
@@ -96,6 +153,37 @@ export default function Dashboard() {
     blue: { bg: 'bg-blue-50', text: 'text-blue-600' },
     green: { bg: 'bg-green-50', text: 'text-green-600' },
     gray: { bg: 'bg-gray-50', text: 'text-gray-600' },
+  };
+
+  const languageBreakdown = (counts: Record<string, number>) => {
+    const items: Array<{ code: string; label: string; count: number }> = [
+      { code: 'en', label: 'EN', count: counts.en || 0 },
+      { code: 'ru', label: 'RU', count: counts.ru || 0 },
+      { code: 'fr', label: 'FR', count: counts.fr || 0 },
+      { code: 'es', label: 'ES', count: counts.es || 0 },
+    ];
+
+    const total = items.reduce((sum, i) => sum + i.count, 0);
+    if (total === 0) return 'No responses yet';
+
+    return items
+      .filter(i => i.count > 0)
+      .map(i => `${i.label}: ${i.count}`)
+      .join(' • ');
+  };
+
+  const relativeTime = (iso?: string | null) => {
+    if (!iso) return 'No activity';
+    const then = new Date(iso).getTime();
+    const now = Date.now();
+    const diffSec = Math.max(0, Math.round((now - then) / 1000));
+    if (diffSec < 60) return `${diffSec}s ago`;
+    const diffMin = Math.round(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHr = Math.round(diffMin / 60);
+    if (diffHr < 24) return `${diffHr}h ago`;
+    const diffDay = Math.round(diffHr / 24);
+    return `${diffDay}d ago`;
   };
 
   const metricCards = [
@@ -224,24 +312,12 @@ export default function Dashboard() {
                 )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6 mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6 mb-6">
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Status</p>
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    activeSurvey.status === 'active' 
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-amber-100 text-amber-800'
-                  }`}>
-                    {activeSurvey.status === 'active' && <div className="w-2 h-2 bg-green-600 rounded-full mr-2"></div>}
-                    {activeSurvey.status.charAt(0).toUpperCase() + activeSurvey.status.slice(1)}
-                  </span>
+                  <p className="text-sm text-gray-600 mb-1">Languages (responses)</p>
+                  <p className="text-base font-medium text-gray-900">{languageBreakdown(languageCounts)}</p>
                 </div>
-                
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Language</p>
-                  <p className="text-base font-medium text-gray-900">English</p>
-                </div>
-                
+
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Total Responses</p>
                   <p className="text-base font-medium text-gray-900">{activeSurvey.responses_count}</p>
@@ -284,29 +360,24 @@ export default function Dashboard() {
           
           <div className="p-4 md:p-6">
             <div className="space-y-4">
-              <div className="flex items-start gap-3 pb-4 border-b border-gray-100">
-                <div className="w-2 h-2 bg-indigo-600 rounded-full mt-2"></div>
-                <div className="flex-1">
-                  <p className="text-sm text-gray-900">New response submitted</p>
-                  <p className="text-xs text-gray-500 mt-1">2 hours ago</p>
-                </div>
-              </div>
-              
-              <div className="flex items-start gap-3 pb-4 border-b border-gray-100">
-                <div className="w-2 h-2 bg-indigo-600 rounded-full mt-2"></div>
-                <div className="flex-1">
-                  <p className="text-sm text-gray-900">New email collected</p>
-                  <p className="text-xs text-gray-500 mt-1">4 hours ago</p>
-                </div>
-              </div>
-              
-              <div className="flex items-start gap-3">
-                <div className="w-2 h-2 bg-gray-300 rounded-full mt-2"></div>
-                <div className="flex-1">
-                  <p className="text-sm text-gray-900">Survey link accessed</p>
-                  <p className="text-xs text-gray-500 mt-1">6 hours ago</p>
-                </div>
-              </div>
+              {recentActivity.length === 0 ? (
+                <div className="text-sm text-gray-600">No recent activity</div>
+              ) : (
+                recentActivity.map((item, idx) => (
+                  <div
+                    key={`${item.label}-${idx}`}
+                    className={`flex items-start gap-3 ${idx < recentActivity.length - 1 ? 'pb-4 border-b border-gray-100' : ''}`}
+                  >
+                    <div
+                      className={`w-2 h-2 rounded-full mt-2 ${item.tone === 'primary' ? 'bg-indigo-600' : 'bg-gray-300'}`}
+                    ></div>
+                    <div className="flex-1">
+                      <p className="text-sm text-gray-900">{item.label}</p>
+                      <p className="text-xs text-gray-500 mt-1">{item.when}</p>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

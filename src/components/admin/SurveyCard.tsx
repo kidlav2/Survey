@@ -43,10 +43,15 @@ export default function SurveyCard({ survey, onDelete }: SurveyCardProps) {
     onDelete(id);
   };
 
+  const handleSendSurvey = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    console.log(`Survey with ID ${id} sent!`);
+    // Add your logic to send the survey here
+  };
+
   const statusColors = {
     Active: 'bg-green-100 text-green-800',
     Disabled: 'bg-gray-100 text-gray-800',
-    Draft: 'bg-amber-100 text-amber-800',
   };
 
   return (
@@ -65,7 +70,7 @@ export default function SurveyCard({ survey, onDelete }: SurveyCardProps) {
         </div>
         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColors[status]}`}>
           {status === 'Active' && <div className="w-2 h-2 bg-green-600 rounded-full mr-2"></div>}
-          {status}
+          {status !== 'Draft' && status}
         </span>
       </div>
 
@@ -106,6 +111,13 @@ export default function SurveyCard({ survey, onDelete }: SurveyCardProps) {
           title="Delete survey"
         >
           <Trash2 className="w-4 h-4" />
+        </button>
+        <button
+          onClick={handleSendSurvey}
+          className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+          title="Send survey"
+        >
+          Send Survey
         </button>
       </div>
     </div>

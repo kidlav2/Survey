@@ -22,6 +22,7 @@ interface SurveyStats {
   optInRate: number;
 }
 
+
 export default function SurveyDetails() {
   const navigate = useNavigate();
   const { id } = useParams();

@@ -3,6 +3,8 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { Mail, Shield } from 'lucide-react';
 import LanguageToggle from './LanguageToggle';
 import { translations } from './translations';
+import { supabase } from '../../lib/supabaseClient';
+
 
 export default function EmailOptIn() {
   const navigate = useNavigate();
@@ -11,10 +13,42 @@ export default function EmailOptIn() {
   const [language, setLanguage] = useState<'en' | 'ru' | 'fr' | 'es'>(location.state?.language || 'en');
   const [optIn, setOptIn] = useState(false);
   const [email, setEmail] = useState('');
+  const responseId = location.state?.responseId; 
+
+  
 
   const t = translations[language]?.optIn || translations.en.optIn;
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    // Если галочка стоит и email введен
+    if (optIn && email) {
+      try {
+        if (!responseId) {
+          console.warn('Response ID not found in route state; cannot save email. Did SurveyFlow navigate with responseId?', { state: location.state });
+        } else {
+          // Вместо fetch используем Supabase
+          const { error } = await supabase
+            .from('responses')
+            .update({
+              respondent_email: email,
+              // email_opt_in: true,
+            })
+            .eq('id', responseId);
+
+          if (import.meta.env.DEV) {
+            console.log('Saving opt-in email for response:', { responseId, email });
+          }
+
+          if (error) throw error;
+        }
+      } catch (error) {
+        console.error('Error saving email:', error);
+        // Мы убрали 'return', чтобы пользователь все равно перешел на страницу "Спасибо",
+        // даже если сохранение email не удалось.
+      }
+    }
+
+    // Переход происходит в любом случае
     navigate(`/survey/${id}/thank-you`, { state: { language } });
   };
 

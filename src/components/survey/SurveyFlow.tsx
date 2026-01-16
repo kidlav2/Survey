@@ -9,19 +9,36 @@ export default function SurveyFlow() {
   const navigate = useNavigate();
   const { id } = useParams();
   const location = useLocation();
-  const [language, setLanguage] = useState<'en' | 'ru' | 'fr' | 'es'>(location.state?.language || 'en');
+
+  const searchLng = new URLSearchParams(location.search).get('lng');
+  const stateLng = (location.state as any)?.lng ?? (location.state as any)?.language;
+  const persistedLng = id ? localStorage.getItem(`survey_lng_${id}`) : null;
+  const resolvedLng = (stateLng || searchLng || persistedLng || 'en') as 'en' | 'ru' | 'fr' | 'es';
+
+  const [language, setLanguage] = useState<'en' | 'ru' | 'fr' | 'es'>(resolvedLng);
   const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [answers, setAnswers] = useState<Record<number, any>>({});
+  const [answers, setAnswers] = useState<Record<string, any>>({});
   const [questions, setQuestions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [responseId, setResponseId] = useState<string | null>(null);
+  const [startedAt, setStartedAt] = useState<number>(() => Date.now());
 
   const t = translations[language]?.questions || translations.en.questions;
 
   useEffect(() => {
+    setStartedAt(Date.now());
+    if (id) {
+      localStorage.setItem(`survey_lng_${id}`, language);
+    }
     loadSurveyQuestions();
-    createResponseRecord();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  useEffect(() => {
+    if (id) {
+      localStorage.setItem(`survey_lng_${id}`, language);
+    }
+  }, [id, language]);
 
   const loadSurveyQuestions = async () => {
     try {
@@ -29,36 +46,42 @@ export default function SurveyFlow() {
         .from('questions')
         .select('*')
         .eq('survey_id', id)
-        .order('order', { ascending: true });
+        .order('sort_order', { ascending: true });
 
       if (error) throw error;
 
-      setQuestions(data || []);
+      console.log('Raw questions data:', data);
+
+      const mapped = (data || []).map((row: any, idx: number) => {
+        const payload = row.payload || {};
+        const options = payload.options ?? row.options ?? [];
+
+        console.log(`Question ${idx}:`, {
+          id: row.id,
+          type: payload.type ?? row.type,
+          options: options,
+          payload: payload,
+        });
+
+        return {
+          ...row,
+          order: row.sort_order ?? row.order ?? idx,
+          options: options,
+          type: payload.type ?? row.type,
+          text: payload.text ?? row.text ?? row.question_text ?? '',
+          required: payload.required ?? row.required ?? false,
+          hasOtherOption:
+            payload.hasOtherOption ?? row.has_other_option ?? row.hasOtherOption ?? false,
+        };
+      });
+
+      console.log('Mapped questions:', mapped);
+
+      setQuestions(mapped);
       setLoading(false);
     } catch (error) {
       console.error('Error loading questions:', error);
       setLoading(false);
-    }
-  };
-
-  const createResponseRecord = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('responses')
-        .insert([{
-          survey_id: id,
-          completed: false,
-          language: language,
-          answers: {},
-        }])
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setResponseId(data.id);
-    } catch (error) {
-      console.error('Error creating response:', error);
     }
   };
 
@@ -67,11 +90,14 @@ export default function SurveyFlow() {
   const progress = totalQuestions > 0 ? ((currentQuestion + 1) / totalQuestions) * 100 : 0;
 
   const handleAnswer = (value: any) => {
-    if (question.allowMultiple) {
-      const current = answers[question.id] || [];
-      const newAnswers = current.includes(value)
-        ? current.filter((v: any) => v !== value)
-        : [...current, value];
+    const isMulti = question?.type === 'multiple-choice';
+
+    if (isMulti) {
+      const current = answers[question.id];
+      const arr = Array.isArray(current) ? current : [];
+      const newAnswers = arr.includes(value)
+        ? arr.filter((v: any) => v !== value)
+        : [...arr, value];
       setAnswers({ ...answers, [question.id]: newAnswers });
     } else {
       setAnswers({ ...answers, [question.id]: value });
@@ -79,41 +105,34 @@ export default function SurveyFlow() {
   };
 
   const handleNext = async () => {
-    // Сохранить ответы в БД
-    if (responseId) {
-      try {
-        const { error } = await supabase
-          .from('responses')
-          .update({ answers: answers })
-          .eq('id', responseId);
-
-        if (error) throw error;
-      } catch (error) {
-        console.error('Error saving answers:', error);
-      }
-    }
-
     if (currentQuestion < totalQuestions - 1) {
       setCurrentQuestion(currentQuestion + 1);
     } else {
-      // Отметить как завершённый
-      if (responseId) {
-        try {
-          const { error } = await supabase
-            .from('responses')
-            .update({ 
-              completed: true,
-              answers: answers,
-            })
-            .eq('id', responseId);
+      // Final submit: insert response with answers + duration + language
+      try {
+        const { data, error } = await supabase
+          .from('responses')
+          .insert({
+            survey_id: id,
+            answers: answers,
+            duration_seconds: Math.max(0, Math.round((Date.now() - startedAt) / 1000)),
+            language: language,
+          })
+          .select()
+          .single();
 
-          if (error) throw error;
-        } catch (error) {
-          console.error('Error completing survey:', error);
-        }
+        if (error) throw error;
+
+        const newResponseId = data?.id ?? null;
+        setResponseId(newResponseId);
+
+        navigate(`/survey/${id}/opt-in?lng=${encodeURIComponent(language)}`, {
+          state: { lng: language, language, responseId: newResponseId },
+        });
+      } catch (error) {
+        console.error('Error submitting survey:', error);
+        // stay on the page so the user can retry
       }
-
-      navigate(`/survey/${id}/opt-in`, { state: { language, responseId } });
     }
   };
 
@@ -123,7 +142,8 @@ export default function SurveyFlow() {
     }
   };
 
-  const isAnswered = answers[question?.id] !== undefined && 
+  const isAnswered =
+    answers[question?.id] !== undefined &&
     (Array.isArray(answers[question?.id]) ? answers[question?.id].length > 0 : true);
 
   if (loading || !question) {
@@ -148,7 +168,9 @@ export default function SurveyFlow() {
             <span className="text-sm font-medium text-gray-700">
               {t.question} {currentQuestion + 1} {t.of} {totalQuestions}
             </span>
-            <span className="text-sm text-gray-500">{Math.round(progress)}% {t.complete}</span>
+            <span className="text-sm text-gray-500">
+              {Math.round(progress)}% {t.complete}
+            </span>
           </div>
           <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
             <div
@@ -160,17 +182,17 @@ export default function SurveyFlow() {
 
         {/* Question Card */}
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-8 md:p-10">
-          <h2 className="text-2xl font-semibold text-gray-900 mb-8">
-            {question.text}
-          </h2>
+          <h2 className="text-2xl font-semibold text-gray-900 mb-8">{question.text}</h2>
 
-          {/* Multiple Choice */}
-          {question.type === 'multiple-choice' && (
+          {/* Choice Questions */}
+          {(question.type === 'multiple-choice' || question.type === 'single-choice') && (
             <div className="space-y-3">
               {question.options?.map((option: string) => {
-                const isSelected = question.allowMultiple
-                  ? (answers[question.id] || []).includes(option)
-                  : answers[question.id] === option;
+                const isMulti = question.type === 'multiple-choice';
+                const current = answers[question.id];
+                const isSelected = isMulti
+                  ? (Array.isArray(current) ? current : []).includes(option)
+                  : current === option;
 
                 return (
                   <button
@@ -188,9 +210,7 @@ export default function SurveyFlow() {
                           isSelected ? 'border-indigo-600' : 'border-gray-300'
                         }`}
                       >
-                        {isSelected && (
-                          <div className="w-3 h-3 rounded-full bg-indigo-600" />
-                        )}
+                        {isSelected && <div className="w-3 h-3 rounded-full bg-indigo-600" />}
                       </div>
                       <span>{option}</span>
                     </div>
@@ -254,7 +274,7 @@ export default function SurveyFlow() {
           )}
 
           {/* Multiple selection note */}
-          {question.type === 'multiple-choice' && question.allowMultiple && (
+          {question.type === 'multiple-choice' && (
             <p className="text-sm text-gray-500 mt-4">You can select multiple options</p>
           )}
         </div>
@@ -273,7 +293,7 @@ export default function SurveyFlow() {
             <ChevronLeft className="w-5 h-5" />
             {t.back}
           </button>
-          
+
           <button
             onClick={handleNext}
             disabled={!isAnswered}

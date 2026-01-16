@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { Clock, FileText } from 'lucide-react';
 import LanguageToggle from './LanguageToggle';
@@ -9,14 +9,18 @@ export default function SurveyWelcome() {
   const { id } = useParams();
   const location = useLocation();
   
-  // Get language from navigation state, fallback to 'en'
-  const initialLanguage = (location.state?.language as 'en' | 'ru' | 'fr' | 'es') || 'en';
+  const searchLng = new URLSearchParams(location.search).get('lng');
+  const stateLng = (location.state as any)?.lng ?? (location.state as any)?.language;
+  const persistedLng = id ? localStorage.getItem(`survey_lng_${id}`) : null;
+  const initialLanguage = (stateLng || searchLng || persistedLng || 'en') as 'en' | 'ru' | 'fr' | 'es';
   const [language, setLanguage] = useState<'en' | 'ru' | 'fr' | 'es'>(initialLanguage);
 
   const t = translations[language]?.welcome || translations.en.welcome;
 
   const handleStart = () => {
-    navigate(`/survey/${id}/questions`, { state: { language } });
+    navigate(`/survey/${id}/questions?lng=${encodeURIComponent(language)}`, {
+      state: { lng: language, language },
+    });
   };
 
   return (

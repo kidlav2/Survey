@@ -8,11 +8,12 @@ interface ResponseData {
   survey_id: string;
   surveyTitle: string;
   created_at: string;
-  language: string;
-  duration_seconds?: number;
-  email: string | null;
-  completed: boolean;
-  answers: Record<string, any>;
+  language?: string | null;
+  duration_seconds?: number | null;
+  respondent_email: string | null;
+  // Column may not exist; we derive completion from answers.
+  completed?: boolean | null;
+  answers: Record<string, any> | null;
 }
 
 export default function ResponseDetail() {
@@ -20,6 +21,20 @@ export default function ResponseDetail() {
   const { id } = useParams();
   const [response, setResponse] = useState<ResponseData | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const isCompleted = (r: ResponseData) => {
+    if (r.completed === true) return true;
+    const a = r.answers;
+    return a && typeof a === 'object' && Object.keys(a).length > 0;
+  };
+
+  const formatDuration = (seconds?: number | null) => {
+    if (!seconds || seconds <= 0) return 'N/A';
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    if (m <= 0) return `${s}s`;
+    return s ? `${m}m ${s}s` : `${m}m`;
+  };
 
   useEffect(() => {
     loadResponseDetail();
@@ -105,10 +120,6 @@ export default function ResponseDetail() {
     );
   }
 
-  const durationMinutes = response.duration_seconds 
-    ? Math.round(response.duration_seconds / 60) 
-    : null;
-
   return (
     <main className="flex-1">
       {/* Top Bar */}
@@ -163,7 +174,7 @@ export default function ResponseDetail() {
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Duration</p>
                   <p className="text-sm font-medium text-gray-900">
-                    {durationMinutes ? `${durationMinutes} minutes` : 'N/A'}
+                    {formatDuration(response.duration_seconds)}
                   </p>
                 </div>
               </div>
@@ -184,7 +195,7 @@ export default function ResponseDetail() {
                 </div>
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Email</p>
-                  <p className="text-sm font-medium text-gray-900">{response.email || 'Not provided'}</p>
+                  <p className="text-sm font-medium text-gray-900">{response.respondent_email || 'Not provided'}</p>
                 </div>
               </div>
             </div>
@@ -192,17 +203,19 @@ export default function ResponseDetail() {
             {/* Status */}
             <div className="mt-6 pt-4 border-t border-gray-200">
               <p className="text-sm text-gray-600 mb-2">Status</p>
-              <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                response.completed
-                  ? 'bg-green-100 text-green-800'
-                  : 'bg-yellow-100 text-yellow-800'
-              }`}>
-                <div className={`w-2 h-2 rounded-full mr-2 ${
-                  response.completed
-                    ? 'bg-green-600'
-                    : 'bg-yellow-600'
-                }`}></div>
-                {response.completed ? 'Completed' : 'In Progress'}
+              <span
+                className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                  isCompleted(response)
+                    ? 'bg-green-100 text-green-800'
+                    : 'bg-yellow-100 text-yellow-800'
+                }`}
+              >
+                <div
+                  className={`w-2 h-2 rounded-full mr-2 ${
+                    isCompleted(response) ? 'bg-green-600' : 'bg-yellow-600'
+                  }`}
+                ></div>
+                {isCompleted(response) ? 'Completed' : 'In Progress'}
               </span>
             </div>
           </div>

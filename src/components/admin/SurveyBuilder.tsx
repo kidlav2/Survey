@@ -4,6 +4,7 @@ import { ChevronLeft, Plus, Trash2, GripVertical, ChevronDown, ChevronUp, FileTe
 import { supabase } from '../../lib/supabaseClient';
 import Toast from '../common/Toast';
 
+
 interface Question {
   id: string;
   type: 'single-choice' | 'multiple-choice' | 'scale' | 'text' | 'yes-no';
@@ -12,6 +13,72 @@ interface Question {
   required: boolean;
   hasOtherOption?: boolean;
   order: number;
+}
+
+// --- Auto-translation (MyMemory) ---
+const MYMEMORY_EMAIL = ''; // optional: put your email here to increase daily quota (de=)
+
+type SupportedLng = 'en' | 'ru' | 'fr' | 'es';
+
+async function translateMyMemory(text: string, from: SupportedLng, to: SupportedLng) {
+  const trimmed = (text ?? '').trim();
+  if (!trimmed) return '';
+
+  const baseUrl = 'https://api.mymemory.translated.net/get';
+  const params = new URLSearchParams({
+    q: trimmed,
+    langpair: `${from}|${to}`,
+  });
+  if (MYMEMORY_EMAIL) params.set('de', MYMEMORY_EMAIL);
+
+  const res = await fetch(`${baseUrl}?${params.toString()}`);
+  const data = await res.json();
+  return data?.responseData?.translatedText ?? trimmed;
+}
+
+async function translateArrayMyMemory(items: string[], from: SupportedLng, to: SupportedLng) {
+  const out: string[] = [];
+  for (const item of items) {
+    out.push(await translateMyMemory(item, from, to));
+  }
+  return out;
+}
+
+async function buildQuestionPayloadWithTranslations(args: {
+  baseLanguage: SupportedLng;
+  text: string;
+  options?: string[];
+  type: Question['type'];
+  required: boolean;
+  hasOtherOption?: boolean;
+}) {
+  const { baseLanguage, text, options = [], type, required, hasOtherOption } = args;
+
+  const langs: SupportedLng[] = ['en', 'ru', 'fr', 'es'];
+  const targets = langs.filter((l) => l !== baseLanguage);
+
+  const payload: any = {
+    baseLanguage,
+    type,
+    required,
+    hasOtherOption: !!hasOtherOption,
+    text: { [baseLanguage]: text },
+    options: { [baseLanguage]: options },
+    translations: {},
+  };
+
+  for (const lng of targets) {
+    const translatedText = await translateMyMemory(text, baseLanguage, lng);
+    const translatedOptions = type === 'single-choice' || type === 'multiple-choice'
+      ? await translateArrayMyMemory(options, baseLanguage, lng)
+      : [];
+
+    payload.text[lng] = translatedText;
+    payload.options[lng] = translatedOptions;
+    payload.translations[lng] = { text: translatedText, options: translatedOptions };
+  }
+
+  return payload;
 }
 
 const translations = {
@@ -146,7 +213,7 @@ export default function SurveyBuilder() {
         .from('questions')
         .select('*')
         .eq('survey_id', id)
-        .order('order', { ascending: true });
+        .order('sort_order', { ascending: true });
 
       if (questionsError) throw questionsError;
 
@@ -160,9 +227,15 @@ export default function SurveyBuilder() {
     }
   };
 
+  // Helper for temporary question IDs
+  const makeTempId = () => {
+    const uuid = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    return `temp_${uuid}`;
+  };
+
   const addQuestion = (afterIndex?: number) => {
     const newQuestion: Question = {
-      id: Date.now().toString(),
+      id: makeTempId(),
       type: 'single-choice',
       text: '',
       options: ['Option 1', 'Option 2'],
@@ -193,7 +266,7 @@ export default function SurveyBuilder() {
 
     const newQuestion: Question = {
       ...questionToDuplicate,
-      id: Date.now().toString(),
+      id: makeTempId(),
       order: index + 1,
     };
 
@@ -210,8 +283,8 @@ export default function SurveyBuilder() {
 
   const deleteQuestion = async (questionId: string) => {
     try {
-      // If it's a saved question (not just created), delete from DB
-      if (!questionId.includes('Date.now')) {
+      // If it's a saved question (not a temporary one), delete from DB
+      if (!questionId.startsWith('temp_')) {
         const { error } = await supabase
           .from('questions')
           .delete()
@@ -242,40 +315,95 @@ export default function SurveyBuilder() {
 
     try {
       // Save all questions
+      const updatedQuestions: Question[] = [];
+
       for (const question of questions) {
-        if (question.id.includes('Date.now')) {
-          // New question - insert
-          const { error } = await supabase
-            .from('questions')
-            .insert([{
-              survey_id: id,
-              type: question.type,
-              text: question.text,
-              options: question.options,
-              required: question.required,
-              hasOtherOption: question.hasOtherOption,
-              order: question.order,
-            }]);
+        if (question.id.startsWith('temp_')) {
+          // New question - insert and get the new id back
+          const payload = await buildQuestionPayloadWithTranslations({
+            baseLanguage: language,
+            text: question.text,
+            options: question.options,
+            type: question.type,
+            required: question.required,
+            hasOtherOption: question.hasOtherOption,
+          });
+
+          const insertRow: any = {
+            survey_id: id,
+            type: question.type,
+            text: question.text,
+            options: question.options,
+            required: question.required,
+            has_other_option: question.hasOtherOption,
+            sort_order: question.order,
+            payload,
+          };
+
+          let data: any = null;
+          let error: any = null;
+
+          // Try with payload first
+          {
+            const res = await supabase.from('questions').insert([insertRow]).select('id').single();
+            data = res.data;
+            error = res.error;
+          }
+
+          // If payload column doesn't exist, retry without it
+          if (error?.code === 'PGRST204' && String(error?.message || '').toLowerCase().includes('payload')) {
+            delete insertRow.payload;
+            const res2 = await supabase.from('questions').insert([insertRow]).select('id').single();
+            data = res2.data;
+            error = res2.error;
+          }
 
           if (error) throw error;
+
+          updatedQuestions.push({ ...question, id: data.id });
         } else {
           // Existing question - update
-          const { error } = await supabase
-            .from('questions')
-            .update({
-              type: question.type,
-              text: question.text,
-              options: question.options,
-              required: question.required,
-              hasOtherOption: question.hasOtherOption,
-              order: question.order,
-            })
-            .eq('id', question.id);
+          const payload = await buildQuestionPayloadWithTranslations({
+            baseLanguage: language,
+            text: question.text,
+            options: question.options,
+            type: question.type,
+            required: question.required,
+            hasOtherOption: question.hasOtherOption,
+          });
+
+          const updateRow: any = {
+            type: question.type,
+            text: question.text,
+            options: question.options,
+            required: question.required,
+            has_other_option: question.hasOtherOption,
+            sort_order: question.order,
+            payload,
+          };
+
+          let error: any = null;
+
+          // Try with payload first
+          {
+            const res = await supabase.from('questions').update(updateRow).eq('id', question.id);
+            error = res.error;
+          }
+
+          // If payload column doesn't exist, retry without it
+          if (error?.code === 'PGRST204' && String(error?.message || '').toLowerCase().includes('payload')) {
+            delete updateRow.payload;
+            const res2 = await supabase.from('questions').update(updateRow).eq('id', question.id);
+            error = res2.error;
+          }
 
           if (error) throw error;
+
+          updatedQuestions.push(question);
         }
       }
 
+      setQuestions(updatedQuestions);
       setSaveStatus('saved');
       setToast({ message: t.saved_toast, type: 'success' });
       setTimeout(() => setSaveStatus('idle'), 2000);
