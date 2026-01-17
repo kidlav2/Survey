@@ -5,7 +5,6 @@ import LanguageToggle from './LanguageToggle';
 import { translations } from './translations';
 import { supabase } from '../../lib/supabaseClient';
 
-
 export default function EmailOptIn() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -29,15 +28,14 @@ export default function EmailOptIn() {
   const persistedRid = id ? localStorage.getItem(`survey_rid_${id}`) : null;
   const responseId = (location.state?.responseId as string | undefined) || ridFromQuery || persistedRid || null;
 
-  
-
   const t = translations[language]?.optIn || translations.en.optIn;
 
   const handleSubmit = async () => {
     if (id && responseId) {
       localStorage.setItem(`survey_rid_${id}`, responseId);
     }
-    // Если галочка стоит и email введен
+
+    // If opted-in and email provided
     if (optIn && email) {
       try {
         if (!responseId) {
@@ -47,13 +45,9 @@ export default function EmailOptIn() {
             persistedRid,
           });
         } else {
-          // Вместо fetch используем Supabase
           const { error } = await supabase
             .from('responses')
-            .update({
-              respondent_email: email,
-              // email_opt_in: true,
-            })
+            .update({ respondent_email: email })
             .eq('id', responseId);
 
           if (import.meta.env.DEV) {
@@ -64,12 +58,11 @@ export default function EmailOptIn() {
         }
       } catch (error) {
         console.error('Error saving email:', error);
-        // Мы убрали 'return', чтобы пользователь все равно перешел на страницу "Спасибо",
-        // даже если сохранение email не удалось.
+        // Do not block navigation
       }
     }
 
-    // Переход происходит в любом случае
+    // Navigate regardless
     if (id) localStorage.setItem(`survey_lng_${id}`, language);
     const rid = responseId ? `&rid=${encodeURIComponent(responseId)}` : '';
     navigate(`/survey/${id}/thank-you?lng=${encodeURIComponent(language)}${rid}`, { state: { language } });
@@ -84,9 +77,11 @@ export default function EmailOptIn() {
           onLanguageChange={(lng) => {
             setLanguage(lng);
             if (id) localStorage.setItem(`survey_lng_${id}`, lng);
-            // keep URL synced for refresh
             const rid = responseId ? `&rid=${encodeURIComponent(responseId)}` : '';
-            navigate(`/survey/${id}/opt-in?lng=${encodeURIComponent(lng)}${rid}`, { replace: true, state: { ...location.state, language: lng } });
+            navigate(`/survey/${id}/opt-in?lng=${encodeURIComponent(lng)}${rid}`, {
+              replace: true,
+              state: { ...location.state, language: lng },
+            });
           }}
         />
       </div>
@@ -98,12 +93,8 @@ export default function EmailOptIn() {
             <div className="inline-flex items-center justify-center w-14 h-14 bg-indigo-50 rounded-full mb-4">
               <Mail className="w-7 h-7 text-indigo-600" />
             </div>
-            <h2 className="text-2xl font-semibold text-gray-900 mb-2">
-              {t.title}
-            </h2>
-            <p className="text-gray-600">
-              {t.description}
-            </p>
+            <h2 className="text-2xl font-semibold text-gray-900 mb-2">{t.title}</h2>
+            <p className="text-gray-600">{t.description}</p>
           </div>
 
           {/* Opt-in Checkbox */}
@@ -114,18 +105,12 @@ export default function EmailOptIn() {
                   type="checkbox"
                   checked={optIn}
                   onChange={(e) => setOptIn(e.target.checked)}
-                  className="w-5 h-5 border-2 border-gray-300 rounded cursor-pointer 
-                           checked:bg-indigo-600 checked:border-indigo-600
-                           focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                  className="w-5 h-5 border-2 border-gray-300 rounded cursor-pointer checked:bg-indigo-600 checked:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
                 />
               </div>
               <div>
-                <span className="text-gray-900 font-medium">
-                  {t.checkbox}
-                </span>
-                <p className="text-sm text-gray-600 mt-1">
-                  {t.checkboxDetail}
-                </p>
+                <span className="text-gray-900 font-medium">{t.checkbox}</span>
+                <p className="text-sm text-gray-600 mt-1">{t.checkboxDetail}</p>
               </div>
             </label>
           </div>
@@ -142,8 +127,7 @@ export default function EmailOptIn() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder={t.emailPlaceholder}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg 
-                         focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               />
             </div>
           )}
@@ -154,9 +138,7 @@ export default function EmailOptIn() {
               <Shield className="w-5 h-5 text-gray-600 mt-0.5 flex-shrink-0" />
               <div className="text-sm text-gray-600">
                 <p className="font-medium text-gray-900 mb-1">{t.privacyTitle}</p>
-                <p>
-                  {t.privacyText}
-                </p>
+                <p>{t.privacyText}</p>
               </div>
             </div>
           </div>
@@ -166,9 +148,7 @@ export default function EmailOptIn() {
             onClick={handleSubmit}
             disabled={optIn && !email}
             className={`w-full py-4 px-6 rounded-lg font-medium transition-colors ${
-              optIn && !email
-                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+              optIn && !email ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 text-white'
             }`}
           >
             {t.submitButton}
