@@ -35,6 +35,8 @@ export default function EmailOptIn() {
       localStorage.setItem(`survey_rid_${id}`, responseId);
     }
 
+    console.log('handleSubmit:', { optIn, email, responseId, id });
+
     // If opted-in and email provided
     if (optIn && email) {
       try {
@@ -45,6 +47,8 @@ export default function EmailOptIn() {
             persistedRid,
           });
         } else {
+          console.log('Attempting to save email:', { responseId, email });
+          
           const { error } = await supabase
             .from('responses')
             .update({ 
@@ -54,7 +58,7 @@ export default function EmailOptIn() {
             })
             .eq('id', responseId);
 
-          console.log('Saving opt-in email for response:', { responseId, email });
+          console.log('Save result:', { error, responseId, email });
 
           if (error) throw error;
         }

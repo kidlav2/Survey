@@ -182,7 +182,7 @@ export default function SurveyFlow() {
 
         setResponseId(newResponseId);
 
-        navigate(`/survey/${id}/opt-in?lng=${encodeURIComponent(language)}`, {
+        navigate(`/survey/${id}/opt-in?lng=${encodeURIComponent(language)}&rid=${encodeURIComponent(newResponseId)}`, {
           state: { lng: language, language, responseId: newResponseId },
         });
       } catch (error) {
