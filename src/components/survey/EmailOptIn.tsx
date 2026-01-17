@@ -47,18 +47,35 @@ export default function EmailOptIn() {
         } else {
           const { error } = await supabase
             .from('responses')
-            .update({ respondent_email: email })
+            .update({ 
+              respondent_email: email,
+              opted_in: true,
+              completed: true,
+            })
             .eq('id', responseId);
 
-          if (import.meta.env.DEV) {
-            console.log('Saving opt-in email for response:', { responseId, email });
-          }
+          console.log('Saving opt-in email for response:', { responseId, email });
 
           if (error) throw error;
         }
       } catch (error) {
         console.error('Error saving email:', error);
         // Do not block navigation
+      }
+    } else if (!optIn && responseId) {
+      // User didn't opt-in, but mark as completed
+      try {
+        const { error } = await supabase
+          .from('responses')
+          .update({ 
+            opted_in: false,
+            completed: true,
+          })
+          .eq('id', responseId);
+
+        if (error) throw error;
+      } catch (error) {
+        console.error('Error updating response completion:', error);
       }
     }
 
