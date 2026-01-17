@@ -51,6 +51,17 @@ export default function SurveyFlow() {
             : []);
 
     return { text, options };
+
+  };
+
+  const makeUUID = () => {
+    // Use browser crypto when available
+    const c: any = (globalThis as any).crypto;
+    if (c?.randomUUID) return c.randomUUID();
+
+    // Fallback (good enough for client-side ids)
+    const s4 = () => Math.floor((1 + Math.random()) * 0x10000).toString(16).substring(1);
+    return `${s4()}${s4()}-${s4()}-${s4()}-${s4()}-${s4()}${s4()}${s4()}`;
   };
 
   useEffect(() => {
@@ -139,24 +150,23 @@ export default function SurveyFlow() {
     } else {
       // Final submit: insert response with answers + duration + language
       try {
+        const newResponseId = makeUUID();
+
         const baseInsert = {
+          id: newResponseId,
           survey_id: id,
           answers: answers,
           duration_seconds: Math.max(0, Math.round((Date.now() - startedAt) / 1000)),
           language: language,
         };
 
-        let data: any = null;
         let error: any = null;
 
-        // Try with `lng` first (some schemas use this)
+        // Try with `lng` first (some schemas use this). IMPORTANT: no select() for anon users.
         {
           const res = await supabase
             .from('responses')
-            .insert({ ...baseInsert, lng: language })
-            .select()
-            .single();
-          data = res.data;
+            .insert({ ...baseInsert, lng: language });
           error = res.error;
         }
 
@@ -164,16 +174,12 @@ export default function SurveyFlow() {
         if (error?.code === 'PGRST204' && String(error?.message || '').toLowerCase().includes('lng')) {
           const res2 = await supabase
             .from('responses')
-            .insert(baseInsert)
-            .select()
-            .single();
-          data = res2.data;
+            .insert(baseInsert);
           error = res2.error;
         }
 
         if (error) throw error;
 
-        const newResponseId = data?.id ?? null;
         setResponseId(newResponseId);
 
         navigate(`/survey/${id}/opt-in?lng=${encodeURIComponent(language)}`, {
