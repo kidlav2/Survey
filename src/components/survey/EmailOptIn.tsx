@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { useNavigate, useParams, useLocation, useSearchParams } from 'react-router-dom';
 import { Mail, Shield } from 'lucide-react';
 import LanguageToggle from './LanguageToggle';
 import { translations } from './translations';
@@ -10,21 +10,42 @@ export default function EmailOptIn() {
   const navigate = useNavigate();
   const { id } = useParams();
   const location = useLocation();
-  const [language, setLanguage] = useState<'en' | 'ru' | 'fr' | 'es'>(location.state?.language || 'en');
+  const [searchParams] = useSearchParams();
+
+  type Lng = 'en' | 'ru' | 'fr' | 'es';
+  const lngFromQuery = searchParams.get('lng') as Lng | null;
+  const ridFromQuery = searchParams.get('rid');
+
+  const persistedLng = id ? (localStorage.getItem(`survey_lng_${id}`) as Lng | null) : null;
+  const initialLng: Lng = (lngFromQuery && ['en', 'ru', 'fr', 'es'].includes(lngFromQuery))
+    ? lngFromQuery
+    : (location.state?.language as Lng) || persistedLng || 'en';
+
+  const [language, setLanguage] = useState<Lng>(initialLng);
   const [optIn, setOptIn] = useState(false);
   const [email, setEmail] = useState('');
-  const responseId = location.state?.responseId; 
+
+  // responseId can arrive via route state OR query param OR localStorage
+  const persistedRid = id ? localStorage.getItem(`survey_rid_${id}`) : null;
+  const responseId = (location.state?.responseId as string | undefined) || ridFromQuery || persistedRid || null;
 
   
 
   const t = translations[language]?.optIn || translations.en.optIn;
 
   const handleSubmit = async () => {
+    if (id && responseId) {
+      localStorage.setItem(`survey_rid_${id}`, responseId);
+    }
     // Если галочка стоит и email введен
     if (optIn && email) {
       try {
         if (!responseId) {
-          console.warn('Response ID not found in route state; cannot save email. Did SurveyFlow navigate with responseId?', { state: location.state });
+          console.warn('Response ID not found; cannot save email. Ensure SurveyFlow navigates with rid param or state.responseId.', {
+            state: location.state,
+            ridFromQuery,
+            persistedRid,
+          });
         } else {
           // Вместо fetch используем Supabase
           const { error } = await supabase
@@ -49,14 +70,25 @@ export default function EmailOptIn() {
     }
 
     // Переход происходит в любом случае
-    navigate(`/survey/${id}/thank-you`, { state: { language } });
+    if (id) localStorage.setItem(`survey_lng_${id}`, language);
+    const rid = responseId ? `&rid=${encodeURIComponent(responseId)}` : '';
+    navigate(`/survey/${id}/thank-you?lng=${encodeURIComponent(language)}${rid}`, { state: { language } });
   };
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
       {/* Language Toggle */}
       <div className="fixed top-6 right-6">
-        <LanguageToggle currentLanguage={language} onLanguageChange={setLanguage} />
+        <LanguageToggle
+          currentLanguage={language}
+          onLanguageChange={(lng) => {
+            setLanguage(lng);
+            if (id) localStorage.setItem(`survey_lng_${id}`, lng);
+            // keep URL synced for refresh
+            const rid = responseId ? `&rid=${encodeURIComponent(responseId)}` : '';
+            navigate(`/survey/${id}/opt-in?lng=${encodeURIComponent(lng)}${rid}`, { replace: true, state: { ...location.state, language: lng } });
+          }}
+        />
       </div>
 
       <div className="max-w-2xl w-full">
