@@ -44,6 +44,12 @@ async function translateArrayMyMemory(items: string[], from: SupportedLng, to: S
   return out;
 }
 
+function detectBaseLanguage(text: string, options: string[] = []): 'en' | 'ru' {
+  const combined = [text, ...options].join(' ');
+  const hasCyrillic = /[А-Яа-яЁё]/.test(combined);
+  return hasCyrillic ? 'ru' : 'en';
+}
+
 async function buildQuestionPayloadWithTranslations(args: {
   baseLanguage: SupportedLng;
   text: string;
@@ -52,25 +58,30 @@ async function buildQuestionPayloadWithTranslations(args: {
   required: boolean;
   hasOtherOption?: boolean;
 }) {
-  const { baseLanguage, text, options = [], type, required, hasOtherOption } = args;
+const { baseLanguage, text, options = [], type, required, hasOtherOption } = args;
+
+// Auto-detect base language (RU/EN) to avoid wrong translations when you type Russian text
+const resolvedBaseLanguage = (baseLanguage === 'fr' || baseLanguage === 'es')
+  ? baseLanguage
+  : detectBaseLanguage(text, options);
 
   const langs: SupportedLng[] = ['en', 'ru', 'fr', 'es'];
-  const targets = langs.filter((l) => l !== baseLanguage);
+  const targets = langs.filter((l) => l !== resolvedBaseLanguage);
 
   const payload: any = {
-    baseLanguage,
+    baseLanguage: resolvedBaseLanguage,
     type,
     required,
     hasOtherOption: !!hasOtherOption,
-    text: { [baseLanguage]: text },
-    options: { [baseLanguage]: options },
+    text: { [resolvedBaseLanguage]: text },
+    options: { [resolvedBaseLanguage]: options },
     translations: {},
   };
 
   for (const lng of targets) {
-    const translatedText = await translateMyMemory(text, baseLanguage, lng);
+    const translatedText = await translateMyMemory(text, resolvedBaseLanguage, lng);
     const translatedOptions = type === 'single-choice' || type === 'multiple-choice'
-      ? await translateArrayMyMemory(options, baseLanguage, lng)
+      ? await translateArrayMyMemory(options, resolvedBaseLanguage, lng)
       : [];
 
     payload.text[lng] = translatedText;

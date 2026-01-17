@@ -48,7 +48,22 @@ export default function Surveys() {
 
       if (error) throw error;
 
-      setSurveys(data || []);
+      // Get responses count for each survey
+      const surveysWithCounts = await Promise.all(
+        (data || []).map(async (survey) => {
+          const { count, error: countError } = await supabase
+            .from('responses')
+            .select('*', { count: 'exact', head: true })
+            .eq('survey_id', survey.id);
+
+          return {
+            ...survey,
+            responses_count: countError ? 0 : (count || 0),
+          };
+        })
+      );
+
+      setSurveys(surveysWithCounts);
       setErrorMsg(null);
     } catch (error) {
       console.error('Error loading surveys:', error);

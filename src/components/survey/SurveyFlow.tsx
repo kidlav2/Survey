@@ -25,6 +25,34 @@ export default function SurveyFlow() {
 
   const t = translations[language]?.questions || translations.en.questions;
 
+  type Lng = 'en' | 'ru' | 'fr' | 'es';
+
+  const getLocalized = (q: any, lng: Lng) => {
+    const p = q?.payload ?? {};
+    const base = (p.baseLanguage || p.base_language || 'en') as Lng;
+
+    // text can be: string OR { en: string, ... }
+    const textMap = p.text;
+    const text =
+      (textMap && typeof textMap === 'object' ? (textMap[lng] || textMap[base]) : null) ||
+      (typeof q?.text === 'string' ? q.text : '') ||
+      (typeof q?.question_text === 'string' ? q.question_text : '') ||
+      '';
+
+    // options can be: string[] OR { en: string[], ... }
+    const optMap = p.options;
+    const options =
+      (optMap && typeof optMap === 'object' && !Array.isArray(optMap)
+        ? (optMap[lng] || optMap[base] || [])
+        : Array.isArray(optMap)
+          ? optMap
+          : Array.isArray(q?.options)
+            ? q.options
+            : []);
+
+    return { text, options };
+  };
+
   useEffect(() => {
     setStartedAt(Date.now());
     if (id) {
@@ -54,7 +82,7 @@ export default function SurveyFlow() {
 
       const mapped = (data || []).map((row: any, idx: number) => {
         const payload = row.payload || {};
-        const options = payload.options ?? row.options ?? [];
+        const options = Array.isArray(row.options) ? row.options : [];
 
         console.log(`Question ${idx}:`, {
           id: row.id,
@@ -66,9 +94,9 @@ export default function SurveyFlow() {
         return {
           ...row,
           order: row.sort_order ?? row.order ?? idx,
-          options: options,
+          options: row.options ?? [],
           type: payload.type ?? row.type,
-          text: payload.text ?? row.text ?? row.question_text ?? '',
+          text: row.text ?? row.question_text ?? '',
           required: payload.required ?? row.required ?? false,
           hasOtherOption:
             payload.hasOtherOption ?? row.has_other_option ?? row.hasOtherOption ?? false,
@@ -86,6 +114,7 @@ export default function SurveyFlow() {
   };
 
   const question = questions[currentQuestion];
+  const localized = question ? getLocalized(question, language) : { text: '', options: [] as string[] };
   const totalQuestions = questions.length;
   const progress = totalQuestions > 0 ? ((currentQuestion + 1) / totalQuestions) * 100 : 0;
 
@@ -110,16 +139,37 @@ export default function SurveyFlow() {
     } else {
       // Final submit: insert response with answers + duration + language
       try {
-        const { data, error } = await supabase
-          .from('responses')
-          .insert({
-            survey_id: id,
-            answers: answers,
-            duration_seconds: Math.max(0, Math.round((Date.now() - startedAt) / 1000)),
-            language: language,
-          })
-          .select()
-          .single();
+        const baseInsert = {
+          survey_id: id,
+          answers: answers,
+          duration_seconds: Math.max(0, Math.round((Date.now() - startedAt) / 1000)),
+          language: language,
+        };
+
+        let data: any = null;
+        let error: any = null;
+
+        // Try with `lng` first (some schemas use this)
+        {
+          const res = await supabase
+            .from('responses')
+            .insert({ ...baseInsert, lng: language })
+            .select()
+            .single();
+          data = res.data;
+          error = res.error;
+        }
+
+        // If `lng` column doesn't exist, retry without it
+        if (error?.code === 'PGRST204' && String(error?.message || '').toLowerCase().includes('lng')) {
+          const res2 = await supabase
+            .from('responses')
+            .insert(baseInsert)
+            .select()
+            .single();
+          data = res2.data;
+          error = res2.error;
+        }
 
         if (error) throw error;
 
@@ -182,12 +232,12 @@ export default function SurveyFlow() {
 
         {/* Question Card */}
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-8 md:p-10">
-          <h2 className="text-2xl font-semibold text-gray-900 mb-8">{question.text}</h2>
+          <h2 className="text-2xl font-semibold text-gray-900 mb-8">{localized.text}</h2>
 
           {/* Choice Questions */}
           {(question.type === 'multiple-choice' || question.type === 'single-choice') && (
             <div className="space-y-3">
-              {question.options?.map((option: string) => {
+              {localized.options?.map((option: string) => {
                 const isMulti = question.type === 'multiple-choice';
                 const current = answers[question.id];
                 const isSelected = isMulti
@@ -248,7 +298,7 @@ export default function SurveyFlow() {
             <textarea
               value={answers[question.id] || ''}
               onChange={(e) => handleAnswer(e.target.value)}
-              placeholder="Enter your answer here..."
+              placeholder={t.placeholder ?? 'Enter your answer here...'}
               rows={4}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
@@ -257,7 +307,7 @@ export default function SurveyFlow() {
           {/* Yes/No */}
           {question.type === 'yes-no' && (
             <div className="flex gap-4">
-              {['Yes', 'No'].map((option) => (
+              {(localized.options.length ? localized.options : [t.yes ?? 'Yes', t.no ?? 'No']).map((option) => (
                 <button
                   key={option}
                   onClick={() => handleAnswer(option)}
@@ -275,7 +325,7 @@ export default function SurveyFlow() {
 
           {/* Multiple selection note */}
           {question.type === 'multiple-choice' && (
-            <p className="text-sm text-gray-500 mt-4">You can select multiple options</p>
+            <p className="text-sm text-gray-500 mt-4">{t.multiNote ?? 'You can select multiple options'}</p>
           )}
         </div>
 

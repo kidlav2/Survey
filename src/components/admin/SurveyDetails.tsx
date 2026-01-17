@@ -15,11 +15,26 @@ interface SurveyData {
   languages?: string[];
 }
 
+
 interface SurveyStats {
   totalResponses: number;
   completionRate: number;
   avgTime: number;
   optInRate: number;
+}
+
+function formatDateTime(value?: string | null, fallbackValue?: string | null) {
+  const v = value ?? fallbackValue;
+  if (!v) return 'N/A';
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? 'N/A' : d.toLocaleString();
+}
+
+function formatDate(value?: string | null, fallbackValue?: string | null) {
+  const v = value ?? fallbackValue;
+  if (!v) return 'N/A';
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? 'N/A' : d.toLocaleDateString();
 }
 
 
@@ -68,15 +83,40 @@ export default function SurveyDetails() {
 
       if (responsesError) throw responsesError;
 
-      // Calculate stats
+      // Calculate stats (DB-backed)
       const totalResponses = responses?.length || 0;
-      const completedResponses = responses?.filter(r => r.completed).length || 0;
+
+      const isCompleted = (r: any) => {
+        const a = r?.answers;
+        if (a == null) return false;
+        if (typeof a === 'string') {
+          const s = a.trim();
+          if (!s || s === '{}' || s === 'null') return false;
+          try {
+            const obj = JSON.parse(s);
+            return obj && typeof obj === 'object' && Object.keys(obj).length > 0;
+          } catch {
+            // If it's a non-empty string but not JSON, treat as completed
+            return s.length > 0;
+          }
+        }
+        if (typeof a === 'object') return Object.keys(a).length > 0;
+        return Boolean(a);
+      };
+
+      const completedResponses = responses?.filter((r: any) => isCompleted(r)).length || 0;
       const completionRate = totalResponses > 0 ? Math.round((completedResponses / totalResponses) * 100) : 0;
-      const optedInResponses = responses?.filter(r => r.opted_in).length || 0;
+
+      const hasEmail = (r: any) => {
+        const e = (r?.respondent_email ?? r?.email ?? '').toString().trim();
+        return e.length > 0;
+      };
+
+      const optedInResponses = responses?.filter((r: any) => hasEmail(r)).length || 0;
       const optInRate = totalResponses > 0 ? Math.round((optedInResponses / totalResponses) * 100) : 0;
 
-      // Calculate average time
-      const totalSeconds = responses?.reduce((sum, r) => sum + (r.duration_seconds || 0), 0) || 0;
+      // Calculate average time (seconds -> minutes)
+      const totalSeconds = responses?.reduce((sum: number, r: any) => sum + (Number(r?.duration_seconds) || 0), 0) || 0;
       const avgTime = totalResponses > 0 ? Math.round(totalSeconds / totalResponses / 60) : 0;
 
       setStats({
@@ -330,14 +370,14 @@ export default function SurveyDetails() {
               <div>
                 <p className="text-sm text-gray-600 mb-1">Created</p>
                 <p className="text-sm font-medium text-gray-900">
-                  {new Date(survey.created_at).toLocaleDateString()}
+                  {formatDate(survey.created_at, null)}
                 </p>
               </div>
               
               <div>
                 <p className="text-sm text-gray-600 mb-1">Last Modified</p>
                 <p className="text-sm font-medium text-gray-900">
-                  {new Date(survey.updated_at).toLocaleDateString()}
+                  {formatDateTime(survey.updated_at, survey.created_at)}
                 </p>
               </div>
             </div>

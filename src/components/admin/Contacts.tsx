@@ -7,7 +7,9 @@ interface Contact {
   id: string;
   email: string;
   created_at: string;
-  opted_in: boolean;
+  survey_id: string;
+  sourceTitle: string;
+  opted_in: boolean; // derived (email present)
 }
 
 interface ContactStats {
@@ -35,67 +37,138 @@ export default function Contacts() {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError || !user) throw new Error('Not authenticated');
 
-      // Fetch contacts (emails from responses)
-      const { data: responses, error: responsesError } = await supabase
-        .from('responses')
-        .select('id, email, created_at, opted_in, survey_id')
-        .not('email', 'is', null)
-        .order('created_at', { ascending: false });
-
-      if (responsesError) throw responsesError;
-
-      // Filter contacts for user's surveys only
+      // Fetch user's surveys (for filtering + titles)
       const { data: surveys, error: surveysError } = await supabase
         .from('surveys')
-        .select('id')
+        .select('id,title')
         .eq('owner_id', user.id);
 
       if (surveysError) throw surveysError;
 
-      const surveyIds = surveys?.map(s => s.id) || [];
-      const userContacts = responses?.filter(r => surveyIds.includes(r.survey_id)) || [];
+      const surveyIds = surveys?.map((s: any) => s.id) || [];
+      const surveyTitleById = new Map<string, string>();
+      (surveys || []).forEach((s: any) => surveyTitleById.set(s.id, s.title || 'Survey'));
 
-      setContacts(userContacts as Contact[]);
+      if (surveyIds.length === 0) {
+        setContacts([]);
+        setStats({ totalContacts: 0, optInRate: 0, thisWeek: 0 });
+        setLoading(false);
+        return;
+      }
 
-      // Calculate stats
-      const totalContacts = userContacts.length;
-      const optedInCount = userContacts.filter(c => c.opted_in).length;
-      const optInRate = totalContacts > 0 ? Math.round((optedInCount / totalContacts) * 100) : 0;
+      // Fetch all responses for the user's surveys
+      // NOTE: some schemas may not have `email` or `respondent_email`; we try respondent_email first and fall back.
+      let responses: any[] = [];
+      let responsesError: any = null;
 
-      // Count this week
+      {
+        const res = await supabase
+          .from('responses')
+          .select('id, respondent_email, created_at, survey_id')
+          .in('survey_id', surveyIds)
+          .order('created_at', { ascending: false });
+        responses = (res.data || []) as any[];
+        responsesError = res.error;
+      }
+
+      // If respondent_email column doesn't exist, retry with legacy `email`
+      if (responsesError?.code === 'PGRST204' && String(responsesError?.message || '').toLowerCase().includes('respondent_email')) {
+        const res2 = await supabase
+          .from('responses')
+          .select('id, email, created_at, survey_id')
+          .in('survey_id', surveyIds)
+          .order('created_at', { ascending: false });
+        responses = (res2.data || []) as any[];
+        responsesError = res2.error;
+      }
+
+      if (responsesError) throw responsesError;
+
+      const allResponses = (responses || []) as any[];
+
+      const getEmail = (r: any) => (r?.respondent_email ?? r?.email ?? '').toString().trim();
+
+      const responsesWithEmail = allResponses.filter((r) => {
+        const e = getEmail(r);
+        return e.length > 0;
+      });
+
+      // Total responses (for opt-in rate)
+      const totalResponses = allResponses.length;
+      const optInRate = totalResponses > 0
+        ? Math.round((responsesWithEmail.length / totalResponses) * 100)
+        : 0;
+
+      // Build distinct contacts (latest response per email)
+      const byEmail = new Map<string, any>();
+      for (const r of responsesWithEmail) {
+        const e = getEmail(r).toLowerCase();
+        if (!e) continue;
+        if (!byEmail.has(e)) {
+          byEmail.set(e, r);
+        }
+      }
+
+      const contactRows: Contact[] = Array.from(byEmail.entries()).map(([emailLower, r]) => {
+        const sourceTitle = surveyTitleById.get(r.survey_id) || 'Survey';
+        return {
+          id: r.id,
+          email: getEmail(r),
+          created_at: r.created_at,
+          survey_id: r.survey_id,
+          sourceTitle,
+          opted_in: true,
+        };
+      });
+
+      // Stats: total contacts = distinct emails
+      const totalContacts = contactRows.length;
+
+      // This week: distinct emails collected in last 7 days
       const oneWeekAgo = new Date();
       oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-      const thisWeekCount = userContacts.filter(c => 
-        new Date(c.created_at) > oneWeekAgo
-      ).length;
+      const weekSet = new Set<string>();
+      for (const r of responsesWithEmail) {
+        const dt = new Date(r.created_at);
+        if (Number.isNaN(dt.getTime())) continue;
+        if (dt > oneWeekAgo) {
+          const e = getEmail(r).toLowerCase();
+          if (e) weekSet.add(e);
+        }
+      }
 
+      setContacts(contactRows);
       setStats({
         totalContacts,
         optInRate,
-        thisWeek: thisWeekCount,
+        thisWeek: weekSet.size,
       });
 
       setLoading(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading contacts:', error);
+      if (error && typeof error === 'object') {
+        try { console.error('Error loading contacts (details):', JSON.stringify(error, null, 2)); } catch {}
+      }
       setToast({ message: 'Failed to load contacts', type: 'error' });
       setLoading(false);
     }
   };
 
-  const filteredContacts = contacts.filter(contact =>
-    contact.email.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredContacts = contacts.filter((contact) =>
+    (contact.email || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const exportContacts = async () => {
     try {
       const csv = [
-        ['Email', 'Date Collected', 'Opted In'],
-        ...contacts.map(c => [
+        ['Email', 'Source', 'Date Collected', 'Status'],
+        ...contacts.map((c) => [
           c.email,
+          c.sourceTitle,
           new Date(c.created_at).toLocaleString(),
-          c.opted_in ? 'Yes' : 'No'
-        ])
+          c.opted_in ? 'Opted In' : 'No Opt-in',
+        ]),
       ]
         .map(row => row.map(cell => `"${cell}"`).join(','))
         .join('\n');
@@ -208,7 +281,7 @@ export default function Contacts() {
                       {contact.opted_in ? 'Opted In' : 'No Opt-in'}
                     </span>
                   </div>
-                  <p className="text-sm text-gray-600">From: Survey Opt-in</p>
+                  <p className="text-sm text-gray-600">From: {contact.sourceTitle}</p>
                 </div>
               ))
             )}
@@ -247,7 +320,7 @@ export default function Contacts() {
                         {contact.email}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                        Survey Opt-in
+                        {contact.sourceTitle}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                         {new Date(contact.created_at).toLocaleString()}
