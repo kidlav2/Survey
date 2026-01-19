@@ -12,14 +12,17 @@ interface SurveyCardProps {
     link: string;
   };
   onDelete: (id: string) => void;
+  onToggleStatus: (id: string, newStatus: 'active' | 'draft') => void;
 }
 
-export default function SurveyCard({ survey, onDelete }: SurveyCardProps) {
+export default function SurveyCard({ survey, onDelete, onToggleStatus }: SurveyCardProps) {
   const navigate = useNavigate();
   const [copied, setCopied] = React.useState(false);
+  const [isToggling, setIsToggling] = React.useState(false);
 
   const { id, title, status, responses, lastActivity, link } = survey;
   const fullLink = `${window.location.origin}${link}`;
+  const isActive = status === 'Active';
 
   const copyToClipboard = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -49,6 +52,16 @@ export default function SurveyCard({ survey, onDelete }: SurveyCardProps) {
     // Add your logic to send the survey here
   };
 
+  const handleToggleStatus = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isToggling) return;
+    
+    setIsToggling(true);
+    const newStatus = isActive ? 'draft' : 'active';
+    await onToggleStatus(id, newStatus);
+    setIsToggling(false);
+  };
+
   const statusColors = {
     Active: 'bg-green-100 text-green-800',
     Disabled: 'bg-gray-100 text-gray-800',
@@ -68,10 +81,27 @@ export default function SurveyCard({ survey, onDelete }: SurveyCardProps) {
             <span>{lastActivity}</span>
           </div>
         </div>
-        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColors[status]}`}>
-          {status === 'Active' && <div className="w-2 h-2 bg-green-600 rounded-full mr-2"></div>}
-          {status !== 'Draft' && status}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColors[status]}`}>
+            {status === 'Active' && <div className="w-2 h-2 bg-green-600 rounded-full mr-2"></div>}
+            {status === 'Disabled' && <div className="w-2 h-2 bg-red-600 rounded-full mr-2"></div>}
+            {status}
+          </span>
+          <button
+            onClick={handleToggleStatus}
+            disabled={isToggling}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 ${
+              isActive ? 'bg-green-600' : 'bg-gray-300'
+            }`}
+            title={isActive ? 'Disable survey' : 'Enable survey'}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                isActive ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
+        </div>
       </div>
 
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4">

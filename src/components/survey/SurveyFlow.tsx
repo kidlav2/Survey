@@ -81,6 +81,22 @@ export default function SurveyFlow() {
 
   const loadSurveyQuestions = async () => {
     try {
+      // First check survey status
+      const { data: surveyData, error: surveyError } = await supabase
+        .from('surveys')
+        .select('status')
+        .eq('id', id)
+        .single();
+
+      if (surveyError) throw surveyError;
+
+      // If survey is not active, redirect to closed page
+      if (surveyData?.status !== 'active') {
+        navigate(`/survey/${id}/closed`, { replace: true });
+        return;
+      }
+
+      // Load questions if survey is active
       const { data, error } = await supabase
         .from('questions')
         .select('*')
@@ -120,7 +136,7 @@ export default function SurveyFlow() {
       setLoading(false);
     } catch (error) {
       console.error('Error loading questions:', error);
-      setLoading(false);
+      navigate(`/survey/${id}/closed`, { replace: true });
     }
   };
 

@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { Clock, FileText } from 'lucide-react';
 import LanguageToggle from './LanguageToggle';
 import { translations } from './translations';
+import { supabase } from '../../lib/supabaseClient';
 
 export default function SurveyWelcome() {
   const navigate = useNavigate();
@@ -14,6 +15,31 @@ export default function SurveyWelcome() {
   const persistedLng = id ? localStorage.getItem(`survey_lng_${id}`) : null;
   const initialLanguage = (stateLng || searchLng || persistedLng || 'en') as 'en' | 'ru' | 'fr' | 'es';
   const [language, setLanguage] = useState<'en' | 'ru' | 'fr' | 'es'>(initialLanguage);
+
+  useEffect(() => {
+    checkSurveyStatus();
+  }, [id]);
+
+  const checkSurveyStatus = async () => {
+    if (!id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('surveys')
+        .select('status')
+        .eq('id', id)
+        .single();
+
+      if (error) throw error;
+
+      if (data?.status !== 'active') {
+        navigate(`/survey/${id}/closed`, { replace: true });
+      }
+    } catch (error) {
+      console.error('Error checking survey status:', error);
+      navigate(`/survey/${id}/closed`, { replace: true });
+    }
+  };
 
   const t = translations[language]?.welcome || translations.en.welcome;
 

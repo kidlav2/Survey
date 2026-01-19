@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Globe } from 'lucide-react';
+import { supabase } from '../../lib/supabaseClient';
 
 const languages = [
   { code: 'en', name: 'English', flag: '🇬🇧' },
@@ -14,6 +15,37 @@ type Lng = (typeof languages)[number]['code'];
 export default function LanguageSelection() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    checkSurveyStatus();
+  }, [id]);
+
+  const checkSurveyStatus = async () => {
+    if (!id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('surveys')
+        .select('status')
+        .eq('id', id)
+        .single();
+
+      if (error) throw error;
+
+      // If survey is not active (status is 'draft'), redirect to closed page
+      if (data?.status !== 'active') {
+        navigate(`/survey/${id}/closed`, { replace: true });
+        return;
+      }
+
+      setIsLoading(false);
+    } catch (error) {
+      console.error('Error checking survey status:', error);
+      // If survey not found or error, also show closed page
+      navigate(`/survey/${id}/closed`, { replace: true });
+    }
+  };
 
   const handleLanguageSelect = (lng: Lng) => {
     if (!id) return;
@@ -26,6 +58,14 @@ export default function LanguageSelection() {
       state: { lng, language: lng },
     });
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="text-gray-600">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">

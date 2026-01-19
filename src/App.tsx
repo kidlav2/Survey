@@ -17,6 +17,7 @@ import SurveyWelcome from './components/survey/SurveyWelcome';
 import SurveyFlow from './components/survey/SurveyFlow';
 import EmailOptIn from './components/survey/EmailOptIn';
 import ThankYou from './components/survey/ThankYou';
+import SurveyClosed from './components/survey/SurveyClosed';
 
 export default function App() {
   const [session, setSession] = useState<any>(null);
@@ -69,6 +70,7 @@ export default function App() {
 
         {/* Public Survey Routes */} 
         <Route path="/survey/:id" element={<LanguageSelection />} />
+        <Route path="/survey/:id/closed" element={<SurveyClosed />} />
         <Route path="/survey/:id/welcome" element={<SurveyWelcome />} />
         <Route path="/survey/:id/questions" element={<SurveyFlow />} />
         <Route path="/survey/:id/opt-in" element={<EmailOptIn />} />
