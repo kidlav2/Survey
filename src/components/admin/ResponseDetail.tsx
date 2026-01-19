@@ -16,10 +16,17 @@ interface ResponseData {
   answers: Record<string, any> | null;
 }
 
+interface Question {
+  id: string;
+  text: string;
+  type: string;
+}
+
 export default function ResponseDetail() {
   const navigate = useNavigate();
   const { id } = useParams();
   const [response, setResponse] = useState<ResponseData | null>(null);
+  const [questions, setQuestions] = useState<Record<string, Question>>({});
   const [loading, setLoading] = useState(true);
 
   const isCompleted = (r: ResponseData) => {
@@ -67,6 +74,21 @@ export default function ResponseDetail() {
         .single();
 
       if (surveyError) throw surveyError;
+
+      // Fetch questions for this survey
+      const { data: questionsData, error: questionsError } = await supabase
+        .from('questions')
+        .select('id, text, type')
+        .eq('survey_id', responseData.survey_id);
+
+      if (questionsError) throw questionsError;
+
+      // Map questions by ID for easy lookup
+      const questionsMap: Record<string, Question> = {};
+      (questionsData || []).forEach((q) => {
+        questionsMap[q.id] = q;
+      });
+      setQuestions(questionsMap);
 
       setResponse({
         ...responseData,
@@ -233,29 +255,34 @@ export default function ResponseDetail() {
           <div className="p-4 md:p-6">
             {response.answers && Object.keys(response.answers).length > 0 ? (
               <div className="space-y-6">
-                {Object.entries(response.answers).map(([key, answer], index) => (
-                  <div key={key} className="pb-6 border-b border-gray-200 last:border-b-0 last:pb-0">
-                    <div className="mb-3">
-                      <div className="flex items-start gap-3">
-                        <span className="flex-shrink-0 w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-xs font-semibold flex items-center justify-center">
-                          {index + 1}
-                        </span>
-                        <div className="flex-1">
-                          <p className="text-sm md:text-base font-medium text-gray-900">
-                            {key}
+                {Object.entries(response.answers).map(([key, answer], index) => {
+                  const question = questions[key];
+                  const questionText = question?.text || key;
+                  
+                  return (
+                    <div key={key} className="pb-6 border-b border-gray-200 last:border-b-0 last:pb-0">
+                      <div className="mb-3">
+                        <div className="flex items-start gap-3">
+                          <span className="flex-shrink-0 w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-xs font-semibold flex items-center justify-center">
+                            {index + 1}
+                          </span>
+                          <div className="flex-1">
+                            <p className="text-sm md:text-base font-medium text-gray-900">
+                              {questionText}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="ml-9">
+                        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                          <p className="text-sm md:text-base text-gray-900">
+                            {Array.isArray(answer) ? answer.join(', ') : JSON.stringify(answer)}
                           </p>
                         </div>
                       </div>
                     </div>
-                    <div className="ml-9">
-                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                        <p className="text-sm md:text-base text-gray-900">
-                          {JSON.stringify(answer)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <p className="text-gray-500">No answers recorded</p>
