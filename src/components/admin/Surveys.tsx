@@ -213,11 +213,22 @@ export default function Surveys() {
             <p className="text-sm text-gray-500 mt-1">Manage and track your surveys</p>
           </div>
           <div 
-            className="flex items-center gap-3"
+            className="flex items-center gap-3 w-full sm:w-auto"
             style={{
-              flexDirection: window.innerWidth < 640 ? 'row' : 'row-reverse'
+              flexDirection: window.innerWidth < 640 ? 'row-reverse' : 'row'
             }}
           >
+            {/* Sort Dropdown */}
+            {surveys.length > 0 && (
+              <button
+                ref={setSortButtonRef}
+                onClick={() => setShowSortMenu(!showSortMenu)}
+                className="flex items-center gap-2 px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium whitespace-nowrap"
+              >
+                <ArrowUpDown className="w-4 h-4" />
+              </button>
+            )}
+
             <button
               onClick={() => setIsModalOpen(true)}
               className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium flex-1 sm:flex-none"
@@ -226,19 +237,6 @@ export default function Surveys() {
               <span className="hidden sm:inline">Create Survey</span>
               <span className="sm:hidden">Create</span>
             </button>
-            
-            {/* Sort Dropdown */}
-            {surveys.length > 0 && (
-              <>
-                <button
-                  ref={setSortButtonRef}
-                  onClick={() => setShowSortMenu(!showSortMenu)}
-                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium whitespace-nowrap"
-                >
-                  <ArrowUpDown className="w-4 h-4" />
-                </button>
-              </>
-            )}
           </div>
         </div>
       </header>

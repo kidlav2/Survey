@@ -35,21 +35,13 @@ export default function EmailOptIn() {
       localStorage.setItem(`survey_rid_${id}`, responseId);
     }
 
-    console.log('handleSubmit:', { optIn, email, responseId, id });
+    const isEmailValid = optIn && email && email.includes('@');
 
-    // If opted-in and email provided
-    if (optIn && email) {
+    // If opted-in and valid email provided
+    if (isEmailValid) {
       try {
-        if (!responseId) {
-          console.warn('Response ID not found; cannot save email. Ensure SurveyFlow navigates with rid param or state.responseId.', {
-            state: location.state,
-            ridFromQuery,
-            persistedRid,
-          });
-        } else {
-          console.log('Attempting to save email:', { responseId, email });
-          
-          const { error } = await supabase
+        if (responseId) {
+          await supabase
             .from('responses')
             .update({ 
               respondent_email: email,
@@ -57,27 +49,20 @@ export default function EmailOptIn() {
               completed: true,
             })
             .eq('id', responseId);
-
-          console.log('Save result:', { error, responseId, email });
-
-          if (error) throw error;
         }
       } catch (error) {
         console.error('Error saving email:', error);
-        // Do not block navigation
       }
-    } else if (!optIn && responseId) {
-      // User didn't opt-in, but mark as completed
+    } else if (responseId) {
+      // User didn't opt-in, or unchecked the box, or didn't provide email
       try {
-        const { error } = await supabase
+        await supabase
           .from('responses')
           .update({ 
             opted_in: false,
             completed: true,
           })
           .eq('id', responseId);
-
-        if (error) throw error;
       } catch (error) {
         console.error('Error updating response completion:', error);
       }
@@ -167,10 +152,7 @@ export default function EmailOptIn() {
           {/* Submit Button */}
           <button
             onClick={handleSubmit}
-            disabled={optIn && !email}
-            className={`w-full py-4 px-6 rounded-lg font-medium transition-colors ${
-              optIn && !email ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 text-white'
-            }`}
+            className="w-full py-4 px-6 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors shadow-sm"
           >
             {t.submitButton}
           </button>

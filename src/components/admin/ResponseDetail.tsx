@@ -276,7 +276,11 @@ export default function ResponseDetail() {
                       <div className="ml-9">
                         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                           <p className="text-sm md:text-base text-gray-900">
-                            {Array.isArray(answer) ? answer.join(', ') : JSON.stringify(answer)}
+                            {Array.isArray(answer)
+                              ? answer.join(', ')
+                              : typeof answer === 'string'
+                              ? answer
+                              : JSON.stringify(answer)}
                           </p>
                         </div>
                       </div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronLeft, Copy, Edit3, BarChart3, Download, FileJson, Trash2, ExternalLink, CheckCircle, Pencil } from 'lucide-react';
+import { ChevronLeft, Copy, Edit3, BarChart3, Download, FileJson, Trash2, ExternalLink, CheckCircle, Pencil, QrCode, X } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { supabase } from '../../lib/supabaseClient';
 import DeleteSurveyModal from './DeleteSurveyModal';
 import RenameSurveyModal from './RenameSurveyModal';
@@ -51,6 +52,7 @@ export default function SurveyDetails() {
   const [copied, setCopied] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
+  const [isQRModalOpen, setIsQRModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [exportModalType, setExportModalType] = useState<'CSV' | 'JSON' | null>(null);
   const [loading, setLoading] = useState(true);
@@ -140,6 +142,33 @@ export default function SurveyDetails() {
     navigator.clipboard.writeText(surveyLink);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const downloadQRCode = () => {
+    const svg = document.getElementById('survey-qr-code');
+    if (!svg) return;
+    
+    const svgData = new XMLSerializer().serializeToString(svg);
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    
+    img.onload = () => {
+      canvas.width = 1000;
+      canvas.height = 1000;
+      if (ctx) {
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, 1000, 1000);
+        const pngFile = canvas.toDataURL('image/png');
+        const downloadLink = document.createElement('a');
+        downloadLink.download = `qr_${survey?.title || 'survey'}.png`;
+        downloadLink.href = pngFile;
+        downloadLink.click();
+      }
+    };
+    
+    img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
   };
 
   const handleDeleteConfirm = async () => {
@@ -346,22 +375,33 @@ export default function SurveyDetails() {
                 <div className="flex-1 bg-gray-50 border border-gray-200 rounded px-3 py-2 overflow-x-auto">
                   <code className="text-xs md:text-sm text-gray-700 whitespace-nowrap">{surveyLink}</code>
                 </div>
-                <button
-                  onClick={copyToClipboard}
-                  className="flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors self-center sm:self-auto"
-                >
-                  {copied ? (
-                    <>
-                      <CheckCircle className="w-4 h-4 text-green-600" />
-                      <span className="text-sm text-green-600">Copied!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-4 h-4 text-gray-600" />
-                      <span className="text-sm text-gray-700">Copy</span>
-                    </>
-                  )}
-                </button>
+                <div className="flex gap-2 self-center sm:self-auto">
+                  <button
+                    onClick={copyToClipboard}
+                    className="flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors flex-1 sm:flex-initial"
+                  >
+                    {copied ? (
+                      <>
+                        <CheckCircle className="w-4 h-4 text-green-600" />
+                        <span className="text-sm text-green-600">Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4 text-gray-600" />
+                        <span className="text-sm text-gray-700">Copy</span>
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsQRModalOpen(true)}
+                    className="flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors text-gray-700 group"
+                    title="Generate QR Code"
+                  >
+                    <QrCode className="w-4 h-4 text-gray-600 group-hover:text-indigo-600" />
+                    <span className="text-sm">QR Code</span>
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -460,7 +500,63 @@ export default function SurveyDetails() {
         currentTitle={survey.title}
         onSave={handleRenameSurvey}
       />
+      {/* QR Code Modal */}
+      {isQRModalOpen && (
+        <div 
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 cursor-default"
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(4px)' }}
+          onClick={() => setIsQRModalOpen(false)}
+        >
+          <div 
+            className="bg-white rounded-2xl shadow-2xl w-full overflow-hidden"
+            style={{ maxWidth: '340px' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-white">
+              <h3 className="text-base font-bold text-gray-900">QR Code sharing</h3>
+              <button 
+                onClick={() => setIsQRModalOpen(false)}
+                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 flex flex-col items-center justify-center gap-4 bg-white">
+              <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+                <QRCodeSVG
+                  id="survey-qr-code"
+                  value={surveyLink}
+                  size={200}
+                  level="H"
+                  includeMargin={true}
+                />
+              </div>
+              
+              <div className="text-center w-full">
+                <p className="text-sm font-bold text-gray-900 mb-1 truncate px-2">{survey.title}</p>
+                <p className="text-xs text-gray-500">Scan code to open survey</p>
+              </div>
+            </div>
 
+            <div className="p-4 bg-gray-50 border-t border-gray-100 flex flex-col gap-2">
+              <button
+                onClick={downloadQRCode}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-bold text-sm shadow-sm"
+              >
+                <Download className="w-4 h-4" />
+                Download PNG
+              </button>
+              <button
+                onClick={() => setIsQRModalOpen(false)}
+                className="w-full py-2 text-gray-500 hover:text-gray-700 transition-colors text-xs font-bold uppercase tracking-widest"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Export Modals */}
       {exportModalType && (
         <ExportModal
