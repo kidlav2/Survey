@@ -12,12 +12,13 @@ export default function AdminLayout() {
       {/* Overlay for mobile */}
       {isSidebarOpen && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-20 lg:hidden"
+          className="fixed inset-0 z-20 lg:hidden"
           onClick={() => setIsSidebarOpen(false)}
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.3)' }}
         />
       )}
       
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 relative z-10">
         {/* Mobile Header */}
         <div className="lg:hidden bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
           <button
