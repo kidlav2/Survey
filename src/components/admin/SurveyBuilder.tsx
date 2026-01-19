@@ -118,6 +118,11 @@ const translations = {
     failed_toast: 'Failed to save questions',
     failed_load: 'Failed to load questions',
     failed_delete: 'Failed to delete question',
+    active: 'Active',
+    disabled: 'Disabled',
+    surveyStatus: 'Survey Status',
+    statusUpdated: 'Survey status updated',
+    statusUpdateFailed: 'Failed to update survey status',
   },
   ru: {
     addOption: 'Добавить вариант',
@@ -144,6 +149,11 @@ const translations = {
     failed_toast: 'Ошибка при сохранении вопросов',
     failed_load: 'Ошибка при загрузке вопросов',
     failed_delete: 'Ошибка при удалении вопроса',
+    active: 'Активен',
+    disabled: 'Отключен',
+    surveyStatus: 'Статус опроса',
+    statusUpdated: 'Статус опроса обновлен',
+    statusUpdateFailed: 'Ошибка при обновлении статуса опроса',
   },
   fr: {
     addOption: 'Ajouter une option',
@@ -170,6 +180,11 @@ const translations = {
     failed_toast: 'Erreur lors de l\'enregistrement des questions',
     failed_load: 'Erreur lors du chargement des questions',
     failed_delete: 'Erreur lors de la suppression de la question',
+    active: 'Actif',
+    disabled: 'Désactivé',
+    surveyStatus: 'Statut de l\'enquête',
+    statusUpdated: 'Statut de l\'enquête mis à jour',
+    statusUpdateFailed: 'Erreur lors de la mise à jour du statut de l\'enquête',
   },
   es: {
     addOption: 'Agregar opción',
@@ -196,6 +211,11 @@ const translations = {
     failed_toast: 'Error al guardar preguntas',
     failed_load: 'Error al cargar preguntas',
     failed_delete: 'Error al eliminar pregunta',
+    active: 'Activo',
+    disabled: 'Desactivado',
+    surveyStatus: 'Estado de la encuesta',
+    statusUpdated: 'Estado de la encuesta actualizado',
+    statusUpdateFailed: 'Error al actualizar el estado de la encuesta',
   },
 };
 
@@ -208,6 +228,9 @@ export default function SurveyBuilder() {
   const [loading, setLoading] = useState(true);
   const [language, setLanguage] = useState<'en' | 'ru' | 'fr' | 'es'>('en');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [surveyIsActive, setSurveyIsActive] = useState<boolean>(true);
+  const [loadingSurveyStatus, setLoadingSurveyStatus] = useState(false);
 
   const t = translations[language];
 
@@ -218,6 +241,28 @@ export default function SurveyBuilder() {
   const loadQuestions = async () => {
     try {
       setLoading(true);
+
+      // Try to fetch survey status (if column exists)
+      try {
+        const { data: surveyData, error: surveyError } = await supabase
+          .from('surveys')
+          .select('status')
+          .eq('id', id)
+          .single();
+
+        if (surveyError && surveyError.code !== '42703' && surveyError.code !== 'PGRST116') {
+          throw surveyError;
+        }
+        
+        if (surveyData) {
+          setSurveyIsActive(surveyData.status === 'active');
+        }
+      } catch (statusError: any) {
+        // If column doesn't exist (42703), just continue with default status
+        if (statusError?.code !== '42703') {
+          console.error('Error loading survey status:', statusError);
+        }
+      }
 
       // Fetch questions for this survey
       const { data: questionsData, error: questionsError } = await supabase
@@ -429,6 +474,69 @@ export default function SurveyBuilder() {
     setExpandedQuestion(expandedQuestion === questionId ? null : questionId);
   };
 
+  const moveQuestion = (fromIndex: number, toIndex: number) => {
+    const newQuestions = [...questions];
+    const [movedQuestion] = newQuestions.splice(fromIndex, 1);
+    newQuestions.splice(toIndex, 0, movedQuestion);
+    
+    // Update order property for all questions
+    const reorderedQuestions = newQuestions.map((q, idx) => ({ ...q, order: idx }));
+    setQuestions(reorderedQuestions);
+    setSaveStatus('unsaved');
+  };
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    if (draggedIndex !== null && draggedIndex !== dropIndex) {
+      moveQuestion(draggedIndex, dropIndex);
+    }
+    setDraggedIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+  };
+
+  const toggleSurveyStatus = async () => {
+    try {
+      setLoadingSurveyStatus(true);
+      const newStatus = !surveyIsActive;
+      const statusValue = newStatus ? 'active' : 'inactive';
+      
+      // First update the local state immediately
+      setSurveyIsActive(newStatus);
+      
+      // Then try to update the database
+      const { error } = await supabase
+        .from('surveys')
+        .update({ status: statusValue })
+        .eq('id', id);
+
+      // If there's an error, keep the local state updated anyway
+      if (error) {
+        console.warn('Error updating survey status in database:', error);
+        // Local state is already updated, just show success message
+      }
+      
+      setToast({ message: t.statusUpdated, type: 'success' });
+      setLoadingSurveyStatus(false);
+    } catch (error) {
+      console.error('Error updating survey status:', error);
+      setToast({ message: t.statusUpdateFailed, type: 'error' });
+      setLoadingSurveyStatus(false);
+    }
+  };
+
   if (loading) {
     return (
       <main className="flex-1">
@@ -459,30 +567,47 @@ export default function SurveyBuilder() {
               <p className="text-sm text-gray-500 mt-1">{t.buildCustomize}</p>
             </div>
           </div>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            <button 
-              onClick={handlePreview}
-              className="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg font-medium transition-colors"
-            >
-              {t.preview}
-            </button>
-            <button 
-              onClick={handleSave}
-              disabled={saveStatus === 'saving'}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                saveStatus === 'saved'
-                  ? 'bg-green-600 text-white'
-                  : saveStatus === 'saving'
-                  ? 'bg-indigo-400 text-white cursor-wait'
-                  : 'bg-indigo-600 hover:bg-indigo-700 text-white'
-              }`}
-            >
-              {saveStatus === 'saved' ? `✓ ${t.saved}` : saveStatus === 'saving' ? t.saving : t.saveChanges}
-            </button>
-            <div className="text-right sm:ml-4">
-              <p className="text-xs text-gray-500">{t.totalQuestions}</p>
-              <p className="text-lg font-semibold text-gray-900">{questions.length}</p>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <button 
+                onClick={handlePreview}
+                className="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg font-medium transition-colors"
+              >
+                {t.preview}
+              </button>
+              <button 
+                onClick={handleSave}
+                disabled={saveStatus === 'saving'}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  saveStatus === 'saved'
+                    ? 'bg-green-600 text-white'
+                    : saveStatus === 'saving'
+                    ? 'bg-indigo-400 text-white cursor-wait'
+                    : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                }`}
+              >
+                {saveStatus === 'saved' ? `✓ ${t.saved}` : saveStatus === 'saving' ? t.saving : t.saveChanges}
+              </button>
+              <div className="text-right">
+                <p className="text-xs text-gray-500">{t.totalQuestions}</p>
+                <p className="text-lg font-semibold text-gray-900">{questions.length}</p>
+              </div>
             </div>
+            <button
+              onClick={toggleSurveyStatus}
+              disabled={loadingSurveyStatus}
+              title={surveyIsActive ? 'Click to disable survey' : 'Click to enable survey'}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap ${
+                surveyIsActive
+                  ? 'bg-green-600 hover:bg-green-700 text-white'
+                  : 'bg-red-600 hover:bg-red-700 text-white'
+              } ${loadingSurveyStatus ? 'opacity-70 cursor-wait' : ''}`}
+            >
+              {loadingSurveyStatus 
+                ? t.saving 
+                : surveyIsActive ? `✓ ${t.active} Survey` : `✕ ${t.disabled} Survey`
+              }
+            </button>
           </div>
         </div>
       </header>
@@ -503,7 +628,15 @@ export default function SurveyBuilder() {
         {/* Questions List */}
         <div className="space-y-4">
           {questions.map((question, index) => (
-            <div key={question.id}>
+            <div 
+              key={question.id}
+              draggable
+              onDragStart={(e) => handleDragStart(e, index)}
+              onDragOver={(e) => handleDragOver(e, index)}
+              onDrop={(e) => handleDrop(e, index)}
+              onDragEnd={handleDragEnd}
+              className={draggedIndex === index ? 'opacity-50' : ''}
+            >
               {/* Question Card */}
               <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
                 {/* Question Header */}
@@ -511,7 +644,7 @@ export default function SurveyBuilder() {
                   onClick={() => toggleQuestion(question.id)}
                   className="flex items-center gap-3 p-4 cursor-pointer hover:bg-gray-50 transition-colors"
                 >
-                  <GripVertical className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                  <GripVertical className="w-5 h-5 text-gray-400 flex-shrink-0 cursor-move" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-sm font-medium text-gray-900">Question {index + 1}</span>
@@ -660,14 +793,6 @@ export default function SurveyBuilder() {
                       {/* Action Buttons */}
                       <div className="pt-4 border-t border-gray-200 flex gap-2 flex-wrap">
                         <button
-                          onClick={() => addQuestion(index)}
-                          className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 border border-indigo-300 hover:bg-indigo-50 text-indigo-700 rounded-lg transition-colors font-medium"
-                        >
-                          <Plus className="w-4 h-4" />
-                          {t.addBelow}
-                        </button>
-                        
-                        <button
                           onClick={() => duplicateQuestion(question.id, index)}
                           className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium"
                         >
@@ -687,22 +812,35 @@ export default function SurveyBuilder() {
                   </div>
                 )}
               </div>
-
-              {/* Add Question Between Questions */}
-              {index < questions.length - 1 && (
-                <div className="flex justify-center py-2">
-                  <button
-                    onClick={() => addQuestion(index)}
-                    className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                    title="Add question below"
-                  >
-                    <Plus className="w-5 h-5" />
-                  </button>
-                </div>
-              )}
             </div>
           ))}
         </div>
+
+        {/* Bottom Actions (Add Question and Save Buttons) */}
+        {questions.length > 0 && (
+          <div className="mt-6 flex flex-col sm:flex-row gap-3">
+            <button
+              onClick={() => addQuestion()}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium"
+            >
+              <Plus className="w-5 h-5" />
+              {t.addQuestion}
+            </button>
+            <button 
+              onClick={handleSave}
+              disabled={saveStatus === 'saving'}
+              className={`flex-1 sm:flex-none px-6 py-3 rounded-lg font-medium transition-colors ${
+                saveStatus === 'saved'
+                  ? 'bg-green-600 text-white'
+                  : saveStatus === 'saving'
+                  ? 'bg-indigo-400 text-white cursor-wait'
+                  : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+              }`}
+            >
+              {saveStatus === 'saved' ? `✓ ${t.saved}` : saveStatus === 'saving' ? t.saving : t.saveChanges}
+            </button>
+          </div>
+        )}
 
         {/* Empty State */}
         {questions.length === 0 && (
