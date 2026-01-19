@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, Calendar, Clock, Globe, Mail } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
+import SkeletonSurveyCard from '../common/SkeletonSurveyCard';
 
 interface ResponseData {
   id: string;
@@ -117,8 +118,8 @@ export default function ResponseDetail() {
             <h2 className="text-xl md:text-2xl font-semibold text-gray-900">Response Details</h2>
           </div>
         </header>
-        <div className="p-4 md:p-8 flex items-center justify-center min-h-screen">
-          <div className="text-gray-600">Loading...</div>
+        <div className="p-4 md:p-8">
+          <SkeletonSurveyCard />
         </div>
       </main>
     );

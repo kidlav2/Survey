@@ -20,6 +20,7 @@ import EmailOptIn from './components/survey/EmailOptIn';
 import ThankYou from './components/survey/ThankYou';
 import SurveyClosed from './components/survey/SurveyClosed';
 import NotFound from './components/common/NotFound';
+import SkeletonDashboard from './components/common/SkeletonDashboard';
 
 export default function App() {
   const [session, setSession] = useState<any>(null);
@@ -45,7 +46,7 @@ export default function App() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-gray-600">Loading...</div>
+        <SkeletonDashboard />
       </div>
     );
   }

@@ -4,6 +4,7 @@ import { Download, FileJson } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import ExportModal from './ExportModal';
 import Toast from '../common/Toast';
+import SkeletonDashboard from '../common/SkeletonDashboard';
 
 interface Response {
   id: string;
@@ -191,8 +192,8 @@ export default function Responses() {
         <header className="bg-white border-b border-gray-200 px-4 md:px-8 py-4">
           <h2 className="text-xl md:text-2xl font-semibold text-gray-900">Responses</h2>
         </header>
-        <div className="p-4 md:p-8 flex items-center justify-center min-h-screen">
-          <div className="text-gray-600">Loading...</div>
+        <div className="p-4 md:p-8">
+          <SkeletonDashboard />
         </div>
       </main>
     );

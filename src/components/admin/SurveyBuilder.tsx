@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, Plus, Trash2, GripVertical, ChevronDown, ChevronUp, FileText, Copy } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import Toast from '../common/Toast';
+import SkeletonQuestion from '../common/SkeletonQuestion';
 
 
 interface Question {
@@ -543,8 +544,12 @@ export default function SurveyBuilder() {
         <header className="bg-white border-b border-gray-200 px-4 md:px-8 py-4">
           <h2 className="text-xl md:text-2xl font-semibold text-gray-900">{t.surveyBuilder}</h2>
         </header>
-        <div className="p-4 md:p-8 flex items-center justify-center min-h-screen">
-          <div className="text-gray-600">Loading...</div>
+        <div className="p-4 md:p-8 space-y-4">
+          <div className="space-y-4">
+            <SkeletonQuestion />
+            <SkeletonQuestion />
+            <SkeletonQuestion />
+          </div>
         </div>
       </main>
     );

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Globe } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
+import SkeletonQuestionFlow from '../common/SkeletonQuestionFlow';
 
 const languages = [
   { code: 'en', name: 'English', flag: '🇬🇧' },
@@ -62,7 +63,7 @@ export default function LanguageSelection() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="text-gray-600">Loading...</div>
+        <SkeletonQuestionFlow />
       </div>
     );
   }

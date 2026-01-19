@@ -4,6 +4,7 @@ import { ChevronRight, ChevronLeft } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import LanguageToggle from './LanguageToggle';
 import { translations } from './translations';
+import SkeletonQuestionFlow from '../common/SkeletonQuestionFlow';
 
 export default function SurveyFlow() {
   const navigate = useNavigate();
@@ -220,8 +221,12 @@ export default function SurveyFlow() {
 
   if (loading || !question) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-600">Loading survey...</div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+        {/* Language Toggle */}
+        <div className="fixed top-6 right-6">
+          <LanguageToggle currentLanguage={language} onLanguageChange={setLanguage} />
+        </div>
+        <SkeletonQuestionFlow />
       </div>
     );
   }
