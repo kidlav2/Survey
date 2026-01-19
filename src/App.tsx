@@ -18,6 +18,7 @@ import SurveyFlow from './components/survey/SurveyFlow';
 import EmailOptIn from './components/survey/EmailOptIn';
 import ThankYou from './components/survey/ThankYou';
 import SurveyClosed from './components/survey/SurveyClosed';
+import NotFound from './components/common/NotFound';
 
 export default function App() {
   const [session, setSession] = useState<any>(null);
@@ -78,6 +79,9 @@ export default function App() {
         
         {/* Default Route */}
         <Route path="/" element={<Navigate to={session ? "/admin/dashboard" : "/login"} replace />} />
+        
+        {/* 404 Not Found - Must be last */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </Router>
   );
