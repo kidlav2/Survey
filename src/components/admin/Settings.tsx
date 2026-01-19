@@ -113,12 +113,14 @@ export default function Settings() {
     try {
       setLoading(true);
       
-      // Delete user account via Supabase
-      const { error } = await supabase.auth.admin.deleteUser(
-        (await supabase.auth.getUser()).data.user?.id || ''
-      );
+      // Delete user account via a database function (RPC)
+      // This is necessary because supabase.auth.admin.deleteUser is server-side only
+      const { error } = await supabase.rpc('delete_user_account');
 
       if (error) throw error;
+
+      // Sign out locally after successful deletion
+      await supabase.auth.signOut();
 
       setToast({ message: 'Account deleted', type: 'success' });
       setTimeout(() => navigate('/login'), 1500);

@@ -36,7 +36,7 @@ export default function Register() {
 
       if (error) throw error;
 
-      navigate('/login');
+      navigate('/login', { state: { email, needsConfirmation: true } });
     } catch (e: any) {
       setErrorMsg(e?.message ?? 'Registration failed');
     } finally {

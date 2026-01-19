@@ -1,12 +1,20 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Lock, Mail, ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Lock, Mail, ArrowLeft, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
+  useEffect(() => {
+    if (location.state?.email) {
+      setEmail(location.state.email);
+    }
+  }, [location.state]);
+
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -26,7 +34,13 @@ export default function Login() {
       });
 
       if (error) {
-        setError(error.message);
+        if (error.message === 'Invalid login credentials') {
+          setError('Email or password incorrect. Please check your credentials and try again.');
+        } else if (error.message === 'Email not confirmed') {
+          setError('Please confirm your email address before logging in. Check your inbox for the confirmation link.');
+        } else {
+          setError(error.message);
+        }
         return;
       }
 
@@ -183,6 +197,21 @@ export default function Login() {
               Survey Management System
             </p>
           </div>
+
+          {/* Success/Info Message */}
+          {location.state?.needsConfirmation && (
+            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3">
+              <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-green-800">
+                  Account created successfully!
+                </p>
+                <p className="text-xs text-green-700 mt-1">
+                  We've sent a confirmation link to your email. Please verify your account before logging in.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Error Message */}
           {error && (
