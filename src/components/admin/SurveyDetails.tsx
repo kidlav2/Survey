@@ -141,7 +141,7 @@ export default function SurveyDetails() {
     }
   };
 
-  const surveyLink = `/survey/${id}`;
+  const surveyLink = `${window.location.origin}/survey/${id}`;
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(surveyLink);
