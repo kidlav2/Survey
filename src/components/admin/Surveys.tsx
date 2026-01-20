@@ -182,14 +182,15 @@ export default function Surveys() {
         s.id === surveyId ? { ...s, status: newStatus } : s
       ));
 
+      const statusText = newStatus === 'active' ? t.enabled : t.disabled;
       setToast({
-        message: `Survey ${newStatus === 'active' ? 'enabled' : 'disabled'} successfully`,
+        message: `${t.surveys} ${statusText} ${t.success}`,
         type: 'success'
       });
     } catch (error) {
       console.error('Error updating survey status:', error);
       setToast({
-        message: 'Failed to update survey status',
+        message: t.failedToUpdateStatus,
         type: 'error'
       });
     }
@@ -214,8 +215,8 @@ export default function Surveys() {
       <header className="bg-white border-b border-gray-200 px-4 md:px-8 py-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h2 className="text-xl md:text-2xl font-semibold text-gray-900">Surveys</h2>
-            <p className="text-sm text-gray-500 mt-1">Manage and track your surveys</p>
+            <h2 className="text-xl md:text-2xl font-semibold text-gray-900">{t.surveys}</h2>
+            <p className="text-sm text-gray-500 mt-1">{t.manageAndTrack}</p>
           </div>
           <div 
             className="flex items-center gap-3 w-full sm:w-auto"
@@ -239,8 +240,8 @@ export default function Surveys() {
               className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium flex-1 sm:flex-none"
             >
               <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">Create Survey</span>
-              <span className="sm:hidden">Create</span>
+              <span className="hidden sm:inline">{t.createSurvey}</span>
+              <span className="sm:hidden">{t.create}</span>
             </button>
           </div>
         </div>
@@ -272,7 +273,7 @@ export default function Surveys() {
                 sortBy === 'date' ? 'text-indigo-600 font-medium bg-indigo-50' : 'text-gray-700'
               }`}
             >
-              Date Created
+              {t.dateCreated}
             </button>
             <button
               type="button"
@@ -281,7 +282,7 @@ export default function Surveys() {
                 sortBy === 'modified' ? 'text-indigo-600 font-medium bg-indigo-50' : 'text-gray-700'
               }`}
             >
-              Last Modified
+              {t.lastModified}
             </button>
             <button
               type="button"
@@ -290,7 +291,7 @@ export default function Surveys() {
                 sortBy === 'title' ? 'text-indigo-600 font-medium bg-indigo-50' : 'text-gray-700'
               }`}
             >
-              Title (A-Z)
+              {t.titleAZ}
             </button>
             <button
               type="button"
@@ -299,7 +300,7 @@ export default function Surveys() {
                 sortBy === 'responses' ? 'text-indigo-600 font-medium bg-indigo-50' : 'text-gray-700'
               }`}
             >
-              Response Count
+              {t.responseCount}
             </button>
             <button
               type="button"
@@ -308,7 +309,7 @@ export default function Surveys() {
                 sortBy === 'status' ? 'text-indigo-600 font-medium bg-indigo-50' : 'text-gray-700'
               }`}
             >
-              Status (Active First)
+              {t.statusActiveFirst}
             </button>
           </div>
         </>
@@ -325,14 +326,14 @@ export default function Surveys() {
         {surveys.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
             <Settings className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No surveys yet</h3>
-            <p className="text-sm text-gray-500 mb-4">Get started by creating your first survey</p>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">{t.noSurveysYet}</h3>
+            <p className="text-sm text-gray-500 mb-4">{t.getStartedByCreating}</p>
             <button
               onClick={() => setIsModalOpen(true)}
               className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium"
             >
               <Plus className="w-5 h-5" />
-              Create Survey
+              {t.createSurvey}
             </button>
           </div>
         ) : (

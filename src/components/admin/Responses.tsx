@@ -122,13 +122,13 @@ export default function Responses() {
     try {
       if (type === 'CSV') {
         const csv = [
-          ['ID', 'Date', 'Email', 'Status', 'Duration'],
+          [t.id, t.date, t.email, t.status, t.duration],
           ...responses.map(r => [
             r.id,
             new Date(r.created_at).toLocaleString(),
-            r.respondent_email || 'Not provided',
-            r.completed ? 'Completed' : 'In Progress',
-            r.duration_seconds ? `${Math.round(r.duration_seconds / 60)} minutes` : 'N/A'
+            r.respondent_email || t.notProvided,
+            r.completed ? t.completed : t.inProgress,
+            r.duration_seconds ? `${Math.round(r.duration_seconds / 60)} ${t.minutes}` : 'N/A'
           ])
         ]
           .map(row => row.map(cell => `"${cell}"`).join(','))
@@ -153,7 +153,7 @@ export default function Responses() {
       }
 
       setToast({ 
-        message: `${type} exported successfully`, 
+        message: `${type} ${t.exportedSuccessfully}`, 
         type: 'success' 
       });
       setExportModalType(null);
@@ -165,25 +165,25 @@ export default function Responses() {
 
   const statConfig = [
     {
-      label: 'Total Responses',
+      label: t.totalResponses,
       value: stats.totalResponses,
       color: 'indigo',
       icon: Download,
     },
     {
-      label: 'Today',
+      label: t.today,
       value: stats.today,
       color: 'green',
       icon: Download,
     },
     {
-      label: 'This Week',
+      label: t.thisWeek,
       value: stats.thisWeek,
       color: 'blue',
       icon: Download,
     },
     {
-      label: 'Completion Rate',
+      label: t.completionRate,
       value: `${stats.completionRate}%`,
       color: 'yellow',
       icon: Download,
@@ -194,7 +194,7 @@ export default function Responses() {
     return (
       <main className="flex-1">
         <header className="bg-white border-b border-gray-200 px-4 md:px-8 py-4">
-          <h2 className="text-xl md:text-2xl font-semibold text-gray-900">Responses</h2>
+          <h2 className="text-xl md:text-2xl font-semibold text-gray-900">{t.responsesPage}</h2>
         </header>
         <div className="p-4 md:p-8">
           <SkeletonDashboard />
@@ -209,8 +209,8 @@ export default function Responses() {
       <header className="bg-white border-b border-gray-200 px-4 md:px-8 py-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h2 className="text-xl md:text-2xl font-semibold text-gray-900">Responses</h2>
-            <p className="text-sm text-gray-500 mt-1">View and analyze survey responses</p>
+            <h2 className="text-xl md:text-2xl font-semibold text-gray-900">{t.responsesPage}</h2>
+            <p className="text-sm text-gray-500 mt-1">{t.viewAndAnalyze}</p>
           </div>
           <div className="flex flex-col sm:flex-row gap-2">
             <button 
@@ -259,7 +259,7 @@ export default function Responses() {
 
           {responses.length === 0 ? (
             <div className="p-6 text-center text-gray-500">
-              No responses found
+              {t.noResponses}
             </div>
           ) : (
             <>
@@ -299,7 +299,7 @@ export default function Responses() {
                       onClick={() => navigate(`/admin/responses/${response.id}`)}
                       className="mt-3 w-full px-3 py-1.5 text-sm text-indigo-600 border border-indigo-600 hover:bg-indigo-50 rounded transition-colors"
                     >
-                      View Details
+                      {t.view}
                     </button>
                   </div>
                   );
@@ -312,22 +312,22 @@ export default function Responses() {
                   <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        ID
+                        {t.id}
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Date
+                        {t.date}
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Email
+                        {t.email}
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Status
+                        {t.status}
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Duration
+                        {t.duration}
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Actions
+                        {t.edit}
                       </th>
                     </tr>
                   </thead>
@@ -343,7 +343,7 @@ export default function Responses() {
                           {new Date(response.created_at).toLocaleString()}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                          {response.respondent_email || 'Not provided'}
+                          {response.respondent_email || t.notProvided}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span
@@ -353,11 +353,11 @@ export default function Responses() {
                                 : 'bg-yellow-100 text-yellow-800'
                             }`}
                           >
-                            {isCompleted ? 'Completed' : 'In Progress'}
+                            {isCompleted ? t.completed : t.inProgress}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                          {response.duration_seconds ? `${Math.round(response.duration_seconds / 60)} minutes` : 'N/A'}
+                          {response.duration_seconds ? `${Math.round(response.duration_seconds / 60)} ${t.minutes}` : 'N/A'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                           <button 

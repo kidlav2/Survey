@@ -131,16 +131,16 @@ export default function Dashboard() {
         const activity: Array<{ label: string; when: string; tone: 'primary' | 'muted' }> = [];
 
         if (lastCreatedAt) {
-          activity.push({ label: 'New response submitted', when: relativeTime(lastCreatedAt), tone: 'primary' });
+          activity.push({ label: t.newResponseSubmitted, when: relativeTime(lastCreatedAt), tone: 'primary' });
         }
 
         if (lastEmailAt) {
-          activity.push({ label: 'New email collected', when: relativeTime(lastEmailAt), tone: 'primary' });
+          activity.push({ label: t.newEmailCollected, when: relativeTime(lastEmailAt), tone: 'primary' });
         }
 
         const createdAt = (survey as any).created_at ?? null;
         if (createdAt) {
-          activity.push({ label: 'Survey created', when: relativeTime(createdAt), tone: 'muted' });
+          activity.push({ label: t.surveyCreated, when: relativeTime(createdAt), tone: 'muted' });
         }
 
         setRecentActivity(activity.slice(0, 3));
@@ -237,7 +237,7 @@ export default function Dashboard() {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-xl md:text-2xl font-semibold text-gray-900">{t.dashboard}</h2>
-            <p className="text-sm text-gray-500 mt-1">Internal Survey Research Project</p>
+            <p className="text-sm text-gray-500 mt-1">{t.internalSurveyResearchProject}</p>
           </div>
           <div className="flex gap-2">
             {(['en', 'ru', 'fr', 'es'] as const).map((lng) => (
@@ -301,19 +301,19 @@ export default function Dashboard() {
           <div className="bg-white rounded-lg border border-gray-200">
             <div className="px-4 md:px-6 py-4 border-b border-gray-200">
               <h3 className="text-base md:text-lg font-semibold text-gray-900">{t.activeSurveys}</h3>
-              <p className="text-sm text-gray-500 mt-1">Current research project overview</p>
+              <p className="text-sm text-gray-500 mt-1">{t.currentResearchProjectOverview}</p>
             </div>
             
             <div className="p-4 md:p-6">
               <div className="mb-6">
-                <p className="text-sm text-gray-600 mb-2">Survey Title</p>
+                <p className="text-sm text-gray-600 mb-2">{t.surveyTitle}</p>
                 <p className="text-lg md:text-xl font-semibold text-gray-900">
                   {activeSurvey.title}
                 </p>
               </div>
 
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
-                <p className="text-sm text-gray-600 mb-2">Shareable Survey Link</p>
+                <p className="text-sm text-gray-600 mb-2">{t.shareableSurveyLink}</p>
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                   <div className="flex-1 bg-white border border-gray-200 rounded px-3 py-2 overflow-x-auto">
                     <code className="text-xs md:text-sm text-gray-700 whitespace-nowrap">{surveyLink}</code>
@@ -331,18 +331,18 @@ export default function Dashboard() {
                   </button>
                 </div>
                 {copied && (
-                  <p className="text-sm text-green-600 mt-2">Link copied to clipboard!</p>
+                  <p className="text-sm text-green-600 mt-2">{t.linkCopied}</p>
                 )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6 mb-6">
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Languages (responses)</p>
+                  <p className="text-sm text-gray-600 mb-1">{t.language} ({t.responses})</p>
                   <p className="text-base font-medium text-gray-900">{languageBreakdown(languageCounts)}</p>
                 </div>
 
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Total Responses</p>
+                  <p className="text-sm text-gray-600 mb-1">{t.totalResponses}</p>
                   <p className="text-base font-medium text-gray-900">{activeSurvey.responses_count}</p>
                 </div>
               </div>

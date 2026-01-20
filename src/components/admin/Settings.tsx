@@ -8,6 +8,8 @@ import { AdminLanguageContext } from './AdminLayout';
 
 export default function Settings() {
   const navigate = useNavigate();
+  const { language } = useContext(AdminLanguageContext);
+  const t = adminTranslations[language];
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
   const [fullName, setFullName] = useState('');
@@ -34,7 +36,7 @@ export default function Settings() {
       setLoading(false);
     } catch (error) {
       console.error('Error loading user data:', error);
-      setToast({ message: 'Failed to load user data', type: 'error' });
+      setToast({ message: t.failedToLoadUserData, type: 'error' });
       setLoading(false);
     }
   };
@@ -53,10 +55,10 @@ export default function Settings() {
 
       if (error) throw error;
 
-      setToast({ message: 'Profile updated successfully', type: 'success' });
+      setToast({ message: t.profileUpdated, type: 'success' });
     } catch (error: any) {
       console.error('Error updating profile:', error);
-      setToast({ message: error?.message || 'Failed to update profile', type: 'error' });
+      setToast({ message: error?.message || t.failedToUpdateProfile, type: 'error' });
     } finally {
       setIsSavingProfile(false);
     }
@@ -66,7 +68,7 @@ export default function Settings() {
     e.preventDefault();
 
     if (newPassword !== confirmPassword) {
-      setToast({ message: 'Passwords do not match', type: 'error' });
+      setToast({ message: t.passwordsDoNotMatch, type: 'error' });
       return;
     }
 
@@ -84,13 +86,13 @@ export default function Settings() {
 
       if (error) throw error;
 
-      setToast({ message: 'Password updated successfully', type: 'success' });
+      setToast({ message: t.passwordUpdated, type: 'success' });
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
     } catch (error: any) {
       console.error('Error updating password:', error);
-      setToast({ message: error?.message || 'Failed to update password', type: 'error' });
+      setToast({ message: error?.message || t.failedToUpdatePassword, type: 'error' });
     } finally {
       setIsUpdatingPassword(false);
     }
@@ -102,13 +104,13 @@ export default function Settings() {
       navigate('/login');
     } catch (error) {
       console.error('Error logging out:', error);
-      setToast({ message: 'Failed to logout', type: 'error' });
+      setToast({ message: t.failedToLogout, type: 'error' });
     }
   };
 
   const handleDeleteAccount = async () => {
     const confirmed = window.confirm(
-      'Are you sure you want to delete your account? This action cannot be undone.'
+      t.deleteAccountConfirm
     );
 
     if (!confirmed) return;
@@ -125,11 +127,11 @@ export default function Settings() {
       // Sign out locally after successful deletion
       await supabase.auth.signOut();
 
-      setToast({ message: 'Account deleted', type: 'success' });
+      setToast({ message: t.accountDeleted, type: 'success' });
       setTimeout(() => navigate('/login'), 1500);
     } catch (error: any) {
       console.error('Error deleting account:', error);
-      setToast({ message: error?.message || 'Failed to delete account', type: 'error' });
+      setToast({ message: error?.message || t.failedToDeleteAccount, type: 'error' });
       setLoading(false);
     }
   };
@@ -138,7 +140,7 @@ export default function Settings() {
     return (
       <main className="flex-1">
         <header className="bg-white border-b border-gray-200 px-4 md:px-8 py-4">
-          <h2 className="text-xl md:text-2xl font-semibold text-gray-900">Settings</h2>
+          <h2 className="text-xl md:text-2xl font-semibold text-gray-900">{t.settingsPage}</h2>
         </header>
         <div className="p-4 md:p-8">
           <SkeletonDashboard />
@@ -152,14 +154,14 @@ export default function Settings() {
       {/* Top Bar */}
       <header className="bg-white border-b border-gray-200 px-4 md:px-8 py-4 flex items-center justify-between">
         <div>
-          <h2 className="text-xl md:text-2xl font-semibold text-gray-900">Settings</h2>
-          <p className="text-sm text-gray-500 mt-1">Manage your account and preferences</p>
+          <h2 className="text-xl md:text-2xl font-semibold text-gray-900">{t.settingsPage}</h2>
+          <p className="text-sm text-gray-500 mt-1">{t.profileSettings}</p>
         </div>
         <button
           onClick={handleLogout}
           className="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium"
         >
-          Logout
+          {t.logout}
         </button>
       </header>
 
@@ -169,8 +171,8 @@ export default function Settings() {
           {/* Profile Settings */}
           <div className="bg-white rounded-lg border border-gray-200 mb-6">
             <div className="px-4 md:px-6 py-4 border-b border-gray-200">
-              <h3 className="text-base md:text-lg font-semibold text-gray-900">Profile Information</h3>
-              <p className="text-sm text-gray-500 mt-1">Update your account details</p>
+              <h3 className="text-base md:text-lg font-semibold text-gray-900">{t.profileSettings}</h3>
+              <p className="text-sm text-gray-500 mt-1">{t.profileUpdated}</p>
             </div>
 
             <form onSubmit={handleSaveProfile}>
@@ -178,7 +180,7 @@ export default function Settings() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Full Name
+                      {t.fullName}
                     </label>
                     <input
                       type="text"
@@ -191,7 +193,7 @@ export default function Settings() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Email Address
+                      {t.email}
                     </label>
                     <input
                       type="email"
@@ -204,7 +206,7 @@ export default function Settings() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Organization
+                    {t.organization}
                   </label>
                   <input
                     type="text"
@@ -224,10 +226,10 @@ export default function Settings() {
                     {isSavingProfile ? (
                       <>
                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        Saving...
+                        {t.save}...
                       </>
                     ) : (
-                      'Save Changes'
+                      t.save
                     )}
                   </button>
                 </div>
@@ -238,15 +240,15 @@ export default function Settings() {
           {/* Password Settings */}
           <div className="bg-white rounded-lg border border-gray-200 mb-6">
             <div className="px-4 md:px-6 py-4 border-b border-gray-200">
-              <h3 className="text-base md:text-lg font-semibold text-gray-900">Change Password</h3>
-              <p className="text-sm text-gray-500 mt-1">Update your password</p>
+              <h3 className="text-base md:text-lg font-semibold text-gray-900">{t.updatePassword}</h3>
+              <p className="text-sm text-gray-500 mt-1">{t.securitySettings}</p>
             </div>
 
             <form onSubmit={handleUpdatePassword}>
               <div className="p-4 md:p-6 space-y-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    New Password
+                    {t.newPassword}
                   </label>
                   <input
                     type="password"
@@ -260,7 +262,7 @@ export default function Settings() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Confirm New Password
+                    {t.confirmPassword}
                   </label>
                   <input
                     type="password"
@@ -281,10 +283,10 @@ export default function Settings() {
                     {isUpdatingPassword ? (
                       <>
                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        Updating...
+                        {t.updatePassword}...
                       </>
                     ) : (
-                      'Update Password'
+                      t.updatePassword
                     )}
                   </button>
                 </div>
@@ -295,21 +297,21 @@ export default function Settings() {
           {/* Danger Zone */}
           <div className="bg-white rounded-lg border border-red-200">
             <div className="px-4 md:px-6 py-4 border-b border-red-200 bg-red-50">
-              <h3 className="text-base md:text-lg font-semibold text-red-900">Danger Zone</h3>
-              <p className="text-sm text-red-600 mt-1">Irreversible actions</p>
+              <h3 className="text-base md:text-lg font-semibold text-red-900">{t.deleteAccount}</h3>
+              <p className="text-sm text-red-600 mt-1">{t.deleteAccountWarning}</p>
             </div>
 
             <div className="p-4 md:p-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <p className="text-sm font-medium text-gray-900">Delete Account</p>
-                  <p className="text-sm text-gray-500">Permanently delete your account and all data</p>
+                  <p className="text-sm font-medium text-gray-900">{t.deleteAccount}</p>
+                  <p className="text-sm text-gray-500">{t.deleteAccountWarning}</p>
                 </div>
                 <button
                   onClick={handleDeleteAccount}
                   className="px-4 py-2 border border-red-600 hover:bg-red-50 text-red-600 rounded-lg transition-colors font-medium self-start sm:self-auto"
                 >
-                  Delete Account
+                  {t.deleteAccount}
                 </button>
               </div>
             </div>

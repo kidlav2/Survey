@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, Copy, Edit3, BarChart3, Download, FileJson, Trash2, ExternalLink, CheckCircle, Pencil, QrCode, X } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -8,6 +8,8 @@ import RenameSurveyModal from './RenameSurveyModal';
 import ExportModal from './ExportModal';
 import Toast from '../common/Toast';
 import SkeletonSurveyCard from '../common/SkeletonSurveyCard';
+import { adminTranslations } from './adminTranslations';
+import { AdminLanguageContext } from './AdminLayout';
 
 interface SurveyData {
   id: string;
@@ -43,6 +45,8 @@ function formatDate(value?: string | null, fallbackValue?: string | null) {
 export default function SurveyDetails() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { language } = useContext(AdminLanguageContext);
+  const t = adminTranslations[language];
   const [survey, setSurvey] = useState<SurveyData | null>(null);
   const [stats, setStats] = useState<SurveyStats>({
     totalResponses: 0,
@@ -273,7 +277,7 @@ export default function SurveyDetails() {
     return (
       <main className="flex-1">
         <header className="bg-white border-b border-gray-200 px-4 md:px-8 py-4">
-          <h2 className="text-xl md:text-2xl font-semibold text-gray-900">Survey Details</h2>
+          <h2 className="text-xl md:text-2xl font-semibold text-gray-900">{t.responseDetails || 'Survey Details'}</h2>
         </header>
         <div className="p-4 md:p-8">
           <SkeletonSurveyCard />
@@ -287,12 +291,12 @@ export default function SurveyDetails() {
       <main className="flex-1">
         <div className="p-8">
           <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-            <p className="text-gray-600">Survey not found</p>
+            <p className="text-gray-600">{t.surveyNotFound}</p>
             <button
               onClick={() => navigate('/admin/surveys')}
               className="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
             >
-              Back to Surveys
+              {t.backToSurveys}
             </button>
           </div>
         </div>
@@ -301,10 +305,10 @@ export default function SurveyDetails() {
   }
 
   const quickStats = [
-    { label: 'Responses', value: stats.totalResponses.toString(), icon: BarChart3, color: 'blue' },
-    { label: 'Completion Rate', value: `${stats.completionRate}%`, icon: CheckCircle, color: 'green' },
-    { label: 'Avg. Time', value: `${stats.avgTime} min`, icon: Download, color: 'indigo' },
-    { label: 'Opt-in Rate', value: `${stats.optInRate}%`, icon: FileJson, color: 'red' },
+    { label: t.responses, value: stats.totalResponses.toString(), icon: BarChart3, color: 'blue' },
+    { label: t.completionRate || 'Completion Rate', value: `${stats.completionRate}%`, icon: CheckCircle, color: 'green' },
+    { label: t.averageTime || 'Avg. Time', value: `${stats.avgTime} min`, icon: Download, color: 'indigo' },
+    { label: t.opInRate || 'Opt-in Rate', value: `${stats.optInRate}%`, icon: FileJson, color: 'red' },
   ];
 
   return (
@@ -320,7 +324,7 @@ export default function SurveyDetails() {
               <ChevronLeft className="w-5 h-5 text-gray-600" />
             </button>
             <div className="flex-1">
-              <h2 className="text-xl md:text-2xl font-semibold text-gray-900">Survey Details</h2>
+              <h2 className="text-xl md:text-2xl font-semibold text-gray-900">{t.responseDetails || 'Survey Details'}</h2>
               <p className="text-sm text-gray-500 mt-1">{survey.title}</p>
             </div>
           </div>
@@ -350,7 +354,7 @@ export default function SurveyDetails() {
         {/* Survey Info Card */}
         <div className="bg-white rounded-lg border border-gray-200 mb-6">
           <div className="px-4 md:px-6 py-4 border-b border-gray-200">
-            <h3 className="text-base md:text-lg font-semibold text-gray-900">Survey Information</h3>
+            <h3 className="text-base md:text-lg font-semibold text-gray-900">{t.surveyTitle}</h3>
           </div>
           
           <div className="p-4 md:p-6 space-y-6">

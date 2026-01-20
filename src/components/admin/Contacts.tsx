@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { Search, Download, Mail, CheckCircle, Users } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import Toast from '../common/Toast';
 import SkeletonResponseTable from '../common/SkeletonResponseTable';
+import { adminTranslations } from './adminTranslations';
+import { AdminLanguageContext } from './AdminLayout';
 
 interface Contact {
   id: string;
@@ -20,6 +22,8 @@ interface ContactStats {
 }
 
 export default function Contacts() {
+  const { language } = useContext(AdminLanguageContext);
+  const t = adminTranslations[language];
   const [searchTerm, setSearchTerm] = useState('');
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [stats, setStats] = useState<ContactStats>({ totalContacts: 0, optInRate: 0, thisWeek: 0 });
@@ -163,12 +167,12 @@ export default function Contacts() {
   const exportContacts = async () => {
     try {
       const csv = [
-        ['Email', 'Source', 'Date Collected', 'Status'],
+        [t.email, t.sourceTitle, t.dateCollected, t.status],
         ...contacts.map((c) => [
           c.email,
           c.sourceTitle,
           new Date(c.created_at).toLocaleString(),
-          c.opted_in ? 'Opted In' : 'No Opt-in',
+          c.opted_in ? t.optedIn : t.noOptIn,
         ]),
       ]
         .map(row => row.map(cell => `"${cell}"`).join(','))
@@ -208,15 +212,15 @@ export default function Contacts() {
       <header className="bg-white border-b border-gray-200 px-4 md:px-8 py-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h2 className="text-xl md:text-2xl font-semibold text-gray-900">Contacts</h2>
-            <p className="text-sm text-gray-500 mt-1">Manage collected email addresses</p>
+            <h2 className="text-xl md:text-2xl font-semibold text-gray-900">{t.contactsPage}</h2>
+            <p className="text-sm text-gray-500 mt-1">{t.manageCollectedEmails}</p>
           </div>
           <button 
             onClick={exportContacts}
-            className="flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium"
+            className="flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium whitespace-nowrap"
           >
             <Download className="w-4 h-4" />
-            Export Contacts
+            {t.exportContacts}
           </button>
         </div>
       </header>
@@ -227,30 +231,30 @@ export default function Contacts() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center flex-shrink-0">
                 <Mail className="w-5 h-5 text-indigo-600" />
               </div>
-              <p className="text-sm text-gray-600">Total Contacts</p>
+              <p className="text-sm text-gray-600 truncate">{t.totalContacts}</p>
             </div>
             <p className="text-2xl md:text-3xl font-semibold text-gray-900">{stats.totalContacts}</p>
           </div>
           
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center flex-shrink-0">
                 <CheckCircle className="w-5 h-5 text-green-600" />
               </div>
-              <p className="text-sm text-gray-600">Opt-in Rate</p>
+              <p className="text-sm text-gray-600 truncate">{t.optInRate}</p>
             </div>
             <p className="text-2xl md:text-3xl font-semibold text-gray-900">{stats.optInRate}%</p>
           </div>
           
           <div className="bg-white rounded-lg border border-gray-200 p-6 sm:col-span-2 lg:col-span-1">
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
                 <Users className="w-5 h-5 text-blue-600" />
               </div>
-              <p className="text-sm text-gray-600">This Week</p>
+              <p className="text-sm text-gray-600 truncate">{t.thisWeek}</p>
             </div>
             <p className="text-2xl md:text-3xl font-semibold text-gray-900">{stats.thisWeek}</p>
           </div>
@@ -259,7 +263,7 @@ export default function Contacts() {
         {/* Contacts List */}
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
           <div className="px-4 md:px-6 py-4 border-b border-gray-200">
-            <h3 className="text-base md:text-lg font-semibold text-gray-900">Contact List</h3>
+            <h3 className="text-base md:text-lg font-semibold text-gray-900">{t.contactsPage}</h3>
           </div>
 
           {/* Mobile Card View */}
@@ -294,16 +298,16 @@ export default function Contacts() {
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Email
+                    {t.email}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Source
+                    {t.sourceTitle}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Date Collected
+                    {t.dateCollected}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
+                    {t.status}
                   </th>
                 </tr>
               </thead>
@@ -311,7 +315,7 @@ export default function Contacts() {
                 {filteredContacts.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="px-6 py-4 text-center text-gray-500">
-                      No contacts found
+                      {t.noContactsFound}
                     </td>
                   </tr>
                 ) : (
@@ -334,7 +338,7 @@ export default function Contacts() {
                               : 'bg-gray-100 text-gray-800'
                           }`}
                         >
-                          {contact.opted_in ? 'Opted In' : 'No Opt-in'}
+                          {contact.opted_in ? t.optedIn : t.noOptIn}
                         </span>
                       </td>
                     </tr>
