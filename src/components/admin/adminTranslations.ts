@@ -165,6 +165,9 @@ export const adminTranslations = {
     saveInfo: 'Save Info',
     savingInfo: 'Saving...',
     surveyInformation: 'Survey Information',
+    descriptionNote: 'Note: The description below will be shown to survey respondents at the beginning of the survey.',
+    thankYouMessage: 'Thank You Message',
+    defaultThankYouText: 'Thank you for completing this survey! Your feedback is valuable to us.',
   },
   ru: {
     // Navigation & Layout
@@ -332,6 +335,9 @@ export const adminTranslations = {
     saveInfo: 'Сохранить информацию',
     savingInfo: 'Сохранение...',
     surveyInformation: 'Информация об опросе',
+    descriptionNote: 'Примечание: Описание ниже будет показано респондентам в начале опроса.',
+    thankYouMessage: 'Сообщение благодарности',
+    defaultThankYouText: 'Спасибо за заполнение этого опроса! Ваш отзыв очень важен для нас.',
   },
   fr: {
     // Navigation & Layout
@@ -492,11 +498,15 @@ export const adminTranslations = {
     close: 'Fermer',
     confirm: 'Confirmer',
     logout: 'Déconnexion',
+    save: 'Enregistrer',
     description: 'Description',
     estimatedTime: 'Temps estimé',
     saveInfo: 'Enregistrer les informations',
     savingInfo: 'Enregistrement...',
     surveyInformation: 'Informations sur l\'enquête',
+    descriptionNote: 'Remarque : La description ci-dessous sera affichée aux répondants au début de l\'enquête.',
+    thankYouMessage: 'Message de remerciement',
+    defaultThankYouText: 'Merci d\'avoir rempli cette enquête ! Vos commentaires sont précieux pour nous.',
   },
   es: {
     // Navigation & Layout
@@ -664,5 +674,8 @@ export const adminTranslations = {
     saveInfo: 'Guardar información',
     savingInfo: 'Guardando...',
     surveyInformation: 'Información de la encuesta',
+    descriptionNote: 'Nota: La descripción a continuación se mostrará a los encuestados al principio de la encuesta.',
+    thankYouMessage: 'Mensaje de agradecimiento',
+    defaultThankYouText: '¡Gracias por completar esta encuesta! Sus comentarios son muy valiosos para nosotros.',
   },
 };

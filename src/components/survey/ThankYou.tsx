@@ -1,18 +1,54 @@
-import React, { useState } from "react";
-import { useLocation } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { useLocation, useParams } from "react-router-dom";
 import { CheckCircle } from "lucide-react";
+import { supabase } from "../../lib/supabaseClient";
 import LanguageToggle from "./LanguageToggle";
 import { translations } from "./translations";
 
 export default function ThankYou() {
+  const { id } = useParams();
   const location = useLocation();
   const [language, setLanguage] = useState<
     "en" | "ru" | "fr" | "es"
   >(location.state?.language || "en");
+  
+  const [thankYouMessage, setThankYouMessage] = useState("");
+  const [loading, setLoading] = useState(true);
 
   const t =
     translations[language]?.thankYou ||
     translations.en.thankYou;
+
+  useEffect(() => {
+    const loadSurveyMessage = async () => {
+      if (!id) {
+        setLoading(false);
+        return;
+      }
+      
+      try {
+        const { data, error } = await supabase
+          .from("surveys")
+          .select("thank_you_message")
+          .eq("id", id)
+          .single();
+        
+        if (error && error.code !== "42703" && error.code !== "PGRST116") {
+          console.error("Error loading survey:", error);
+        }
+        
+        if (data?.thank_you_message) {
+          setThankYouMessage(data.thank_you_message);
+        }
+      } catch (error) {
+        console.error("Error loading survey message:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadSurveyMessage();
+  }, [id]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
@@ -37,7 +73,7 @@ export default function ThankYou() {
           </h1>
 
           <p className="text-gray-600 leading-relaxed mb-6">
-            {t.description}
+            {thankYouMessage || t.description}
           </p>
 
           {/* Additional Info */}

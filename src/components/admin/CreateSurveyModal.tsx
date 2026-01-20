@@ -11,7 +11,7 @@ interface CreateSurveyModalProps {
 export default function CreateSurveyModal({ isOpen, onClose, onCreate }: CreateSurveyModalProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [estimatedTime, setEstimatedTime] = useState('5');
+  const [estimatedTime, setEstimatedTime] = useState('4');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,7 +39,7 @@ export default function CreateSurveyModal({ isOpen, onClose, onCreate }: CreateS
         .insert([{
           title: title.trim(),
           description: description.trim(),
-          estimated_time: parseInt(estimatedTime) || 5,
+          estimated_time: parseInt(estimatedTime) || 4,
           owner_id: user.id,
           status: 'draft',
         }])

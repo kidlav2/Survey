@@ -126,6 +126,9 @@ const translations = {
     statusUpdateFailed: 'Failed to update survey status',
     yes: 'Yes',
     no: 'No',
+    descriptionNote: 'Note: The description below will be shown to survey respondents at the beginning of the survey.',
+    thankYouMessage: 'Thank You Message',
+    defaultThankYouText: 'Thank you for completing this survey! Your feedback is valuable to us.',
   },
   ru: {
     addOption: 'Добавить вариант',
@@ -159,6 +162,9 @@ const translations = {
     statusUpdateFailed: 'Ошибка при обновлении статуса опроса',
     yes: 'Да',
     no: 'Нет',
+    descriptionNote: 'Примечание: Описание ниже будет показано респондентам в начале опроса.',
+    thankYouMessage: 'Сообщение благодарности',
+    defaultThankYouText: 'Спасибо за заполнение этого опроса! Ваш отзыв очень важен для нас.',
   },
   fr: {
     addOption: 'Ajouter une option',
@@ -192,6 +198,9 @@ const translations = {
     statusUpdateFailed: 'Erreur lors de la mise à jour du statut de l\'enquête',
     yes: 'Oui',
     no: 'Non',
+    descriptionNote: 'Remarque : La description ci-dessous sera affichée aux répondants au début de l\'enquête.',
+    thankYouMessage: 'Message de remerciement',
+    defaultThankYouText: 'Merci d\'avoir rempli cette enquête ! Vos commentaires sont précieux pour nous.',
   },
   es: {
     addOption: 'Agregar opción',
@@ -225,6 +234,9 @@ const translations = {
     statusUpdateFailed: 'Error al actualizar el estado de la encuesta',
     yes: 'Sí',
     no: 'No',
+    descriptionNote: 'Nota: La descripción a continuación se mostrará a los encuestados al principio de la encuesta.',
+    thankYouMessage: 'Mensaje de agradecimiento',
+    defaultThankYouText: '¡Gracias por completar esta encuesta! Sus comentarios son muy valiosos para nosotros.',
   },
 };
 
@@ -242,7 +254,8 @@ export default function SurveyBuilder() {
   const [loadingSurveyStatus, setLoadingSurveyStatus] = useState(false);
   const [surveyTitle, setSurveyTitle] = useState('');
   const [surveyDescription, setSurveyDescription] = useState('');
-  const [estimatedTime, setEstimatedTime] = useState('5');
+  const [estimatedTime, setEstimatedTime] = useState('4');
+  const [thankYouMessage, setThankYouMessage] = useState('');
   const [surveyInfoLoading, setSurveyInfoLoading] = useState(false);
 
   const t = translations[language];
@@ -259,7 +272,7 @@ export default function SurveyBuilder() {
       try {
         const { data: surveyData, error: surveyError } = await supabase
           .from('surveys')
-          .select('status, title, description, estimated_time')
+          .select('status, title, description, estimated_time, thank_you_message')
           .eq('id', id)
           .single();
 
@@ -271,7 +284,8 @@ export default function SurveyBuilder() {
           setSurveyIsActive(surveyData.status === 'active');
           setSurveyTitle(surveyData.title || '');
           setSurveyDescription(surveyData.description || '');
-          setEstimatedTime(surveyData.estimated_time?.toString() || '5');
+          setEstimatedTime(surveyData.estimated_time?.toString() || '4');
+          setThankYouMessage(surveyData.thank_you_message || '');
         }
       } catch (statusError: any) {
         // If column doesn't exist (42703), just continue with default status
@@ -539,21 +553,38 @@ export default function SurveyBuilder() {
     try {
       setSurveyInfoLoading(true);
       
-      const { error } = await supabase
+      const updateData: any = {};
+      
+      // Only include description if it's not empty
+      if (surveyDescription.trim()) {
+        updateData.description = surveyDescription.trim();
+      }
+      
+      // Always include estimated_time
+      updateData.estimated_time = parseInt(estimatedTime) || 4;
+      
+      // Include thank you message if not empty
+      if (thankYouMessage.trim()) {
+        updateData.thank_you_message = thankYouMessage.trim();
+      }
+      
+      const { error, data } = await supabase
         .from('surveys')
-        .update({
-          description: surveyDescription.trim(),
-          estimated_time: parseInt(estimatedTime) || 5
-        })
-        .eq('id', id);
+        .update(updateData)
+        .eq('id', id)
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw new Error(error.message || 'Failed to save survey info');
+      }
       
       setToast({ message: 'Survey info saved successfully', type: 'success' });
-      setSurveyInfoLoading(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving survey info:', error);
-      setToast({ message: 'Failed to save survey info', type: 'error' });
+      const errorMsg = error?.message || 'Failed to save survey info';
+      setToast({ message: errorMsg, type: 'error' });
+    } finally {
       setSurveyInfoLoading(false);
     }
   };
@@ -672,6 +703,14 @@ export default function SurveyBuilder() {
         {/* Survey Info Section */}
         <div className="mb-8 bg-indigo-50 rounded-lg border border-indigo-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Survey Information</h3>
+          
+          {/* Warning notice */}
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="text-sm text-blue-900">
+              {t.descriptionNote}
+            </div>
+          </div>
+          
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -702,11 +741,11 @@ export default function SurveyBuilder() {
                   disabled={surveyInfoLoading}
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg 
                            focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-500"
-                  placeholder="5"
+                  placeholder="4"
                 />
               </div>
               
-          <div className="flex items-end">
+              <div className="flex items-end">
                 <button
                   onClick={saveSurveyInfo}
                   disabled={surveyInfoLoading}
@@ -715,6 +754,21 @@ export default function SurveyBuilder() {
                   {surveyInfoLoading ? 'Saving...' : 'Save Info'}
                 </button>
               </div>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                {t.thankYouMessage}
+              </label>
+              <textarea
+                value={thankYouMessage}
+                onChange={(e) => setThankYouMessage(e.target.value)}
+                rows={3}
+                disabled={surveyInfoLoading}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg 
+                         focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none disabled:bg-gray-50 disabled:text-gray-500"
+                placeholder={t.defaultThankYouText}
+              />
             </div>
           </div>
         </div>
