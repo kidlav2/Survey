@@ -360,13 +360,13 @@ export default function SurveyDetails() {
           <div className="p-4 md:p-6 space-y-6">
             {/* Title */}
             <div>
-              <p className="text-sm text-gray-600 mb-2">Survey Title</p>
+              <p className="text-sm text-gray-600 mb-2">{t.surveyTitle}</p>
               <div className="flex items-start gap-3">
                 <p className="text-base md:text-lg font-medium text-gray-900 flex-1">{survey.title}</p>
                 <button
                   onClick={() => setIsRenameModalOpen(true)}
                   className="p-2 hover:bg-gray-100 rounded-lg transition-colors group"
-                  title="Rename survey"
+                  title={t.renamesurvey}
                 >
                   <Pencil className="w-4 h-4 text-gray-600 group-hover:text-indigo-600" />
                 </button>
@@ -375,7 +375,7 @@ export default function SurveyDetails() {
 
             {/* Share Link */}
             <div>
-              <p className="text-sm text-gray-600 mb-2">Shareable Link</p>
+              <p className="text-sm text-gray-600 mb-2">{t.shareableLink}</p>
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                 <div className="flex-1 bg-gray-50 border border-gray-200 rounded px-3 py-2 overflow-x-auto">
                   <code className="text-xs md:text-sm text-gray-700 whitespace-nowrap">{surveyLink}</code>
@@ -388,12 +388,12 @@ export default function SurveyDetails() {
                     {copied ? (
                       <>
                         <CheckCircle className="w-4 h-4 text-green-600" />
-                        <span className="text-sm text-green-600">Copied!</span>
+                        <span className="text-sm text-green-600">{t.copied}</span>
                       </>
                     ) : (
                       <>
                         <Copy className="w-4 h-4 text-gray-600" />
-                        <span className="text-sm text-gray-700">Copy</span>
+                        <span className="text-sm text-gray-700">{t.copy}</span>
                       </>
                     )}
                   </button>
@@ -401,10 +401,10 @@ export default function SurveyDetails() {
                     type="button"
                     onClick={() => setIsQRModalOpen(true)}
                     className="flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors text-gray-700 group"
-                    title="Generate QR Code"
+                    title={t.generateQRCode}
                   >
                     <QrCode className="w-4 h-4 text-gray-600 group-hover:text-indigo-600" />
-                    <span className="text-sm">QR Code</span>
+                    <span className="text-sm">{t.generateQRCode}</span>
                   </button>
                 </div>
               </div>
@@ -413,14 +413,14 @@ export default function SurveyDetails() {
             {/* Metadata Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6 pt-4 border-t border-gray-200">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Created</p>
+                <p className="text-sm text-gray-600 mb-1">{t.created}</p>
                 <p className="text-sm font-medium text-gray-900">
                   {formatDate(survey.created_at, null)}
                 </p>
               </div>
               
               <div>
-                <p className="text-sm text-gray-600 mb-1">Last Modified</p>
+                <p className="text-sm text-gray-600 mb-1">{t.lastModified}</p>
                 <p className="text-sm font-medium text-gray-900">
                   {formatDateTime(survey.updated_at, survey.created_at)}
                 </p>
@@ -432,7 +432,7 @@ export default function SurveyDetails() {
         {/* Actions */}
         <div className="bg-white rounded-lg border border-gray-200">
           <div className="px-4 md:px-6 py-4 border-b border-gray-200">
-            <h3 className="text-base md:text-lg font-semibold text-gray-900">Actions</h3>
+            <h3 className="text-base md:text-lg font-semibold text-gray-900">{t.actions}</h3>
           </div>
           
           <div className="p-4 md:p-6">
@@ -442,7 +442,7 @@ export default function SurveyDetails() {
                 className="flex items-center gap-2 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium justify-center"
               >
                 <Edit3 className="w-4 h-4" />
-                Edit Questions
+                {t.editQuestions}
               </button>
 
               <button
@@ -450,7 +450,7 @@ export default function SurveyDetails() {
                 className="flex items-center gap-2 px-4 py-3 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium justify-center"
               >
                 <BarChart3 className="w-4 h-4" />
-                View Responses
+                {t.viewResponses}
               </button>
 
               <button
@@ -458,7 +458,7 @@ export default function SurveyDetails() {
                 className="flex items-center gap-2 px-4 py-3 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium justify-center"
               >
                 <Download className="w-4 h-4" />
-                Export CSV
+                {t.exportCSV}
               </button>
 
               <button
@@ -466,7 +466,7 @@ export default function SurveyDetails() {
                 className="flex items-center gap-2 px-4 py-3 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium justify-center"
               >
                 <FileJson className="w-4 h-4" />
-                Export JSON
+                {t.exportJSON}
               </button>
 
               <button
@@ -474,7 +474,7 @@ export default function SurveyDetails() {
                 className="flex items-center gap-2 px-4 py-3 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium justify-center"
               >
                 <ExternalLink className="w-4 h-4" />
-                Preview
+                {t.preview}
               </button>
 
               <button
@@ -482,7 +482,7 @@ export default function SurveyDetails() {
                 className="flex items-center gap-2 px-4 py-3 border border-red-300 hover:bg-red-50 text-red-700 rounded-lg transition-colors font-medium justify-center"
               >
                 <Trash2 className="w-4 h-4" />
-                Delete Survey
+                {t.deleteSurvey}
               </button>
             </div>
           </div>

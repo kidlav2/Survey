@@ -30,6 +30,26 @@ export const adminTranslations = {
     newEmailCollected: 'New email collected',
     surveyCreated: 'Survey created',
     
+    // Common Buttons (specific new ones)
+    addOption: 'Add Option',
+    export: 'Export',
+    import: 'Import',
+    copy: 'Copy',
+    copied: 'Copied!',
+    search: 'Search',
+    filter: 'Filter',
+    sort: 'Sort',
+    
+    // SurveyDetails (only new ones not already defined)
+    shareableLink: 'Shareable Link',
+    renamesurvey: 'Rename survey',
+    generateQRCode: 'Generate QR Code',
+    editQuestions: 'Edit Questions',
+    viewResponses: 'View Responses',
+    exportCSV: 'Export CSV',
+    preview: 'Preview',
+    actions: 'Actions',
+    
     // Surveys List
     activeSurveysList: 'Active Surveys',
     draftSurveys: 'Draft Surveys',
@@ -171,6 +191,26 @@ export const adminTranslations = {
     newResponseSubmitted: 'Получен новый ответ',
     newEmailCollected: 'Получен новый адрес электронной почты',
     surveyCreated: 'Опрос создан',
+    
+    // Common Buttons (specific new ones)
+    addOption: 'Добавить вариант',
+    export: 'Экспортировать',
+    import: 'Импортировать',
+    copy: 'Копировать',
+    copied: 'Скопировано!',
+    search: 'Поиск',
+    filter: 'Фильтр',
+    sort: 'Сортировка',
+    
+    // SurveyDetails (only new ones not already defined)
+    shareableLink: 'Ссылка для общего доступа',
+    renamesurvey: 'Переименовать опрос',
+    generateQRCode: 'Создать QR-код',
+    editQuestions: 'Редактировать вопросы',
+    viewResponses: 'Просмотреть ответы',
+    exportCSV: 'Экспортировать CSV',
+    preview: 'Предпросмотр',
+    actions: 'Действия',
     
     // Surveys List
     activeSurveysList: 'Активные опросы',
@@ -314,6 +354,26 @@ export const adminTranslations = {
     newEmailCollected: 'Nouvel e-mail collecté',
     surveyCreated: 'Enquête créée',
     
+    // Common Buttons (specific new ones)
+    addOption: 'Ajouter une option',
+    export: 'Exporter',
+    import: 'Importer',
+    copy: 'Copier',
+    copied: 'Copié!',
+    search: 'Rechercher',
+    filter: 'Filtrer',
+    sort: 'Trier',
+    
+    // SurveyDetails (only new ones not already defined)
+    shareableLink: 'Lien partageable',
+    renamesurvey: 'Renommer l\'enquête',
+    generateQRCode: 'Générer un code QR',
+    editQuestions: 'Modifier les questions',
+    viewResponses: 'Afficher les réponses',
+    exportCSV: 'Exporter en CSV',
+    preview: 'Aperçu',
+    actions: 'Actions',
+    
     // Surveys List
     activeSurveysList: 'Enquêtes actives',
     draftSurveys: 'Brouillons d\'enquête',
@@ -391,8 +451,6 @@ export const adminTranslations = {
     general: 'Général',
     security: 'Sécurité',
     privacy: 'Confidentialité',
-    save: 'Enregistrer',
-    cancel: 'Annuler',
     fullName: 'Nom complet',
     organization: 'Organisation',
     currentPassword: 'Mot de passe actuel',
@@ -455,6 +513,26 @@ export const adminTranslations = {
     newResponseSubmitted: 'Nueva respuesta enviada',
     newEmailCollected: 'Nuevo correo electrónico recopilado',
     surveyCreated: 'Encuesta creada',
+    
+    // Common Buttons (specific new ones)
+    addOption: 'Añadir opción',
+    export: 'Exportar',
+    import: 'Importar',
+    copy: 'Copiar',
+    copied: '¡Copiado!',
+    search: 'Buscar',
+    filter: 'Filtrar',
+    sort: 'Ordenar',
+    
+    // SurveyDetails (only new ones not already defined)
+    shareableLink: 'Enlace compartible',
+    renamesurvey: 'Renombrar encuesta',
+    generateQRCode: 'Generar código QR',
+    editQuestions: 'Editar preguntas',
+    viewResponses: 'Ver respuestas',
+    exportCSV: 'Exportar CSV',
+    preview: 'Vista previa',
+    actions: 'Acciones',
     
     // Surveys List
     activeSurveysList: 'Encuestas activas',
