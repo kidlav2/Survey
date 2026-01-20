@@ -23,7 +23,7 @@ interface ActiveSurvey {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { language, setLanguage } = useContext(AdminLanguageContext);
+  const { language } = useContext(AdminLanguageContext);
   const [copied, setCopied] = React.useState(false);
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [isQRModalOpen, setIsQRModalOpen] = React.useState(false);
@@ -254,21 +254,6 @@ export default function Dashboard() {
           <div>
             <h2 className="text-xl md:text-2xl font-semibold text-gray-900">{t.dashboard}</h2>
             <p className="text-sm text-gray-500 mt-1">{t.internalSurveyResearchProject}</p>
-          </div>
-          <div className="flex gap-2">
-            {(['en', 'ru', 'fr', 'es'] as const).map((lng) => (
-              <button
-                key={lng}
-                onClick={() => setLanguage(lng)}
-                className={`px-3 py-2 rounded-lg font-medium transition-colors ${
-                  language === lng
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                {lng.toUpperCase()}
-              </button>
-            ))}
           </div>
         </div>
       </header>
