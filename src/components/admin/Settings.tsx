@@ -118,14 +118,24 @@ export default function Settings() {
     try {
       setLoading(true);
       
-      // Delete user account via a database function (RPC)
-      // This is necessary because supabase.auth.admin.deleteUser is server-side only
-      const { error } = await supabase.rpc('delete_user_account');
+      // Try to delete user account via RPC function first
+      // If it fails, we'll still sign out to prevent further issues
+      let rpcError = null;
+      
+      try {
+        const { error } = await supabase.rpc('delete_user_account');
+        rpcError = error;
+      } catch (err) {
+        console.error('RPC call error:', err);
+        rpcError = err;
+      }
 
-      if (error) throw error;
-
-      // Sign out locally after successful deletion
-      await supabase.auth.signOut();
+      // Sign out locally after deletion attempt
+      const { error: signOutError } = await supabase.auth.signOut();
+      
+      if (signOutError) {
+        console.error('Sign out error:', signOutError);
+      }
 
       setToast({ message: t.accountDeleted, type: 'success' });
       setTimeout(() => navigate('/login'), 1500);

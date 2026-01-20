@@ -1189,15 +1189,20 @@ export default function SurveyBuilder() {
 
         {/* All Questions (including those without sections) */}
         <div className="space-y-4">
-          {questions.map((question, index) => (
+          {questions.filter(q => !q.section_id).length === 0 && sections.length > 0 ? (
+            <p className="text-sm text-gray-500 italic text-center py-4">All questions are assigned to sections. Add more questions above.</p>
+          ) : (
+          questions.filter(q => !q.section_id).map((question, index) => {
+            const actualIndex = questions.findIndex(q => q.id === question.id);
+            return (
             <div 
               key={question.id}
               draggable
-              onDragStart={(e) => handleDragStart(e, index)}
-              onDragOver={(e) => handleDragOver(e, index)}
-              onDrop={(e) => handleDrop(e, index)}
+              onDragStart={(e) => handleDragStart(e, actualIndex)}
+              onDragOver={(e) => handleDragOver(e, actualIndex)}
+              onDrop={(e) => handleDrop(e, actualIndex)}
               onDragEnd={handleDragEnd}
-              className={draggedIndex === index ? 'opacity-50' : ''}
+              className={draggedIndex === actualIndex ? 'opacity-50' : ''}
             >
               {/* Question Card */}
               <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -1209,7 +1214,7 @@ export default function SurveyBuilder() {
                   <GripVertical className="w-5 h-5 text-gray-400 flex-shrink-0 cursor-move" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-medium text-gray-900">Question {index + 1}</span>
+                      <span className="text-sm font-medium text-gray-900">Question {actualIndex + 1}</span>
                       <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded">
                         {question.type === 'single-choice' ? 'Single Choice' : question.type === 'multiple-choice' ? 'Multiple' : question.type}
                       </span>
@@ -1399,7 +1404,7 @@ export default function SurveyBuilder() {
                       {/* Action Buttons */}
                       <div className="pt-4 border-t border-gray-200 flex gap-2 flex-wrap">
                         <button
-                          onClick={() => duplicateQuestion(question.id, index)}
+                          onClick={() => duplicateQuestion(question.id, actualIndex)}
                           className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium"
                         >
                           <Copy className="w-4 h-4" />
@@ -1419,7 +1424,9 @@ export default function SurveyBuilder() {
                 )}
               </div>
             </div>
-          ))}
+            );
+          })
+          )}
         </div>
 
         {/* Bottom Actions (Add Question and Save Buttons) */}
