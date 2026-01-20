@@ -72,7 +72,7 @@ export default function Login() {
       // Attempt to send reset email
       // Note: Supabase will not reveal if email exists or not for security
       const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-        redirectTo: `${window.location.origin}/reset-password`,
+        redirectTo: '/reset-password',
       });
 
       if (error) {
