@@ -155,6 +155,9 @@ export default function SurveyFlow() {
           hasOtherOption:
             payload.hasOtherOption ?? row.has_other_option ?? row.hasOtherOption ?? false,
           section_id: row.section_id,
+          conditional_logic: row.conditional_logic 
+            ? (typeof row.conditional_logic === 'string' ? JSON.parse(row.conditional_logic) : row.conditional_logic)
+            : undefined
         };
       });
 
@@ -189,6 +192,22 @@ export default function SurveyFlow() {
   };
 
   const handleNext = async () => {
+    // Check if current question has conditional logic
+    if (question && question.conditional_logic && question.conditional_logic.length > 0) {
+      const answer = answers[question.id];
+      const logic = question.conditional_logic.find((l: any) => l.answer === answer);
+      
+      if (logic && logic.next_question_id) {
+        // Find the next question by ID
+        const nextQuestionIndex = questions.findIndex((q: any) => q.id === logic.next_question_id);
+        if (nextQuestionIndex >= 0) {
+          setCurrentQuestion(nextQuestionIndex);
+          return;
+        }
+      }
+    }
+
+    // Default behavior - move to next question
     if (currentQuestion < totalQuestions - 1) {
       setCurrentQuestion(currentQuestion + 1);
     } else {

@@ -74,7 +74,7 @@ export default function SurveyDetails() {
       // Fetch survey data
       const { data: surveyData, error: surveyError } = await supabase
         .from('surveys')
-        .select('*')
+        .select('id, title, description, status, created_at, thank_you_message, show_survey_info, estimated_time')
         .eq('id', id)
         .single();
 
