@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Inbox, Mail, Clock, Copy, Plus, CheckCircle } from 'lucide-react';
+import { Inbox, Mail, Clock, Copy, Plus, CheckCircle, QrCode, X, Download } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { supabase } from '../../lib/supabaseClient';
 import CreateSurveyModal from './CreateSurveyModal';
 import Toast from '../common/Toast';
@@ -25,6 +26,7 @@ export default function Dashboard() {
   const { language, setLanguage } = useContext(AdminLanguageContext);
   const [copied, setCopied] = React.useState(false);
   const [isModalOpen, setIsModalOpen] = React.useState(false);
+  const [isQRModalOpen, setIsQRModalOpen] = React.useState(false);
   const [toast, setToast] = React.useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
   const [metrics, setMetrics] = useState<DashboardMetrics>({ totalResponses: 0, emailsCollected: 0, lastActivity: 'No activity' });
   const [activeSurvey, setActiveSurvey] = useState<ActiveSurvey | null>(null);
@@ -200,6 +202,30 @@ export default function Dashboard() {
     }
   };
 
+  const downloadQRCode = () => {
+    if (!activeSurvey) return;
+    const svg = document.getElementById(`dashboard-qrcode-${activeSurvey.id}`);
+    if (!svg) return;
+
+    const svgData = new XMLSerializer().serializeToString(svg);
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    const img = new Image();
+
+    img.onload = () => {
+      canvas.width = 1000;
+      canvas.height = 1000;
+      ctx?.drawImage(img, 0, 0, 1000, 1000);
+      const pngFile = canvas.toDataURL("image/png");
+      const downloadLink = document.createElement("a");
+      downloadLink.download = `survey-qr-${activeSurvey.id}.png`;
+      downloadLink.href = pngFile;
+      downloadLink.click();
+    };
+
+    img.src = "data:image/svg+xml;base64," + btoa(svgData);
+  };
+
   const handleCreateSurvey = (surveyData: { id: string }) => {
     setToast({ message: 'Survey created successfully', type: 'success' });
     setIsModalOpen(false);
@@ -319,6 +345,13 @@ export default function Dashboard() {
                       <Copy className="w-5 h-5 text-gray-600" />
                     )}
                   </button>
+                  <button
+                    onClick={() => setIsQRModalOpen(true)}
+                    className="p-2.5 border border-gray-300 hover:bg-white rounded-lg transition-colors self-center sm:self-auto"
+                    title="View QR Code"
+                  >
+                    <QrCode className="w-5 h-5 text-gray-600" />
+                  </button>
                 </div>
                 {copied && (
                   <p className="text-sm text-green-600 mt-2">{t.linkCopied}</p>
@@ -402,6 +435,50 @@ export default function Dashboard() {
         onClose={() => setIsModalOpen(false)}
         onCreate={handleCreateSurvey}
       />
+
+      {/* QR Code Modal */}
+      {isQRModalOpen && activeSurvey && (
+        <div className="fixed inset-0 flex items-center justify-center p-6 z-50" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+          <div className="bg-white rounded-lg shadow-lg max-w-sm w-full">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">QR Code</h2>
+              <button
+                onClick={() => setIsQRModalOpen(false)}
+                className="p-1 hover:bg-gray-100 rounded transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-600" />
+              </button>
+            </div>
+
+            <div className="p-6 text-center">
+              <QRCodeSVG
+                id={`dashboard-qrcode-${activeSurvey.id}`}
+                value={surveyLink}
+                size={256}
+                level="H"
+                includeMargin={true}
+              />
+              <p className="text-xs text-gray-500 mt-4 mb-6">{activeSurvey.title}</p>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={downloadQRCode}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium"
+                >
+                  <Download className="w-4 h-4" />
+                  Download
+                </button>
+                <button
+                  onClick={() => setIsQRModalOpen(false)}
+                  className="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toast */}
       {toast && (

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, Plus, Trash2, GripVertical, ChevronDown, ChevronUp, FileText, Copy } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
@@ -123,6 +123,7 @@ const translations = {
     active: 'Active',
     disabled: 'Disabled',
     surveyStatus: 'Survey Status',
+    surveyState: 'State',
     statusUpdated: 'Survey status updated',
     statusUpdateFailed: 'Failed to update survey status',
     yes: 'Yes',
@@ -136,6 +137,10 @@ const translations = {
     addSection: 'Add Section',
     deleteSection: 'Delete Section',
     selectSection: 'Select Section',
+    activateModalTitle: 'Activate Survey?',
+    activateModalDesc: 'Your questionnaire has been saved. To start collecting responses, activate the survey.',
+    activateLater: 'Later',
+    activateNow: 'Activate',
   },
   ru: {
     addOption: 'Добавить вариант',
@@ -165,6 +170,7 @@ const translations = {
     active: 'Активен',
     disabled: 'Отключен',
     surveyStatus: 'Статус опроса',
+    surveyState: 'Состояние',
     statusUpdated: 'Статус опроса обновлен',
     statusUpdateFailed: 'Ошибка при обновлении статуса опроса',
     yes: 'Да',
@@ -178,6 +184,10 @@ const translations = {
     addSection: 'Добавить раздел',
     deleteSection: 'Удалить раздел',
     selectSection: 'Выберите раздел',
+    activateModalTitle: 'Активировать опрос?',
+    activateModalDesc: 'Ваш вопросник сохранен. Чтобы начать собирать ответы, активируйте опрос.',
+    activateLater: 'Позже',
+    activateNow: 'Активировать',
   },
   fr: {
     addOption: 'Ajouter une option',
@@ -207,6 +217,7 @@ const translations = {
     active: 'Actif',
     disabled: 'Désactivé',
     surveyStatus: 'Statut de l\'enquête',
+    surveyState: 'État',
     statusUpdated: 'Statut de l\'enquête mis à jour',
     statusUpdateFailed: 'Erreur lors de la mise à jour du statut de l\'enquête',
     yes: 'Oui',
@@ -220,6 +231,10 @@ const translations = {
     addSection: 'Ajouter une section',
     deleteSection: 'Supprimer la section',
     selectSection: 'Sélectionner une section',
+    activateModalTitle: 'Activer l\'enquête?',
+    activateModalDesc: 'Votre questionnaire a été enregistré. Pour commencer à collecter des réponses, activez l\'enquête.',
+    activateLater: 'Plus tard',
+    activateNow: 'Activer',
   },
   es: {
     addOption: 'Agregar opción',
@@ -249,6 +264,7 @@ const translations = {
     active: 'Activo',
     disabled: 'Desactivado',
     surveyStatus: 'Estado de la encuesta',
+    surveyState: 'Estado',
     statusUpdated: 'Estado de la encuesta actualizado',
     statusUpdateFailed: 'Error al actualizar el estado de la encuesta',
     yes: 'Sí',
@@ -262,6 +278,10 @@ const translations = {
     addSection: 'Añadir sección',
     deleteSection: 'Eliminar sección',
     selectSection: 'Seleccionar sección',
+    activateModalTitle: '¿Activar encuesta?',
+    activateModalDesc: 'Su cuestionario ha sido guardado. Para comenzar a recopilar respuestas, active la encuesta.',
+    activateLater: 'Más tarde',
+    activateNow: 'Activar',
   },
 };
 
@@ -290,12 +310,21 @@ export default function SurveyBuilder() {
   const [newSectionDesc, setNewSectionDesc] = useState('');
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
   const [sectionsLoading, setSectionsLoading] = useState(false);
+  const otherInputRef = useRef<HTMLInputElement | null>(null);
+  const [showActivationModal, setShowActivationModal] = useState(false);
 
   const t = translations[language];
 
   useEffect(() => {
     loadQuestions();
   }, [id]);
+
+  // Auto-focus on "Other" input when it's added
+  useEffect(() => {
+    if (otherInputRef.current) {
+      otherInputRef.current.focus();
+    }
+  }, [expandedQuestion, questions.map(q => q.hasOtherOption).join()]);
 
   const loadQuestions = async () => {
     try {
@@ -555,6 +584,12 @@ export default function SurveyBuilder() {
       setQuestions(updatedQuestions);
       setSaveStatus('saved');
       setToast({ message: t.saved_toast, type: 'success' });
+      
+      // Show activation modal if survey is not active
+      if (!surveyIsActive) {
+        setShowActivationModal(true);
+      }
+      
       setTimeout(() => setSaveStatus('idle'), 2000);
     } catch (error) {
       console.error('Error saving questions:', error);
@@ -771,7 +806,7 @@ export default function SurveyBuilder() {
               <p className="text-sm text-gray-500 mt-1">{t.buildCustomize}</p>
             </div>
           </div>
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
               <button 
                 onClick={handlePreview}
@@ -797,21 +832,23 @@ export default function SurveyBuilder() {
                 <p className="text-lg font-semibold text-gray-900">{questions.length}</p>
               </div>
             </div>
-            <button
-              onClick={toggleSurveyStatus}
-              disabled={loadingSurveyStatus}
-              title={surveyIsActive ? 'Click to disable survey' : 'Click to enable survey'}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap ${
-                surveyIsActive
-                  ? 'bg-green-600 hover:bg-green-700 text-white'
-                  : 'bg-red-600 hover:bg-red-700 text-white'
-              } ${loadingSurveyStatus ? 'opacity-70 cursor-wait' : ''}`}
-            >
-              {loadingSurveyStatus 
-                ? t.saving 
-                : surveyIsActive ? `✓ ${t.active} Survey` : `✕ ${t.disabled} Survey`
-              }
-            </button>
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-gray-700">{t.surveyState}</span>
+              <button
+                onClick={toggleSurveyStatus}
+                disabled={loadingSurveyStatus}
+                title={surveyIsActive ? 'Click to disable survey' : 'Click to enable survey'}
+                className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
+                  surveyIsActive ? 'bg-green-600' : 'bg-gray-300'
+                } ${loadingSurveyStatus ? 'opacity-70 cursor-wait' : 'cursor-pointer'}`}
+              >
+                <span
+                  className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                    surveyIsActive ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -857,6 +894,21 @@ export default function SurveyBuilder() {
               />
             </div>
             
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                {t.thankYouMessage}
+              </label>
+              <textarea
+                value={thankYouMessage}
+                onChange={(e) => setThankYouMessage(e.target.value)}
+                rows={3}
+                disabled={surveyInfoLoading}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg 
+                         focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none disabled:bg-gray-50 disabled:text-gray-500"
+                placeholder={t.defaultThankYouText}
+              />
+            </div>
+            
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -879,26 +931,11 @@ export default function SurveyBuilder() {
                 <button
                   onClick={saveSurveyInfo}
                   disabled={surveyInfoLoading}
-                  className="w-full px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                 >
                   {surveyInfoLoading ? 'Saving...' : 'Save Info'}
                 </button>
               </div>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                {t.thankYouMessage}
-              </label>
-              <textarea
-                value={thankYouMessage}
-                onChange={(e) => setThankYouMessage(e.target.value)}
-                rows={3}
-                disabled={surveyInfoLoading}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg 
-                         focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none disabled:bg-gray-50 disabled:text-gray-500"
-                placeholder={t.defaultThankYouText}
-              />
             </div>
 
             {/* Show Survey Info Toggle */}
@@ -1342,10 +1379,11 @@ export default function SurveyBuilder() {
                                 {question.hasOtherOption && (
                                   <div className="flex items-center gap-2 p-3 bg-white border border-gray-300 rounded-lg">
                                     <input
+                                      ref={otherInputRef}
                                       type="text"
-                                      value={t.other}
-                                      disabled
-                                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600"
+                                      placeholder={t.other}
+                                      defaultValue=""
+                                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                     />
                                     <button
                                       onClick={() => updateQuestion(question.id, 'hasOtherOption', false)}
@@ -1479,6 +1517,35 @@ export default function SurveyBuilder() {
           isVisible={true}
           onClose={() => setToast(null)}
         />
+      )}
+
+      {/* Activation Modal */}
+      {showActivationModal && (
+        <div className="fixed inset-0 flex items-center justify-center p-6 z-50" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+          <div className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full">
+            <h3 className="text-lg font-semibold text-gray-900 mb-3">{t.activateModalTitle}</h3>
+            <p className="text-gray-600 mb-6">
+              {t.activateModalDesc}
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowActivationModal(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg font-medium transition-colors"
+              >
+                {t.activateLater}
+              </button>
+              <button
+                onClick={() => {
+                  setShowActivationModal(false);
+                  toggleSurveyStatus();
+                }}
+                className="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors"
+              >
+                {t.activateNow}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </main>
   );

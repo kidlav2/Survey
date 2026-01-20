@@ -98,7 +98,23 @@ export default function ThankYou() {
 
           {/* Footer */}
           <p className="text-sm text-gray-500 mt-8">
-            {t.footer}
+            {language === 'ru' ? (
+              <>
+                Теперь вы можете <strong>закрыть</strong> это окно
+              </>
+            ) : language === 'fr' ? (
+              <>
+                Vous pouvez maintenant <strong>fermer</strong> cette fenêtre
+              </>
+            ) : language === 'es' ? (
+              <>
+                Ahora puede <strong>cerrar</strong> esta ventana
+              </>
+            ) : (
+              <>
+                You may now <strong>close</strong> this window
+              </>
+            )}
           </p>
         </div>
       </div>
