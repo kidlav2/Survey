@@ -1,14 +1,8 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { LayoutDashboard, FileText, Inbox, Users, Settings, X } from 'lucide-react';
-
-const navItems = [
-  { icon: LayoutDashboard, label: 'Dashboard', path: '/admin/dashboard' },
-  { icon: FileText, label: 'Surveys', path: '/admin/surveys' },
-  { icon: Inbox, label: 'Responses', path: '/admin/responses' },
-  { icon: Users, label: 'Contacts', path: '/admin/contacts' },
-  { icon: Settings, label: 'Settings', path: '/admin/settings' },
-];
+import { adminTranslations } from './adminTranslations';
+import { AdminLanguageContext } from './AdminLayout';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -18,6 +12,16 @@ interface SidebarProps {
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { language } = useContext(AdminLanguageContext);
+  const t = adminTranslations[language];
+
+  const navItems = [
+    { icon: LayoutDashboard, label: t.dashboard, path: '/admin/dashboard' },
+    { icon: FileText, label: t.surveys, path: '/admin/surveys' },
+    { icon: Inbox, label: t.responses, path: '/admin/responses' },
+    { icon: Users, label: t.contacts, path: '/admin/contacts' },
+    { icon: Settings, label: t.settings, path: '/admin/settings' },
+  ];
 
   const handleNavigate = (path: string) => {
     navigate(path);
@@ -29,8 +33,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex w-64 bg-white border-r border-gray-200 min-h-screen flex-shrink-0 flex-col">
         <div className="p-6">
-          <h1 className="text-xl font-semibold text-gray-900">Survey Research</h1>
-          <p className="text-sm text-gray-500 mt-1">Admin Portal</p>
+          <h1 className="text-xl font-semibold text-gray-900">{t.surveyResearch}</h1>
+          <p className="text-sm text-gray-500 mt-1">{t.adminPortal}</p>
         </div>
         
         <nav className="px-3 space-y-1 flex-1">
@@ -64,8 +68,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       >
         <div className="p-6 flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">Survey Research</h1>
-            <p className="text-sm text-gray-500 mt-1">Admin Portal</p>
+            <h1 className="text-xl font-semibold text-gray-900">{t.surveyResearch}</h1>
+            <p className="text-sm text-gray-500 mt-1">{t.adminPortal}</p>
           </div>
           <button
             onClick={onClose}

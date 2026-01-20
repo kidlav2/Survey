@@ -1,10 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Inbox, Mail, Clock, Copy, Plus, CheckCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import CreateSurveyModal from './CreateSurveyModal';
 import Toast from '../common/Toast';
 import SkeletonDashboard from '../common/SkeletonDashboard';
+import { adminTranslations } from './adminTranslations';
+import { AdminLanguageContext } from './AdminLayout';
 
 interface DashboardMetrics {
   totalResponses: number;
@@ -20,6 +22,7 @@ interface ActiveSurvey {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { language, setLanguage } = useContext(AdminLanguageContext);
   const [copied, setCopied] = React.useState(false);
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [toast, setToast] = React.useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
@@ -28,6 +31,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [languageCounts, setLanguageCounts] = useState<Record<string, number>>({});
   const [recentActivity, setRecentActivity] = useState<Array<{ label: string; when: string; tone: 'primary' | 'muted' }>>([]);
+
+  const t = adminTranslations[language];
 
   useEffect(() => {
     loadDashboardData();
@@ -188,9 +193,9 @@ export default function Dashboard() {
   };
 
   const metricCards = [
-    { label: 'Total Responses', value: metrics.totalResponses, icon: Inbox, color: 'blue', path: '/admin/responses' },
-    { label: 'Emails Collected', value: metrics.emailsCollected, icon: Mail, color: 'green', path: '/admin/contacts' },
-    { label: 'Last Activity', value: metrics.lastActivity, icon: Clock, color: 'gray', path: null },
+    { label: t.totalResponses, value: metrics.totalResponses, icon: Inbox, color: 'blue', path: '/admin/responses' },
+    { label: t.emailsCollected, value: metrics.emailsCollected, icon: Mail, color: 'green', path: '/admin/contacts' },
+    { label: t.lastActivity, value: metrics.lastActivity, icon: Clock, color: 'gray', path: null },
   ];
 
   const surveyLink = activeSurvey ? `${window.location.origin}/survey/${activeSurvey.id}` : '';
@@ -229,9 +234,26 @@ export default function Dashboard() {
     <main className="flex-1">
       {/* Top Bar */}
       <header className="bg-white border-b border-gray-200 px-4 md:px-8 py-4">
-        <div>
-          <h2 className="text-xl md:text-2xl font-semibold text-gray-900">Dashboard</h2>
-          <p className="text-sm text-gray-500 mt-1">Internal Survey Research Project</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl md:text-2xl font-semibold text-gray-900">{t.dashboard}</h2>
+            <p className="text-sm text-gray-500 mt-1">Internal Survey Research Project</p>
+          </div>
+          <div className="flex gap-2">
+            {(['en', 'ru', 'fr', 'es'] as const).map((lng) => (
+              <button
+                key={lng}
+                onClick={() => setLanguage(lng)}
+                className={`px-3 py-2 rounded-lg font-medium transition-colors ${
+                  language === lng
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {lng.toUpperCase()}
+              </button>
+            ))}
+          </div>
         </div>
       </header>
 
@@ -270,7 +292,7 @@ export default function Dashboard() {
             className="flex items-center justify-center md:justify-start gap-2 w-full md:w-auto px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium"
           >
             <Plus className="w-5 h-5" />
-            Create New Survey
+            {t.createSurvey}
           </button>
         </div>
 
@@ -278,7 +300,7 @@ export default function Dashboard() {
         {activeSurvey ? (
           <div className="bg-white rounded-lg border border-gray-200">
             <div className="px-4 md:px-6 py-4 border-b border-gray-200">
-              <h3 className="text-base md:text-lg font-semibold text-gray-900">Active Survey</h3>
+              <h3 className="text-base md:text-lg font-semibold text-gray-900">{t.activeSurveys}</h3>
               <p className="text-sm text-gray-500 mt-1">Current research project overview</p>
             </div>
             
@@ -356,13 +378,13 @@ export default function Dashboard() {
         {/* Recent Activity */}
         <div className="mt-6 bg-white rounded-lg border border-gray-200">
           <div className="px-4 md:px-6 py-4 border-b border-gray-200">
-            <h3 className="text-base md:text-lg font-semibold text-gray-900">Recent Activity</h3>
+            <h3 className="text-base md:text-lg font-semibold text-gray-900">{t.recentActivity}</h3>
           </div>
           
           <div className="p-4 md:p-6">
             <div className="space-y-4">
               {recentActivity.length === 0 ? (
-                <div className="text-sm text-gray-600">No recent activity</div>
+                <div className="text-sm text-gray-600">{t.noActivity}</div>
               ) : (
                 recentActivity.map((item, idx) => (
                   <div

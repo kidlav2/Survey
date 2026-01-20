@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Trash2, Settings, ArrowUpDown } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
@@ -7,6 +7,8 @@ import CreateSurveyModal from './CreateSurveyModal';
 import DeleteSurveyModal from './DeleteSurveyModal';
 import Toast from '../common/Toast';
 import SkeletonDashboard from '../common/SkeletonDashboard';
+import { adminTranslations } from './adminTranslations';
+import { AdminLanguageContext } from './AdminLayout';
 
 interface Survey {
   id: string;
@@ -20,6 +22,8 @@ interface Survey {
 
 export default function Surveys() {
   const navigate = useNavigate();
+  const { language } = useContext(AdminLanguageContext);
+  const t = adminTranslations[language];
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedSurvey, setSelectedSurvey] = useState<string | null>(null);
