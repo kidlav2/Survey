@@ -41,15 +41,19 @@ export default function SurveyFlow() {
       '';
 
     // options can be: string[] OR { en: string[], ... }
-    const optMap = p.options;
-    const options =
-      (optMap && typeof optMap === 'object' && !Array.isArray(optMap)
-        ? (optMap[lng] || optMap[base] || [])
-        : Array.isArray(optMap)
-          ? optMap
-          : Array.isArray(q?.options)
-            ? q.options
-            : []);
+    // For yes-no questions, always return empty options so translations are used
+    let options: any[] = [];
+    if (q?.type !== 'yes-no') {
+      const optMap = p.options;
+      options =
+        (optMap && typeof optMap === 'object' && !Array.isArray(optMap)
+          ? (optMap[lng] || optMap[base] || [])
+          : Array.isArray(optMap)
+            ? optMap
+            : Array.isArray(q?.options)
+              ? q.options
+              : []);
+    }
 
     return { text, options };
 

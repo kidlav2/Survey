@@ -17,6 +17,8 @@ export const translations = {
       finish: 'Finish',
       selectAll: 'Select all that apply',
       question: 'Question',
+      yes: 'Yes',
+      no: 'No',
     },
     questions_list: [
       {
@@ -86,6 +88,8 @@ export const translations = {
       finish: 'Завершить',
       selectAll: 'Выберите все подходящие варианты',
       question: 'Вопрос',
+      yes: 'Да',
+      no: 'Нет',
     },
     questions_list: [
       {
@@ -155,6 +159,8 @@ export const translations = {
       finish: 'Terminer',
       selectAll: 'Sélectionnez toutes les réponses applicables',
       question: 'Question',
+      yes: 'Oui',
+      no: 'Non',
     },
     questions_list: [
       {
@@ -223,8 +229,8 @@ export const translations = {
       back: 'Atrás',
       finish: 'Finalizar',
       selectAll: 'Seleccione todas las que correspondan',
-      question: 'Pregunta',
-    },
+      question: 'Pregunta',      yes: 'Sí',
+      no: 'No',    },
     questions_list: [
       {
         question: '¿Con qué frecuencia utiliza herramientas digitales para sus tareas diarias?',

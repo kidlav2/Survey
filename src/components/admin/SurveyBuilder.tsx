@@ -124,6 +124,8 @@ const translations = {
     surveyStatus: 'Survey Status',
     statusUpdated: 'Survey status updated',
     statusUpdateFailed: 'Failed to update survey status',
+    yes: 'Yes',
+    no: 'No',
   },
   ru: {
     addOption: 'Добавить вариант',
@@ -155,6 +157,8 @@ const translations = {
     surveyStatus: 'Статус опроса',
     statusUpdated: 'Статус опроса обновлен',
     statusUpdateFailed: 'Ошибка при обновлении статуса опроса',
+    yes: 'Да',
+    no: 'Нет',
   },
   fr: {
     addOption: 'Ajouter une option',
@@ -186,6 +190,8 @@ const translations = {
     surveyStatus: 'Statut de l\'enquête',
     statusUpdated: 'Statut de l\'enquête mis à jour',
     statusUpdateFailed: 'Erreur lors de la mise à jour du statut de l\'enquête',
+    yes: 'Oui',
+    no: 'Non',
   },
   es: {
     addOption: 'Agregar opción',
@@ -217,6 +223,8 @@ const translations = {
     surveyStatus: 'Estado de la encuesta',
     statusUpdated: 'Estado de la encuesta actualizado',
     statusUpdateFailed: 'Error al actualizar el estado de la encuesta',
+    yes: 'Sí',
+    no: 'No',
   },
 };
 
@@ -359,7 +367,19 @@ export default function SurveyBuilder() {
   };
 
   const updateQuestion = (questionId: string, key: keyof Question, value: any) => {
-    setQuestions(questions.map(q => q.id === questionId ? { ...q, [key]: value } : q));
+    setQuestions(questions.map(q => {
+      if (q.id === questionId) {
+        const updatedQ = { ...q, [key]: value };
+        
+        // When changing to yes-no type, set options to Yes/No
+        if (key === 'type' && value === 'yes-no') {
+          updatedQ.options = [t.yes, t.no];
+        }
+        
+        return updatedQ;
+      }
+      return q;
+    }));
     setSaveStatus('unsaved');
   };
 
@@ -701,77 +721,102 @@ export default function SurveyBuilder() {
                         </select>
                       </div>
 
-                      {/* Options (for single-choice and multiple-choice) */}
-                      {(question.type === 'single-choice' || question.type === 'multiple-choice') && (
+                      {/* Options (for single-choice, multiple-choice, and yes-no) */}
+                      {(question.type === 'single-choice' || question.type === 'multiple-choice' || question.type === 'yes-no') && (
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
                             {t.options}
                           </label>
                           <div className="space-y-2">
-                            {question.options?.map((option, optIndex) => (
-                              <div key={optIndex} className="flex items-center gap-2">
-                                <input
-                                  type="text"
-                                  value={option}
-                                  onChange={(e) => {
-                                    const newOptions = [...(question.options || [])];
-                                    newOptions[optIndex] = e.target.value;
-                                    updateQuestion(question.id, 'options', newOptions);
-                                  }}
-                                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                  placeholder={`Option ${optIndex + 1}`}
-                                />
-                                <button
-                                  onClick={() => {
-                                    const newOptions = question.options?.filter((_, i) => i !== optIndex);
-                                    updateQuestion(question.id, 'options', newOptions);
-                                  }}
-                                  disabled={(question.options?.length || 0) <= 2}
-                                  className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            ))}
+                            {question.type === 'yes-no' ? (
+                              // Display read-only yes-no options
+                              <>
+                                <div className="flex items-center gap-2 p-3 bg-white border border-gray-300 rounded-lg cursor-not-allowed">
+                                  <input
+                                    type="text"
+                                    value={t.yes}
+                                    disabled
+                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600"
+                                  />
+                                </div>
+                                <div className="flex items-center gap-2 p-3 bg-white border border-gray-300 rounded-lg cursor-not-allowed">
+                                  <input
+                                    type="text"
+                                    value={t.no}
+                                    disabled
+                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600"
+                                  />
+                                </div>
+                              </>
+                            ) : (
+                              // Editable options for single-choice and multiple-choice
+                              <>
+                                {question.options?.map((option, optIndex) => (
+                                  <div key={optIndex} className="flex items-center gap-2">
+                                    <input
+                                      type="text"
+                                      value={option}
+                                      onChange={(e) => {
+                                        const newOptions = [...(question.options || [])];
+                                        newOptions[optIndex] = e.target.value;
+                                        updateQuestion(question.id, 'options', newOptions);
+                                      }}
+                                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                      placeholder={`Option ${optIndex + 1}`}
+                                    />
+                                    <button
+                                      onClick={() => {
+                                        const newOptions = question.options?.filter((_, i) => i !== optIndex);
+                                        updateQuestion(question.id, 'options', newOptions);
+                                      }}
+                                      disabled={(question.options?.length || 0) <= 2}
+                                      className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                ))}
 
-                            {/* Other Option */}
-                            {question.hasOtherOption && (
-                              <div className="flex items-center gap-2 p-3 bg-white border border-gray-300 rounded-lg">
-                                <input
-                                  type="text"
-                                  value={t.other}
-                                  disabled
-                                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600"
-                                />
-                                <button
-                                  onClick={() => updateQuestion(question.id, 'hasOtherOption', false)}
-                                  className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
+                                {/* Other Option */}
+                                {question.hasOtherOption && (
+                                  <div className="flex items-center gap-2 p-3 bg-white border border-gray-300 rounded-lg">
+                                    <input
+                                      type="text"
+                                      value={t.other}
+                                      disabled
+                                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600"
+                                    />
+                                    <button
+                                      onClick={() => updateQuestion(question.id, 'hasOtherOption', false)}
+                                      className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                )}
+
+                                <div className="flex gap-2 pt-2">
+                                  <button
+                                    onClick={() => {
+                                      const newOptions = [...(question.options || []), `Option ${(question.options?.length || 0) + 1}`];
+                                      updateQuestion(question.id, 'options', newOptions);
+                                    }}
+                                    className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                                  >
+                                    + {t.addOption}
+                                  </button>
+                                  
+                                  {!question.hasOtherOption && (
+                                    <button
+                                      onClick={() => updateQuestion(question.id, 'hasOtherOption', true)}
+                                      className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                                    >
+                                      + {t.addOther}
+                                    </button>
+                                  )}
+                                </div>
+                              </>
                             )}
-
-                            <div className="flex gap-2 pt-2">
-                              <button
-                                onClick={() => {
-                                  const newOptions = [...(question.options || []), `Option ${(question.options?.length || 0) + 1}`];
-                                  updateQuestion(question.id, 'options', newOptions);
-                                }}
-                                className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
-                              >
-                                + {t.addOption}
-                              </button>
-                              
-                              {!question.hasOtherOption && (
-                                <button
-                                  onClick={() => updateQuestion(question.id, 'hasOtherOption', true)}
-                                  className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
-                                >
-                                  + {t.addOther}
-                                </button>
-                              )}
-                            </div>
                           </div>
                         </div>
                       )}
