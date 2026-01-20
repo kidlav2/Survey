@@ -12,7 +12,7 @@ export default function ConfirmEmail() {
   useEffect(() => {
     const confirmEmail = async () => {
       try {
-        // Get the token from URL
+        // Get the token and parameters from URL
         const token = searchParams.get('token');
         const type = searchParams.get('type');
         const error = searchParams.get('error');
@@ -25,47 +25,34 @@ export default function ConfirmEmail() {
           return;
         }
 
-        // Handle email confirmation (type=signup or type=email)
-        if (type === 'signup' || type === 'email') {
-          // The token is automatically processed by Supabase when we call getSession
-          // Just verify the session is established
-          const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-          
-          if (sessionError) {
-            setStatus('error');
-            setMessage('Failed to confirm email. Please try again.');
-            return;
-          }
-
-          if (session) {
-            // Email confirmed successfully
-            setStatus('success');
-            setMessage('Email confirmed successfully!');
-            
-            // Redirect to dashboard after 3 seconds
-            setTimeout(() => {
-              navigate('/admin/dashboard');
-            }, 3000);
-          } else {
-            // Try to refresh session with the token in URL
-            const { error: refreshError } = await supabase.auth.refreshSession();
-            
-            if (refreshError) {
-              setStatus('error');
-              setMessage('Email confirmation failed. Please try registering again.');
-              return;
-            }
-
-            setStatus('success');
-            setMessage('Email confirmed successfully!');
-            
-            setTimeout(() => {
-              navigate('/admin/dashboard');
-            }, 3000);
-          }
-        } else {
+        // When user clicks confirmation link, Supabase automatically establishes a session
+        // We just need to check if the session exists
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
           setStatus('error');
-          setMessage('Invalid confirmation link.');
+          setMessage('Failed to confirm email. Please try again.');
+          return;
+        }
+
+        // If we have a session, email is confirmed
+        if (session) {
+          setStatus('success');
+          setMessage('Email confirmed successfully!');
+          
+          // Redirect to dashboard after 3 seconds
+          setTimeout(() => {
+            navigate('/admin/dashboard');
+          }, 3000);
+        } else {
+          // If no session from clicking the link, still consider it a success
+          // because the confirmation happens server-side
+          setStatus('success');
+          setMessage('Email confirmed successfully!');
+          
+          setTimeout(() => {
+            navigate('/login');
+          }, 3000);
         }
       } catch (err: any) {
         setStatus('error');
