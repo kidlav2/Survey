@@ -41,11 +41,11 @@ export default function Login() {
 
       if (error) {
         if (error.message === 'Invalid login credentials') {
-          setError('Email or password incorrect. Please check your credentials and try again.');
+          setError(t.emailNotRegistered);
           // Show suggestion to register if email might not exist
           setShowRegisterSuggestion(true);
         } else if (error.message === 'Email not confirmed') {
-          setError('Please confirm your email address before logging in. Check your inbox for the confirmation link.');
+          setError(t.emailNotConfirmed);
           setShowRegisterSuggestion(false);
         } else {
           setError(error.message);
@@ -284,7 +284,7 @@ export default function Login() {
                   </p>
                   <button
                     type="button"
-                    onClick={() => navigate('/register')}
+                    onClick={() => navigate('/register', { state: { email } })}
                     className="text-sm font-medium text-indigo-600 hover:text-indigo-700 underline"
                   >
                     {t.createNewAccount}

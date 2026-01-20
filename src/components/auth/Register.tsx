@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { UserPlus } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { authTranslations } from './authTranslations';
 
 export default function Register() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -15,6 +16,13 @@ export default function Register() {
   const [language, setLanguage] = useState<'en' | 'ru' | 'fr' | 'es'>('en');
 
   const t = authTranslations[language];
+
+  useEffect(() => {
+    // If coming from login with email, pre-fill it
+    if (location.state?.email) {
+      setEmail(location.state.email);
+    }
+  }, [location.state]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
