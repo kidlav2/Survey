@@ -126,10 +126,14 @@ export default function Responses() {
 
   const handleExport = (type: 'CSV' | 'JSON') => {
     try {
+      // Apply current filters and sort to exported data
+      let filteredResponses = responses.filter(r => filterSurvey === 'all' || r.survey_id === filterSurvey);
+      let sortedResponses = sortBy === 'newest' ? filteredResponses : [...filteredResponses].reverse();
+
       if (type === 'CSV') {
         const csv = [
           [t.id, t.date, t.email, t.status, t.duration],
-          ...responses.map(r => [
+          ...sortedResponses.map(r => [
             r.id,
             new Date(r.created_at).toLocaleString(),
             r.respondent_email || t.notProvided,
@@ -148,7 +152,7 @@ export default function Responses() {
         a.click();
         window.URL.revokeObjectURL(url);
       } else if (type === 'JSON') {
-        const json = JSON.stringify(responses, null, 2);
+        const json = JSON.stringify(sortedResponses, null, 2);
         const blob = new Blob([json], { type: 'application/json' });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');

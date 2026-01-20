@@ -311,6 +311,10 @@ export default function SurveyBuilder() {
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
   const [sectionsLoading, setSectionsLoading] = useState(false);
   const otherInputRef = useRef<HTMLInputElement | null>(null);
+  const [otherValues, setOtherValues] = useState<Record<string, string>>({});
+  const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
+  const [editingSectionName, setEditingSectionName] = useState('');
+  const [editingSectionDesc, setEditingSectionDesc] = useState('');
   const [showActivationModal, setShowActivationModal] = useState(false);
 
   const t = translations[language];
@@ -736,6 +740,30 @@ export default function SurveyBuilder() {
     }
   };
 
+  const updateSection = async (sectionId: string, name: string, description: string) => {
+    try {
+      setSectionsLoading(true);
+      
+      const { error } = await supabase
+        .from('survey_sections')
+        .update({ name, description })
+        .eq('id', sectionId);
+      
+      if (error) throw error;
+      
+      setSections(sections.map(s => 
+        s.id === sectionId ? { ...s, name, description } : s
+      ));
+      setEditingSectionId(null);
+      setToast({ message: 'Section updated successfully', type: 'success' });
+    } catch (error: any) {
+      console.error('Error updating section:', error);
+      setToast({ message: error.message || 'Failed to update section', type: 'error' });
+    } finally {
+      setSectionsLoading(false);
+    }
+  };
+
   const toggleSurveyStatus = async () => {
     try {
       setLoadingSurveyStatus(true);
@@ -997,7 +1025,13 @@ export default function SurveyBuilder() {
               <button
                 onClick={addSection}
                 disabled={sectionsLoading}
-                className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+                className="px-4 py-3 mt-3 text-white font-semibold rounded-lg transition-all block border-2 border-solid"
+                style={{ 
+                  backgroundColor: '#c4b5fd',
+                  borderColor: '#a78bfa',
+                  visibility: 'visible',
+                  display: 'block'
+                }}
               >
                 {t.addSection}
               </button>
@@ -1010,9 +1044,57 @@ export default function SurveyBuilder() {
                   <div key={section.id} className="p-4 bg-white rounded-lg border border-purple-100">
                     <div className="flex items-start justify-between gap-3 mb-4 pb-3 border-b border-purple-100">
                       <div className="flex-1">
-                        <h4 className="font-semibold text-gray-900">{section.name}</h4>
-                        {section.description && (
-                          <p className="text-sm text-gray-600 mt-1">{section.description}</p>
+                        {editingSectionId === section.id ? (
+                          <div className="space-y-2">
+                            <input
+                              type="text"
+                              value={editingSectionName}
+                              onChange={(e) => setEditingSectionName(e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                              placeholder="Section name"
+                            />
+                            <textarea
+                              value={editingSectionDesc}
+                              onChange={(e) => setEditingSectionDesc(e.target.value)}
+                              rows={2}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+                              placeholder="Section description"
+                            />
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => {
+                                  updateSection(section.id, editingSectionName, editingSectionDesc);
+                                }}
+                                disabled={sectionsLoading}
+                                className="px-3 py-1.5 text-sm bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                              >
+                                Save
+                              </button>
+                              <button
+                                onClick={() => setEditingSectionId(null)}
+                                disabled={sectionsLoading}
+                                className="px-3 py-1.5 text-sm bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition-colors disabled:opacity-50"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => {
+                                setEditingSectionId(section.id);
+                                setEditingSectionName(section.name);
+                                setEditingSectionDesc(section.description || '');
+                              }}
+                              className="font-semibold text-gray-900 hover:text-indigo-600 transition-colors text-left"
+                            >
+                              {section.name}
+                            </button>
+                            {section.description && (
+                              <p className="text-sm text-gray-600 mt-1">{section.description}</p>
+                            )}
+                          </>
                         )}
                       </div>
                       <button
@@ -1030,7 +1112,7 @@ export default function SurveyBuilder() {
                         setSelectedSectionId(section.id);
                         addQuestion();
                       }}
-                      className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg transition-colors border border-purple-200 mb-3"
+                      className="w-max flex items-center justify-center gap-2 px-3 py-2 text-sm bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg transition-colors border border-purple-200 mb-3"
                     >
                       <Plus className="w-4 h-4" />
                       Add Question
@@ -1127,20 +1209,102 @@ export default function SurveyBuilder() {
                                         {t.options}
                                       </label>
                                       <div className="space-y-2">
-                                        {question.options?.map((option, idx) => (
-                                          <div key={idx} className="flex gap-2">
-                                            <input
-                                              type="text"
-                                              value={option}
-                                              onChange={(e) => {
-                                                const newOptions = [...(question.options || [])];
-                                                newOptions[idx] = e.target.value;
-                                                updateQuestion(question.id, 'options', newOptions);
-                                              }}
-                                              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                            />
-                                          </div>
-                                        ))}
+                                        {question.type === 'yes-no' ? (
+                                          <>
+                                            <div className="flex items-center gap-2 p-3 bg-white border border-gray-300 rounded-lg cursor-not-allowed">
+                                              <input
+                                                type="text"
+                                                value={t.yes}
+                                                disabled
+                                                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600"
+                                              />
+                                            </div>
+                                            <div className="flex items-center gap-2 p-3 bg-white border border-gray-300 rounded-lg cursor-not-allowed">
+                                              <input
+                                                type="text"
+                                                value={t.no}
+                                                disabled
+                                                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600"
+                                              />
+                                            </div>
+                                          </>
+                                        ) : (
+                                          <>
+                                            {question.options?.map((option, optIndex) => (
+                                              <div key={optIndex} className="flex items-center gap-2">
+                                                <input
+                                                  type="text"
+                                                  value={option}
+                                                  onChange={(e) => {
+                                                    const newOptions = [...(question.options || [])];
+                                                    newOptions[optIndex] = e.target.value;
+                                                    updateQuestion(question.id, 'options', newOptions);
+                                                  }}
+                                                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                                  placeholder={`Option ${optIndex + 1}`}
+                                                />
+                                                <button
+                                                  onClick={() => {
+                                                    const newOptions = question.options?.filter((_, i) => i !== optIndex);
+                                                    updateQuestion(question.id, 'options', newOptions);
+                                                  }}
+                                                  disabled={(question.options?.length || 0) <= 2}
+                                                  className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                  <Trash2 className="w-4 h-4" />
+                                                </button>
+                                              </div>
+                                            ))}
+
+                                            {question.hasOtherOption && (
+                                              <div className="flex items-center gap-2 p-3 bg-white border border-gray-300 rounded-lg">
+                                                <input
+                                                  ref={otherInputRef}
+                                                  type="text"
+                                                  placeholder={t.other}
+                                                  value={otherValues[question.id] || ''}
+                                                  onChange={(e) => setOtherValues({
+                                                    ...otherValues,
+                                                    [question.id]: e.target.value
+                                                  })}
+                                                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                                />
+                                                <button
+                                                  onClick={() => {
+                                                    updateQuestion(question.id, 'hasOtherOption', false);
+                                                    const newOtherValues = { ...otherValues };
+                                                    delete newOtherValues[question.id];
+                                                    setOtherValues(newOtherValues);
+                                                  }}
+                                                  className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                                >
+                                                  <Trash2 className="w-4 h-4" />
+                                                </button>
+                                              </div>
+                                            )}
+
+                                            <div className="flex flex-wrap gap-2 pt-2">
+                                              <button
+                                                onClick={() => {
+                                                  const newOptions = [...(question.options || []), `Option ${(question.options?.length || 0) + 1}`];
+                                                  updateQuestion(question.id, 'options', newOptions);
+                                                }}
+                                                className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                                              >
+                                                + {t.addOption}
+                                              </button>
+                                              
+                                              {!question.hasOtherOption && (
+                                                <button
+                                                  onClick={() => updateQuestion(question.id, 'hasOtherOption', true)}
+                                                  className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                                                >
+                                                  + {t.addOther}
+                                                </button>
+                                              )}
+                                            </div>
+                                          </>
+                                        )}
                                       </div>
                                     </div>
                                   )}
@@ -1167,7 +1331,7 @@ export default function SurveyBuilder() {
                                         addQuestion(currentIndex);
                                         setSelectedSectionId(section.id);
                                       }}
-                                      className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-colors border border-blue-200"
+                                      className="w-max flex items-center justify-center gap-2 px-3 py-2 text-sm bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-colors border border-blue-200"
                                     >
                                       <Plus className="w-4 h-4" />
                                       Add after this
@@ -1195,6 +1359,9 @@ export default function SurveyBuilder() {
                           <Plus className="w-4 h-4" />
                           Add Section
                         </button>
+                        {questions.filter(q => !q.section_id).length === 0 && (
+                          <p className="text-sm text-gray-500 italic text-center py-3 mt-3">All questions are assigned to sections. Add more questions above.</p>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1227,7 +1394,7 @@ export default function SurveyBuilder() {
         {/* All Questions (including those without sections) */}
         <div className="space-y-4">
           {questions.filter(q => !q.section_id).length === 0 && sections.length > 0 ? (
-            <p className="text-sm text-gray-500 italic text-center py-4">All questions are assigned to sections. Add more questions above.</p>
+            null
           ) : (
           questions.filter(q => !q.section_id).map((question, index) => {
             const actualIndex = questions.findIndex(q => q.id === question.id);

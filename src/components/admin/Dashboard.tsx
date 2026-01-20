@@ -61,7 +61,7 @@ export default function Dashboard() {
         // Get total stats from ALL surveys
         const { data: allResponses, error: allResponsesError } = await supabase
           .from('responses')
-          .select('respondent_email, opted_in, created_at, lng')
+          .select('respondent_email, opted_in, created_at, lng, survey_id')
           .in('survey_id', surveys.map(s => s.id));
 
         if (allResponsesError) throw allResponsesError;

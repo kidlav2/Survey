@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { ChevronRight, ChevronLeft } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
@@ -30,7 +30,7 @@ export default function SurveyFlow() {
 
   type Lng = 'en' | 'ru' | 'fr' | 'es';
 
-  const getLocalized = (q: any, lng: Lng) => {
+  const getLocalized = useCallback((q: any, lng: Lng) => {
     const p = q?.payload ?? {};
     const base = (p.baseLanguage || p.base_language || 'en') as Lng;
 
@@ -66,7 +66,7 @@ export default function SurveyFlow() {
 
     return { text, options };
 
-  };
+  }, [tQuestions]);
 
   const makeUUID = () => {
     // Use browser crypto when available
