@@ -230,6 +230,15 @@ export default function SurveyDetails() {
 
       if (responsesError) throw responsesError;
 
+      // Fetch questions for answers-only export
+      const { data: questions, error: questionsError } = await supabase
+        .from('questions')
+        .select('*')
+        .eq('survey_id', id)
+        .order('sort_order', { ascending: true });
+
+      if (questionsError) throw questionsError;
+
       if (type === 'CSV') {
         const csv = [
           ['ID', 'Date', 'Email', 'Status', 'Duration'],
@@ -252,12 +261,37 @@ export default function SurveyDetails() {
         a.click();
         window.URL.revokeObjectURL(url);
       } else if (type === 'JSON') {
-        const json = JSON.stringify(responses, null, 2);
+        // For answers-only export, include email and structured answers
+        const answersOnly = (responses || []).map(r => {
+          const answersObj: any = {
+            email: r.respondent_email || r.email || 'Not provided'
+          };
+
+          // Add answers mapped to question text
+          if (r.answers && typeof r.answers === 'object') {
+            Object.entries(r.answers).forEach(([questionId, answer]) => {
+              const question = questions?.find((q: any) => q.id === questionId);
+              if (question) {
+                const payload = question.payload || {};
+                const questionText = payload.text && typeof payload.text === 'object' 
+                  ? payload.text.en || question.text 
+                  : question.text;
+                answersObj[questionText || questionId] = answer;
+              } else {
+                answersObj[questionId] = answer;
+              }
+            });
+          }
+
+          return answersObj;
+        });
+
+        const json = JSON.stringify(answersOnly, null, 2);
         const blob = new Blob([json], { type: 'application/json' });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `responses_${survey?.title}_${new Date().toISOString().split('T')[0]}.json`;
+        a.download = `answers_${survey?.title}_${new Date().toISOString().split('T')[0]}.json`;
         a.click();
         window.URL.revokeObjectURL(url);
       }
@@ -467,6 +501,72 @@ export default function SurveyDetails() {
               >
                 <FileJson className="w-4 h-4" />
                 {t.exportJSON}
+              </button>
+
+              <button
+                onClick={async () => {
+                  try {
+                    // Fetch responses with answers
+                    const { data: responses, error: responsesError } = await supabase
+                      .from('responses')
+                      .select('*')
+                      .eq('survey_id', id);
+
+                    if (responsesError) throw responsesError;
+
+                    // Fetch questions
+                    const { data: questions, error: questionsError } = await supabase
+                      .from('questions')
+                      .select('*')
+                      .eq('survey_id', id)
+                      .order('sort_order', { ascending: true });
+
+                    if (questionsError) throw questionsError;
+
+                    // Create answers-only format (email + answers)
+                    const answersOnly = (responses || []).map(r => {
+                      const answersObj: any = {
+                        email: r.respondent_email || r.email || 'Not provided'
+                      };
+
+                      // Add answers mapped to question text
+                      if (r.answers && typeof r.answers === 'object') {
+                        Object.entries(r.answers).forEach(([questionId, answer]) => {
+                          const question = questions?.find((q: any) => q.id === questionId);
+                          if (question) {
+                            const payload = question.payload || {};
+                            const questionText = payload.text && typeof payload.text === 'object' 
+                              ? payload.text.en || question.text 
+                              : question.text;
+                            answersObj[questionText || questionId] = answer;
+                          } else {
+                            answersObj[questionId] = answer;
+                          }
+                        });
+                      }
+
+                      return answersObj;
+                    });
+
+                    const json = JSON.stringify(answersOnly, null, 2);
+                    const blob = new Blob([json], { type: 'application/json' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `answers_only_${survey?.title}_${new Date().toISOString().split('T')[0]}.json`;
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    
+                    setToast({ message: 'Answers exported successfully', type: 'success' });
+                  } catch (error: any) {
+                    console.error('Error exporting answers:', error);
+                    setToast({ message: 'Failed to export answers', type: 'error' });
+                  }
+                }}
+                className="flex items-center gap-2 px-4 py-3 border border-green-300 hover:bg-green-50 text-green-700 rounded-lg transition-colors font-medium justify-center"
+              >
+                <FileJson className="w-4 h-4" />
+                Answers Only
               </button>
 
               <button
