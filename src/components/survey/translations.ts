@@ -19,6 +19,8 @@ export const translations = {
       question: 'Question',
       yes: 'Yes',
       no: 'No',
+      placeholder: 'Enter your answer here...',
+      multiNote: 'You can select multiple options',
     },
     questions_list: [
       {
@@ -90,6 +92,8 @@ export const translations = {
       question: 'Вопрос',
       yes: 'Да',
       no: 'Нет',
+      placeholder: 'Введите ваш ответ...',
+      multiNote: 'Вы можете выбрать несколько вариантов',
     },
     questions_list: [
       {
@@ -161,6 +165,8 @@ export const translations = {
       question: 'Question',
       yes: 'Oui',
       no: 'Non',
+      placeholder: 'Entrez votre réponse...',
+      multiNote: 'Vous pouvez sélectionner plusieurs options',
     },
     questions_list: [
       {
@@ -229,8 +235,12 @@ export const translations = {
       back: 'Atrás',
       finish: 'Finalizar',
       selectAll: 'Seleccione todas las que correspondan',
-      question: 'Pregunta',      yes: 'Sí',
-      no: 'No',    },
+      question: 'Pregunta',
+      yes: 'Sí',
+      no: 'No',
+      placeholder: 'Ingrese su respuesta...',
+      multiNote: 'Puede seleccionar varias opciones',
+    },
     questions_list: [
       {
         question: '¿Con qué frecuencia utiliza herramientas digitales para sus tareas diarias?',

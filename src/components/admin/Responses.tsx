@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Download, FileJson } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import ExportModal from './ExportModal';
 import Toast from '../common/Toast';
 import SkeletonDashboard from '../common/SkeletonDashboard';
+import { adminTranslations } from './adminTranslations';
+import { AdminLanguageContext } from './AdminLayout';
 
 interface Response {
   id: string;
@@ -26,6 +28,8 @@ interface ResponseStats {
 
 export default function Responses() {
   const navigate = useNavigate();
+  const { language } = useContext(AdminLanguageContext);
+  const t = adminTranslations[language];
   const [responses, setResponses] = useState<Response[]>([]);
   const [stats, setStats] = useState<ResponseStats>({
     totalResponses: 0,

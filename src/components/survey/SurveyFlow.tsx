@@ -25,6 +25,7 @@ export default function SurveyFlow() {
   const [startedAt, setStartedAt] = useState<number>(() => Date.now());
 
   const t = translations[language]?.questions || translations.en.questions;
+  const tQuestions = t as typeof translations.en.questions;
 
   type Lng = 'en' | 'ru' | 'fr' | 'es';
 
@@ -329,7 +330,7 @@ export default function SurveyFlow() {
             <textarea
               value={answers[question.id] || ''}
               onChange={(e) => handleAnswer(e.target.value)}
-              placeholder={t.placeholder ?? 'Enter your answer here...'}
+              placeholder={tQuestions.placeholder ?? 'Enter your answer here...'}
               rows={4}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
@@ -338,7 +339,7 @@ export default function SurveyFlow() {
           {/* Yes/No */}
           {question.type === 'yes-no' && (
             <div className="flex gap-4">
-              {(localized.options.length ? localized.options : [t.yes ?? 'Yes', t.no ?? 'No']).map((option) => (
+              {(localized.options.length ? localized.options : [tQuestions.yes ?? 'Yes', tQuestions.no ?? 'No']).map((option) => (
                 <button
                   key={option}
                   onClick={() => handleAnswer(option)}
@@ -356,7 +357,7 @@ export default function SurveyFlow() {
 
           {/* Multiple selection note */}
           {question.type === 'multiple-choice' && (
-            <p className="text-sm text-gray-500 mt-4">{t.multiNote ?? 'You can select multiple options'}</p>
+            <p className="text-sm text-gray-500 mt-4">{tQuestions.multiNote ?? 'You can select multiple options'}</p>
           )}
         </div>
 

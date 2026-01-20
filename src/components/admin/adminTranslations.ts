@@ -33,7 +33,7 @@ export const adminTranslations = {
     deleteSurvey: 'Delete Survey',
     newSurvey: 'New Survey',
     created: 'Created',
-    responses: 'Responses',
+    responseCount: 'Responses',
     status: 'Status',
     
     // Responses
@@ -115,7 +115,7 @@ export const adminTranslations = {
     deleteSurvey: 'Удалить опрос',
     newSurvey: 'Новый опрос',
     created: 'Создан',
-    responses: 'Ответы',
+    responseCount: 'Ответы',
     status: 'Статус',
     
     // Responses
@@ -197,7 +197,7 @@ export const adminTranslations = {
     deleteSurvey: 'Supprimer l\'enquête',
     newSurvey: 'Nouvelle enquête',
     created: 'Créé',
-    responses: 'Réponses',
+    responseCount: 'Réponses',
     status: 'Statut',
     
     // Responses
@@ -279,7 +279,7 @@ export const adminTranslations = {
     deleteSurvey: 'Eliminar encuesta',
     newSurvey: 'Nueva encuesta',
     created: 'Creado',
-    responses: 'Respuestas',
+    responseCount: 'Respuestas',
     status: 'Estado',
     
     // Responses
