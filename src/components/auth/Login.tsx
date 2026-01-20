@@ -110,7 +110,7 @@ export default function Login() {
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
-                  {lang.toUpperCase()}
+                  {lang === 'en' ? 'Eng' : lang === 'ru' ? 'Рус' : lang === 'fr' ? 'Fra' : 'Esp'}
                 </button>
               ))}
             </div>
@@ -232,7 +232,7 @@ export default function Login() {
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                {lang.toUpperCase()}
+                {lang === 'en' ? 'Eng' : lang === 'ru' ? 'Рус' : lang === 'fr' ? 'Fra' : 'Esp'}
               </button>
             ))}
           </div>

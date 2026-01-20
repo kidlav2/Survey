@@ -12,7 +12,7 @@ interface SidebarProps {
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { language } = useContext(AdminLanguageContext);
+  const { language, setLanguage } = useContext(AdminLanguageContext);
   const t = adminTranslations[language];
 
   const navItems = [
@@ -58,6 +58,25 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             );
           })}
         </nav>
+
+        {/* Language Selector */}
+        <div className="px-3 py-4 border-t border-gray-200">
+          <div className="flex gap-1">
+            {(['en', 'ru', 'fr', 'es'] as const).map((lang) => (
+              <button
+                key={lang}
+                onClick={() => setLanguage(lang)}
+                className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
+                  language === lang
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {lang === 'en' ? 'Eng' : lang === 'ru' ? 'Рус' : lang === 'fr' ? 'Fra' : 'Esp'}
+              </button>
+            ))}
+          </div>
+        </div>
       </aside>
 
       {/* Mobile Sidebar */}
@@ -100,6 +119,28 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             );
           })}
         </nav>
+
+        {/* Language Selector */}
+        <div className="p-3 border-t border-gray-200">
+          <div className="flex gap-1">
+            {(['en', 'ru', 'fr', 'es'] as const).map((lang) => (
+              <button
+                key={lang}
+                onClick={() => {
+                  setLanguage(lang);
+                  onClose();
+                }}
+                className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
+                  language === lang
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {lang === 'en' ? 'Eng' : lang === 'ru' ? 'Рус' : lang === 'fr' ? 'Fra' : 'Esp'}
+              </button>
+            ))}
+          </div>
+        </div>
       </aside>
     </>
   );
