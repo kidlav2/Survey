@@ -39,6 +39,9 @@ export const adminTranslations = {
     search: 'Search',
     filter: 'Filter',
     sort: 'Sort',
+    allSurveys: 'All Surveys',
+    newestFirst: 'Newest First',
+    oldestFirst: 'Oldest First',
     
     // SurveyDetails (only new ones not already defined)
     shareableLink: 'Shareable Link',
@@ -215,6 +218,9 @@ export const adminTranslations = {
     search: 'Поиск',
     filter: 'Фильтр',
     sort: 'Сортировка',
+    allSurveys: 'Все опросы',
+    newestFirst: 'Сначала новые',
+    oldestFirst: 'Сначала старые',
     
     // SurveyDetails (only new ones not already defined)
     shareableLink: 'Ссылка для общего доступа',
@@ -391,6 +397,9 @@ export const adminTranslations = {
     search: 'Rechercher',
     filter: 'Filtrer',
     sort: 'Trier',
+    allSurveys: 'Toutes les enquêtes',
+    newestFirst: 'Les plus récentes d\'abord',
+    oldestFirst: 'Les plus anciennes d\'abord',
     
     // SurveyDetails (only new ones not already defined)
     shareableLink: 'Lien partageable',
@@ -566,6 +575,9 @@ export const adminTranslations = {
     search: 'Buscar',
     filter: 'Filtrar',
     sort: 'Ordenar',
+    allSurveys: 'Todas las encuestas',
+    newestFirst: 'Más reciente primero',
+    oldestFirst: 'Más antiguo primero',
     
     // SurveyDetails (only new ones not already defined)
     shareableLink: 'Enlace compartible',

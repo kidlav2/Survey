@@ -40,6 +40,9 @@ export default function Responses() {
   const [loading, setLoading] = useState(true);
   const [exportModalType, setExportModalType] = useState<'CSV' | 'JSON' | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
+  const [surveys, setSurveys] = useState<any[]>([]);
+  const [filterSurvey, setFilterSurvey] = useState<string>('all');
 
   useEffect(() => {
     loadResponses();
@@ -56,10 +59,13 @@ export default function Responses() {
       // Fetch surveys for current user
       const { data: surveys, error: surveysError } = await supabase
         .from('surveys')
-        .select('id')
+        .select('id, title')
         .eq('owner_id', user.id);
 
       if (surveysError) throw surveysError;
+
+      // Store surveys in state for filtering
+      setSurveys(surveys || []);
 
       const surveyIds = surveys?.map(s => s.id) || [];
 
@@ -253,8 +259,30 @@ export default function Responses() {
 
         {/* Responses Table */}
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <div className="px-4 md:px-6 py-4 border-b border-gray-200">
+          <div className="px-4 md:px-6 py-4 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <h3 className="text-base md:text-lg font-semibold text-gray-900">Recent Responses</h3>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <select
+                value={filterSurvey}
+                onChange={(e) => setFilterSurvey(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="all">{t.allSurveys}</option>
+                {surveys.map((survey) => (
+                  <option key={survey.id} value={survey.id}>
+                    {survey.title}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as 'newest' | 'oldest')}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="newest">{t.newestFirst}</option>
+                <option value="oldest">{t.oldestFirst}</option>
+              </select>
+            </div>
           </div>
 
           {responses.length === 0 ? (
@@ -265,7 +293,10 @@ export default function Responses() {
             <>
               {/* Mobile Card View */}
               <div className="block md:hidden">
-                {responses.map((response) => {
+                {(() => {
+                  const filtered = responses.filter(r => filterSurvey === 'all' || r.survey_id === filterSurvey);
+                  const sorted = sortBy === 'newest' ? filtered : [...filtered].reverse();
+                  return sorted.map((response) => {
                   const isCompleted = response.completed === true || (response.answers && typeof response.answers === 'object' && Object.keys(response.answers).length > 0);
                   return (
                   <div key={response.id} className="p-4 border-b border-gray-200 last:border-b-0">
@@ -303,7 +334,8 @@ export default function Responses() {
                     </button>
                   </div>
                   );
-                })}
+                });
+                })()}
               </div>
 
               {/* Desktop Table View */}
@@ -332,7 +364,10 @@ export default function Responses() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {responses.map((response) => {
+                    {(() => {
+                      const filtered = responses.filter(r => filterSurvey === 'all' || r.survey_id === filterSurvey);
+                      const sorted = sortBy === 'newest' ? filtered : [...filtered].reverse();
+                      return sorted.map((response) => {
                       const isCompleted = response.completed === true || (response.answers && typeof response.answers === 'object' && Object.keys(response.answers).length > 0);
                       return (
                       <tr key={response.id} className="hover:bg-gray-50">
@@ -369,7 +404,8 @@ export default function Responses() {
                         </td>
                       </tr>
                       );
-                    })}
+                    });
+                    })()}
                   </tbody>
                 </table>
               </div>

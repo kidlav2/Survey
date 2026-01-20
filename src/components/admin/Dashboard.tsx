@@ -32,7 +32,7 @@ export default function Dashboard() {
   const [activeSurvey, setActiveSurvey] = useState<ActiveSurvey | null>(null);
   const [loading, setLoading] = useState(true);
   const [languageCounts, setLanguageCounts] = useState<Record<string, number>>({});
-  const [recentActivity, setRecentActivity] = useState<Array<{ label: string; when: string; tone: 'primary' | 'muted' }>>([]);
+  const [recentActivity, setRecentActivity] = useState<Array<{ label: string; when: string; tone: 'primary' | 'muted'; surveyId?: string }>>([]);
 
   const t = adminTranslations[language];
 
@@ -120,22 +120,22 @@ export default function Dashboard() {
           lastActivity: relativeTime(lastResponseAt),
         });
 
-        const activity: Array<{ label: string; when: string; tone: 'primary' | 'muted' }> = [];
+        const activity: Array<{ label: string; when: string; tone: 'primary' | 'muted'; surveyId?: string }> = [];
 
         if (lastResponseAt) {
-          activity.push({ label: t.newResponseSubmitted, when: relativeTime(lastResponseAt), tone: 'primary' });
+          activity.push({ label: t.newResponseSubmitted, when: relativeTime(lastResponseAt), tone: 'primary', surveyId: activeSurvey?.id });
         }
 
         if (lastEmailAt) {
-          activity.push({ label: t.newEmailCollected, when: relativeTime(lastEmailAt), tone: 'primary' });
+          activity.push({ label: t.newEmailCollected, when: relativeTime(lastEmailAt), tone: 'primary', surveyId: activeSurvey?.id });
         }
 
         const createdAt = (survey as any).created_at ?? null;
         if (createdAt) {
-          activity.push({ label: t.surveyCreated, when: relativeTime(createdAt), tone: 'muted' });
+          activity.push({ label: t.surveyCreated, when: relativeTime(createdAt), tone: 'muted', surveyId: activeSurvey?.id });
         }
 
-        setRecentActivity(activity.slice(0, 3));
+        setRecentActivity(activity.slice(0, 10));
       }
 
       setLoading(false);
