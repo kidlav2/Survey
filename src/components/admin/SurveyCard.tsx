@@ -23,7 +23,7 @@ export default function SurveyCard({ survey, onDelete, onToggleStatus }: SurveyC
   const [isQRModalOpen, setIsQRModalOpen] = React.useState(false);
 
   const { id, title, status, responses, lastActivity, link } = survey;
-  const fullLink = `${window.location.origin}${link}`;
+  const fullLink = link;
   const isActive = status === 'Active';
 
   const downloadQRCode = (e: React.MouseEvent) => {

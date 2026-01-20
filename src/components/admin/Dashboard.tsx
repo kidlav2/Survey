@@ -190,7 +190,7 @@ export default function Dashboard() {
     { label: t.lastActivity, value: metrics.lastActivity, icon: Clock, color: 'gray', path: null },
   ];
 
-  const surveyLink = activeSurvey ? `${window.location.origin}/survey/${activeSurvey.id}` : '';
+  const surveyLink = activeSurvey ? `/survey/${activeSurvey.id}` : '';
 
   const copyToClipboard = async () => {
     try {
