@@ -240,6 +240,10 @@ export default function SurveyBuilder() {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [surveyIsActive, setSurveyIsActive] = useState<boolean>(true);
   const [loadingSurveyStatus, setLoadingSurveyStatus] = useState(false);
+  const [surveyTitle, setSurveyTitle] = useState('');
+  const [surveyDescription, setSurveyDescription] = useState('');
+  const [estimatedTime, setEstimatedTime] = useState('5');
+  const [surveyInfoLoading, setSurveyInfoLoading] = useState(false);
 
   const t = translations[language];
 
@@ -251,11 +255,11 @@ export default function SurveyBuilder() {
     try {
       setLoading(true);
 
-      // Try to fetch survey status (if column exists)
+      // Try to fetch survey status and info
       try {
         const { data: surveyData, error: surveyError } = await supabase
           .from('surveys')
-          .select('status')
+          .select('status, title, description, estimated_time')
           .eq('id', id)
           .single();
 
@@ -265,6 +269,9 @@ export default function SurveyBuilder() {
         
         if (surveyData) {
           setSurveyIsActive(surveyData.status === 'active');
+          setSurveyTitle(surveyData.title || '');
+          setSurveyDescription(surveyData.description || '');
+          setEstimatedTime(surveyData.estimated_time?.toString() || '5');
         }
       } catch (statusError: any) {
         // If column doesn't exist (42703), just continue with default status
@@ -528,6 +535,29 @@ export default function SurveyBuilder() {
     setDraggedIndex(null);
   };
 
+  const saveSurveyInfo = async () => {
+    try {
+      setSurveyInfoLoading(true);
+      
+      const { error } = await supabase
+        .from('surveys')
+        .update({
+          description: surveyDescription.trim(),
+          estimated_time: parseInt(estimatedTime) || 5
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+      
+      setToast({ message: 'Survey info saved successfully', type: 'success' });
+      setSurveyInfoLoading(false);
+    } catch (error) {
+      console.error('Error saving survey info:', error);
+      setToast({ message: 'Failed to save survey info', type: 'error' });
+      setSurveyInfoLoading(false);
+    }
+  };
+
   const toggleSurveyStatus = async () => {
     try {
       setLoadingSurveyStatus(true);
@@ -639,6 +669,56 @@ export default function SurveyBuilder() {
 
       {/* Main Content */}
       <div className="p-4 md:p-8">
+        {/* Survey Info Section */}
+        <div className="mb-8 bg-indigo-50 rounded-lg border border-indigo-200 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Survey Information</h3>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Description
+              </label>
+              <textarea
+                value={surveyDescription}
+                onChange={(e) => setSurveyDescription(e.target.value)}
+                rows={3}
+                disabled={surveyInfoLoading}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg 
+                         focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none disabled:bg-gray-50 disabled:text-gray-500"
+                placeholder="Survey description shown to respondents at the start..."
+              />
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Estimated Time (minutes)
+                </label>
+                <input
+                  type="number"
+                  value={estimatedTime}
+                  onChange={(e) => setEstimatedTime(e.target.value)}
+                  min="1"
+                  max="120"
+                  disabled={surveyInfoLoading}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg 
+                           focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-500"
+                  placeholder="5"
+                />
+              </div>
+              
+          <div className="flex items-end">
+                <button
+                  onClick={saveSurveyInfo}
+                  disabled={surveyInfoLoading}
+                  className="w-full px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {surveyInfoLoading ? 'Saving...' : 'Save Info'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Add Question Button at Top */}
         <div className="mb-6">
           <button

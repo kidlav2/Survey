@@ -15,6 +15,8 @@ export default function SurveyWelcome() {
   const persistedLng = id ? localStorage.getItem(`survey_lng_${id}`) : null;
   const initialLanguage = (stateLng || searchLng || persistedLng || 'en') as 'en' | 'ru' | 'fr' | 'es';
   const [language, setLanguage] = useState<'en' | 'ru' | 'fr' | 'es'>(initialLanguage);
+  const [survey, setSurvey] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     checkSurveyStatus();
@@ -26,11 +28,13 @@ export default function SurveyWelcome() {
     try {
       const { data, error } = await supabase
         .from('surveys')
-        .select('status')
+        .select('id, title, description, estimated_time, status')
         .eq('id', id)
         .single();
 
       if (error) throw error;
+
+      setSurvey(data);
 
       if (data?.status !== 'active') {
         navigate(`/survey/${id}/closed`, { replace: true });
@@ -38,6 +42,8 @@ export default function SurveyWelcome() {
     } catch (error) {
       console.error('Error checking survey status:', error);
       navigate(`/survey/${id}/closed`, { replace: true });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -64,10 +70,10 @@ export default function SurveyWelcome() {
               <FileText className="w-8 h-8 text-indigo-600" />
             </div>
             <h1 className="text-3xl font-semibold text-gray-900 mb-3">
-              {t.title}
+              {survey?.title || t.title}
             </h1>
             <p className="text-gray-600 leading-relaxed">
-              {t.description}
+              {survey?.description || t.description}
             </p>
           </div>
 
@@ -77,7 +83,7 @@ export default function SurveyWelcome() {
               <Clock className="w-5 h-5 text-gray-600 mt-0.5 flex-shrink-0" />
               <div>
                 <p className="text-sm font-medium text-gray-900 mb-1">{t.estimatedTime}</p>
-                <p className="text-sm text-gray-600">{t.timeValue}</p>
+                <p className="text-sm text-gray-600">{survey?.estimated_time || '5'} {t.minutes || 'minutes'}</p>
               </div>
             </div>
           </div>

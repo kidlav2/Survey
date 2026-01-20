@@ -11,6 +11,7 @@ interface CreateSurveyModalProps {
 export default function CreateSurveyModal({ isOpen, onClose, onCreate }: CreateSurveyModalProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [estimatedTime, setEstimatedTime] = useState('5');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,6 +39,7 @@ export default function CreateSurveyModal({ isOpen, onClose, onCreate }: CreateS
         .insert([{
           title: title.trim(),
           description: description.trim(),
+          estimated_time: parseInt(estimatedTime) || 5,
           owner_id: user.id,
           status: 'draft',
         }])
@@ -59,6 +61,7 @@ export default function CreateSurveyModal({ isOpen, onClose, onCreate }: CreateS
       // Reset form
       setTitle('');
       setDescription('');
+      setEstimatedTime('5');
       setError(null);
       
       onClose();
@@ -121,6 +124,24 @@ export default function CreateSurveyModal({ isOpen, onClose, onCreate }: CreateS
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg 
                        focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none disabled:bg-gray-50 disabled:text-gray-500"
               placeholder="Brief description of the survey purpose and goals"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="estimatedTime" className="block text-sm font-medium text-gray-700 mb-2">
+              Estimated Time to Complete (minutes)
+            </label>
+            <input
+              type="number"
+              id="estimatedTime"
+              value={estimatedTime}
+              onChange={(e) => setEstimatedTime(e.target.value)}
+              min="1"
+              max="120"
+              disabled={isLoading}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg 
+                       focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-500"
+              placeholder="5"
             />
           </div>
 

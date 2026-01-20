@@ -160,6 +160,11 @@ export const adminTranslations = {
     close: 'Close',
     confirm: 'Confirm',
     logout: 'Logout',
+    description: 'Description',
+    estimatedTime: 'Estimated Time',
+    saveInfo: 'Save Info',
+    savingInfo: 'Saving...',
+    surveyInformation: 'Survey Information',
   },
   ru: {
     // Navigation & Layout
@@ -322,6 +327,11 @@ export const adminTranslations = {
     close: 'Закрыть',
     confirm: 'Подтвердить',
     logout: 'Выход',
+    description: 'Описание',
+    estimatedTime: 'Приблизительное время',
+    saveInfo: 'Сохранить информацию',
+    savingInfo: 'Сохранение...',
+    surveyInformation: 'Информация об опросе',
   },
   fr: {
     // Navigation & Layout
@@ -482,6 +492,11 @@ export const adminTranslations = {
     close: 'Fermer',
     confirm: 'Confirmer',
     logout: 'Déconnexion',
+    description: 'Description',
+    estimatedTime: 'Temps estimé',
+    saveInfo: 'Enregistrer les informations',
+    savingInfo: 'Enregistrement...',
+    surveyInformation: 'Informations sur l\'enquête',
   },
   es: {
     // Navigation & Layout
@@ -644,5 +659,10 @@ export const adminTranslations = {
     close: 'Cerrar',
     confirm: 'Confirmar',
     logout: 'Cerrar sesión',
+    description: 'Descripción',
+    estimatedTime: 'Tiempo estimado',
+    saveInfo: 'Guardar información',
+    savingInfo: 'Guardando...',
+    surveyInformation: 'Información de la encuesta',
   },
 };
