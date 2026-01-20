@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
 import ResetPassword from './components/auth/ResetPassword';
+import ConfirmEmail from './components/auth/ConfirmEmail';
 import AdminLayout from './components/admin/AdminLayout';
 import Dashboard from './components/admin/Dashboard';
 import Surveys from './components/admin/Surveys';
@@ -57,6 +58,7 @@ export default function App() {
         {/* Auth Routes */}
         <Route path="/login" element={!session ? <Login /> : <Navigate to="/admin/dashboard" replace />} />
         <Route path="/register" element={!session ? <Register /> : <Navigate to="/admin/dashboard" replace />} />
+        <Route path="/auth/confirm" element={<ConfirmEmail />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         
         {/* Admin Routes - Protected */}
