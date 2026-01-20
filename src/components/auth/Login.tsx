@@ -25,10 +25,12 @@ export default function Login() {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [resetSent, setResetSent] = useState(false);
+  const [showRegisterSuggestion, setShowRegisterSuggestion] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setShowRegisterSuggestion(false);
     setLoading(true);
 
     try {
@@ -40,10 +42,14 @@ export default function Login() {
       if (error) {
         if (error.message === 'Invalid login credentials') {
           setError('Email or password incorrect. Please check your credentials and try again.');
+          // Show suggestion to register if email might not exist
+          setShowRegisterSuggestion(true);
         } else if (error.message === 'Email not confirmed') {
           setError('Please confirm your email address before logging in. Check your inbox for the confirmation link.');
+          setShowRegisterSuggestion(false);
         } else {
           setError(error.message);
+          setShowRegisterSuggestion(false);
         }
         return;
       }
@@ -51,6 +57,7 @@ export default function Login() {
       navigate('/admin/dashboard');
     } catch (err) {
       setError('An error occurred. Please try again.');
+      setShowRegisterSuggestion(false);
     } finally {
       setLoading(false);
     }
@@ -266,8 +273,24 @@ export default function Login() {
 
           {/* Error Message */}
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-              {error}
+            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-700 mb-3">
+                {error}
+              </p>
+              {showRegisterSuggestion && (
+                <div className="pt-3 border-t border-red-200">
+                  <p className="text-sm text-red-600 mb-2">
+                    {t.dontHaveAccountError}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/register')}
+                    className="text-sm font-medium text-indigo-600 hover:text-indigo-700 underline"
+                  >
+                    {t.createNewAccount}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
