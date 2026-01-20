@@ -2,12 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Lock, Mail, ArrowLeft, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
+import { authTranslations } from './authTranslations';
 
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [language, setLanguage] = useState<'en' | 'ru' | 'fr' | 'es'>('en');
+
+  const t = authTranslations[language];
 
   useEffect(() => {
     if (location.state?.email) {
@@ -84,8 +88,31 @@ export default function Login() {
 
   if (showForgotPassword) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 md:p-6">
-        <div className="w-full max-w-md">
+      <div className="min-h-screen bg-gray-50 flex flex-col">
+        {/* Top Bar with Language Toggle */}
+        <header className="bg-white border-b border-gray-200 px-4 md:px-8 py-4">
+          <div className="flex items-center justify-end">
+            <div className="flex gap-2">
+              {(['en', 'ru', 'fr', 'es'] as const).map((lang) => (
+                <button
+                  key={lang}
+                  onClick={() => setLanguage(lang)}
+                  className={`px-3 py-2 rounded-lg font-medium transition-colors ${
+                    language === lang
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {lang.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          </div>
+        </header>
+
+        {/* Main Content */}
+        <div className="flex-1 flex items-center justify-center p-4 md:p-6">
+          <div className="w-full max-w-md">
           <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 md:p-8">
             {/* Header */}
             <div className="text-center mb-8">
@@ -93,10 +120,10 @@ export default function Login() {
                 <Mail className="w-6 h-6 text-indigo-600" />
               </div>
               <h1 className="text-2xl font-semibold text-gray-900 mb-2">
-                Reset Password
+                {t.resetPassword}
               </h1>
               <p className="text-sm text-gray-600">
-                Enter your email address to receive a password reset link
+                {t.enterEmailResetLink}
               </p>
             </div>
 
@@ -110,8 +137,8 @@ export default function Login() {
             {/* Success Message */}
             {resetSent && (
               <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
-                <p className="font-medium mb-1">Check your email!</p>
-                <p>If an account exists with this email address, you'll receive a password reset link shortly. Please check your inbox and spam folder.</p>
+                <p className="font-medium mb-1">{t.checkYourEmail}</p>
+                <p>{t.resetLinkMessage}</p>
               </div>
             )}
 
@@ -120,7 +147,7 @@ export default function Login() {
               <form onSubmit={handleForgotPassword} className="space-y-5">
                 <div>
                   <label htmlFor="reset-email" className="block text-sm font-medium text-gray-700 mb-2">
-                    Email Address
+                    {t.emailAddress}
                   </label>
                   <input
                     id="reset-email"
@@ -128,7 +155,7 @@ export default function Login() {
                     value={resetEmail}
                     onChange={(e) => setResetEmail(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    placeholder="admin@research.edu"
+                    placeholder={t.emailPlaceholder}
                     required
                     disabled={loading}
                   />
@@ -139,7 +166,7 @@ export default function Login() {
                   disabled={loading}
                   className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 px-4 rounded-lg transition-colors disabled:opacity-50"
                 >
-                  {loading ? 'Sending...' : 'Send Reset Link'}
+                  {loading ? t.sending : t.sendResetLink}
                 </button>
               </form>
             ) : (
@@ -152,7 +179,7 @@ export default function Login() {
                 }}
                 className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 px-4 rounded-lg transition-colors"
               >
-                Back to Login
+                {t.backToLogin}
               </button>
             )}
 
@@ -168,22 +195,46 @@ export default function Login() {
                 className="mt-4 w-full flex items-center justify-center gap-2 text-sm text-indigo-600 hover:text-indigo-700 font-medium"
               >
                 <ArrowLeft className="w-4 h-4" />
-                Back to Login
+                {t.backToLogin}
               </button>
             )}
           </div>
 
           <p className="text-center text-xs text-gray-500 mt-6">
-            For research administration use only
+            {t.forResearchAdminOnly}
           </p>
+        </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 md:p-6">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* Top Bar with Language Toggle */}
+      <header className="bg-white border-b border-gray-200 px-4 md:px-8 py-4">
+        <div className="flex items-center justify-end">
+          <div className="flex gap-2">
+            {(['en', 'ru', 'fr', 'es'] as const).map((lang) => (
+              <button
+                key={lang}
+                onClick={() => setLanguage(lang)}
+                className={`px-3 py-2 rounded-lg font-medium transition-colors ${
+                  language === lang
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {lang.toUpperCase()}
+              </button>
+            ))}
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <div className="flex-1 flex items-center justify-center p-4 md:p-6">
+        <div className="w-full max-w-md">
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 md:p-8">
           {/* Header */}
           <div className="text-center mb-8">
@@ -191,10 +242,10 @@ export default function Login() {
               <Lock className="w-6 h-6 text-indigo-600" />
             </div>
             <h1 className="text-2xl font-semibold text-gray-900 mb-2">
-              Admin Login
+              {t.adminLogin}
             </h1>
             <p className="text-sm text-gray-600">
-              Survey Management System
+              {t.surveyManagementSystem}
             </p>
           </div>
 
@@ -204,10 +255,10 @@ export default function Login() {
               <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
               <div>
                 <p className="text-sm font-medium text-green-800">
-                  Account created successfully!
+                  {t.accountCreatedSuccessfully}
                 </p>
                 <p className="text-xs text-green-700 mt-1">
-                  We've sent a confirmation link to your email. Please verify your account before logging in.
+                  {t.confirmationLinkSent}
                 </p>
               </div>
             </div>
@@ -224,7 +275,7 @@ export default function Login() {
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                Email Address
+                {t.emailAddress}
               </label>
               <input
                 id="email"
@@ -232,7 +283,7 @@ export default function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="admin@research.edu"
+                placeholder={t.emailPlaceholder}
                 required
                 disabled={loading}
               />
@@ -240,7 +291,7 @@ export default function Login() {
 
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                Password
+                {t.password}
               </label>
               <div className="flex items-center w-full border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-indigo-500 bg-white overflow-hidden">
                 <input
@@ -249,7 +300,7 @@ export default function Login() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="flex-1 px-4 py-2 bg-transparent focus:outline-none"
-                  placeholder="••••••••"
+                  placeholder={t.passwordPlaceholder}
                   required
                   disabled={loading}
                 />
@@ -273,7 +324,7 @@ export default function Login() {
               disabled={loading}
               className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 px-4 rounded-lg transition-colors disabled:opacity-50"
             >
-              {loading ? 'Signing in...' : 'Sign In'}
+              {loading ? t.signingIn : t.signIn}
             </button>
           </form>
 
@@ -283,27 +334,28 @@ export default function Login() {
               onClick={() => setShowForgotPassword(true)}
               className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
             >
-              Forgot your password?
+              {t.forgotYourPassword}
             </button>
           </div>
 
           {/* Footer */}
           <div className="mt-6 text-center border-t border-gray-200 pt-6">
             <p className="text-sm text-gray-600">
-              Don't have an account?{' '}
+              {t.dontHaveAccount}{' '}
               <button
                 onClick={() => navigate('/register')}
                 className="text-indigo-600 hover:text-indigo-700 font-medium"
               >
-                Register
+                {t.register}
               </button>
             </p>
           </div>
         </div>
 
         <p className="text-center text-xs text-gray-500 mt-6">
-          For research administration use only
+          {t.forResearchAdminOnly}
         </p>
+      </div>
       </div>
     </div>
   );

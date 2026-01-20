@@ -21,6 +21,7 @@ export const translations = {
       no: 'No',
       placeholder: 'Enter your answer here...',
       multiNote: 'You can select multiple options',
+      other: 'Other (please specify)',
     },
     questions_list: [
       {
@@ -94,6 +95,7 @@ export const translations = {
       no: 'Нет',
       placeholder: 'Введите ваш ответ...',
       multiNote: 'Вы можете выбрать несколько вариантов',
+      other: 'Другое (укажите)',
     },
     questions_list: [
       {
@@ -167,6 +169,7 @@ export const translations = {
       no: 'Non',
       placeholder: 'Entrez votre réponse...',
       multiNote: 'Vous pouvez sélectionner plusieurs options',
+      other: 'Autre (veuillez préciser)',
     },
     questions_list: [
       {
@@ -239,8 +242,7 @@ export const translations = {
       yes: 'Sí',
       no: 'No',
       placeholder: 'Ingrese su respuesta...',
-      multiNote: 'Puede seleccionar varias opciones',
-    },
+      multiNote: 'Puede seleccionar varias opciones',      other: 'Otro (por favor especifica)',    },
     questions_list: [
       {
         question: '¿Con qué frecuencia utiliza herramientas digitales para sus tareas diarias?',

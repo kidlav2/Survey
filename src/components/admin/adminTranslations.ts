@@ -168,6 +168,12 @@ export const adminTranslations = {
     descriptionNote: 'Note: The description below will be shown to survey respondents at the beginning of the survey.',
     thankYouMessage: 'Thank You Message',
     defaultThankYouText: 'Thank you for completing this survey! Your feedback is valuable to us.',
+    section: 'Section',
+    sectionName: 'Section Name',
+    sectionDescription: 'Section Description',
+    addSection: 'Add Section',
+    deleteSection: 'Delete Section',
+    selectSection: 'Select Section',
   },
   ru: {
     // Navigation & Layout
@@ -338,6 +344,12 @@ export const adminTranslations = {
     descriptionNote: 'Примечание: Описание ниже будет показано респондентам в начале опроса.',
     thankYouMessage: 'Сообщение благодарности',
     defaultThankYouText: 'Спасибо за заполнение этого опроса! Ваш отзыв очень важен для нас.',
+    section: 'Раздел',
+    sectionName: 'Название раздела',
+    sectionDescription: 'Описание раздела',
+    addSection: 'Добавить раздел',
+    deleteSection: 'Удалить раздел',
+    selectSection: 'Выберите раздел',
   },
   fr: {
     // Navigation & Layout
@@ -507,6 +519,12 @@ export const adminTranslations = {
     descriptionNote: 'Remarque : La description ci-dessous sera affichée aux répondants au début de l\'enquête.',
     thankYouMessage: 'Message de remerciement',
     defaultThankYouText: 'Merci d\'avoir rempli cette enquête ! Vos commentaires sont précieux pour nous.',
+    section: 'Section',
+    sectionName: 'Nom de la section',
+    sectionDescription: 'Description de la section',
+    addSection: 'Ajouter une section',
+    deleteSection: 'Supprimer la section',
+    selectSection: 'Sélectionner une section',
   },
   es: {
     // Navigation & Layout
@@ -677,5 +695,11 @@ export const adminTranslations = {
     descriptionNote: 'Nota: La descripción a continuación se mostrará a los encuestados al principio de la encuesta.',
     thankYouMessage: 'Mensaje de agradecimiento',
     defaultThankYouText: '¡Gracias por completar esta encuesta! Sus comentarios son muy valiosos para nosotros.',
+    section: 'Sección',
+    sectionName: 'Nombre de la sección',
+    sectionDescription: 'Descripción de la sección',
+    addSection: 'Añadir sección',
+    deleteSection: 'Eliminar sección',
+    selectSection: 'Seleccionar sección',
   },
 };

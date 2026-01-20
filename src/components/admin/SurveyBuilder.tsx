@@ -14,6 +14,7 @@ interface Question {
   required: boolean;
   hasOtherOption?: boolean;
   order: number;
+  section_id?: string;
 }
 
 // --- Auto-translation (MyMemory) ---
@@ -129,6 +130,12 @@ const translations = {
     descriptionNote: 'Note: The description below will be shown to survey respondents at the beginning of the survey.',
     thankYouMessage: 'Thank You Message',
     defaultThankYouText: 'Thank you for completing this survey! Your feedback is valuable to us.',
+    section: 'Section',
+    sectionName: 'Section Name',
+    sectionDescription: 'Section Description',
+    addSection: 'Add Section',
+    deleteSection: 'Delete Section',
+    selectSection: 'Select Section',
   },
   ru: {
     addOption: 'Добавить вариант',
@@ -165,6 +172,12 @@ const translations = {
     descriptionNote: 'Примечание: Описание ниже будет показано респондентам в начале опроса.',
     thankYouMessage: 'Сообщение благодарности',
     defaultThankYouText: 'Спасибо за заполнение этого опроса! Ваш отзыв очень важен для нас.',
+    section: 'Раздел',
+    sectionName: 'Название раздела',
+    sectionDescription: 'Описание раздела',
+    addSection: 'Добавить раздел',
+    deleteSection: 'Удалить раздел',
+    selectSection: 'Выберите раздел',
   },
   fr: {
     addOption: 'Ajouter une option',
@@ -201,6 +214,12 @@ const translations = {
     descriptionNote: 'Remarque : La description ci-dessous sera affichée aux répondants au début de l\'enquête.',
     thankYouMessage: 'Message de remerciement',
     defaultThankYouText: 'Merci d\'avoir rempli cette enquête ! Vos commentaires sont précieux pour nous.',
+    section: 'Section',
+    sectionName: 'Nom de la section',
+    sectionDescription: 'Description de la section',
+    addSection: 'Ajouter une section',
+    deleteSection: 'Supprimer la section',
+    selectSection: 'Sélectionner une section',
   },
   es: {
     addOption: 'Agregar opción',
@@ -237,6 +256,12 @@ const translations = {
     descriptionNote: 'Nota: La descripción a continuación se mostrará a los encuestados al principio de la encuesta.',
     thankYouMessage: 'Mensaje de agradecimiento',
     defaultThankYouText: '¡Gracias por completar esta encuesta! Sus comentarios son muy valiosos para nosotros.',
+    section: 'Sección',
+    sectionName: 'Nombre de la sección',
+    sectionDescription: 'Descripción de la sección',
+    addSection: 'Añadir sección',
+    deleteSection: 'Eliminar sección',
+    selectSection: 'Seleccionar sección',
   },
 };
 
@@ -256,7 +281,15 @@ export default function SurveyBuilder() {
   const [surveyDescription, setSurveyDescription] = useState('');
   const [estimatedTime, setEstimatedTime] = useState('4');
   const [thankYouMessage, setThankYouMessage] = useState('');
+  const [showSurveyInfo, setShowSurveyInfo] = useState(true);
+  const [surveyInfoExpanded, setSurveyInfoExpanded] = useState(false);
   const [surveyInfoLoading, setSurveyInfoLoading] = useState(false);
+  const [sections, setSections] = useState<any[]>([]);
+  const [sectionsExpanded, setSectionsExpanded] = useState(false);
+  const [newSectionName, setNewSectionName] = useState('');
+  const [newSectionDesc, setNewSectionDesc] = useState('');
+  const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
+  const [sectionsLoading, setSectionsLoading] = useState(false);
 
   const t = translations[language];
 
@@ -272,7 +305,7 @@ export default function SurveyBuilder() {
       try {
         const { data: surveyData, error: surveyError } = await supabase
           .from('surveys')
-          .select('status, title, description, estimated_time, thank_you_message')
+          .select('status, title, description, estimated_time, thank_you_message, show_survey_info')
           .eq('id', id)
           .single();
 
@@ -286,6 +319,7 @@ export default function SurveyBuilder() {
           setSurveyDescription(surveyData.description || '');
           setEstimatedTime(surveyData.estimated_time?.toString() || '4');
           setThankYouMessage(surveyData.thank_you_message || '');
+          setShowSurveyInfo(surveyData.show_survey_info !== false);
         }
       } catch (statusError: any) {
         // If column doesn't exist (42703), just continue with default status
@@ -304,6 +338,20 @@ export default function SurveyBuilder() {
       if (questionsError) throw questionsError;
 
       setQuestions(questionsData || []);
+      
+      // Fetch sections for this survey
+      const { data: sectionsData, error: sectionsError } = await supabase
+        .from('survey_sections')
+        .select('*')
+        .eq('survey_id', id)
+        .order('order_index', { ascending: true });
+      
+      if (sectionsError && sectionsError.code !== '42703' && sectionsError.code !== 'PGRST116') {
+        console.error('Error loading sections:', sectionsError);
+      }
+      
+      setSections(sectionsData || []);
+      
       setSaveStatus('saved');
       setLoading(false);
     } catch (error) {
@@ -328,6 +376,7 @@ export default function SurveyBuilder() {
       required: false,
       hasOtherOption: false,
       order: afterIndex !== undefined ? afterIndex + 1 : questions.length,
+      section_id: selectedSectionId || undefined,
     };
 
     let newQuestions: Question[];
@@ -436,6 +485,7 @@ export default function SurveyBuilder() {
             has_other_option: question.hasOtherOption,
             sort_order: question.order,
             payload,
+            section_id: question.section_id || null,
           };
 
           let data: any = null;
@@ -478,6 +528,7 @@ export default function SurveyBuilder() {
             has_other_option: question.hasOtherOption,
             sort_order: question.order,
             payload,
+            section_id: question.section_id || null,
           };
 
           let error: any = null;
@@ -568,6 +619,9 @@ export default function SurveyBuilder() {
         updateData.thank_you_message = thankYouMessage.trim();
       }
       
+      // Include show_survey_info flag
+      updateData.show_survey_info = showSurveyInfo;
+      
       const { error, data } = await supabase
         .from('surveys')
         .update(updateData)
@@ -589,11 +643,70 @@ export default function SurveyBuilder() {
     }
   };
 
+  const addSection = async () => {
+    if (!newSectionName.trim()) {
+      setToast({ message: 'Section name is required', type: 'error' });
+      return;
+    }
+
+    try {
+      setSectionsLoading(true);
+      const nextOrder = sections.length;
+      
+      const { data, error } = await supabase
+        .from('survey_sections')
+        .insert({
+          survey_id: id,
+          name: newSectionName.trim(),
+          description: newSectionDesc.trim(),
+          order_index: nextOrder,
+        })
+        .select();
+      
+      if (error) throw error;
+      
+      setSections([...sections, data[0]]);
+      setNewSectionName('');
+      setNewSectionDesc('');
+      setToast({ message: 'Section added successfully', type: 'success' });
+    } catch (error: any) {
+      console.error('Error adding section:', error);
+      setToast({ message: error.message || 'Failed to add section', type: 'error' });
+    } finally {
+      setSectionsLoading(false);
+    }
+  };
+
+  const deleteSection = async (sectionId: string) => {
+    try {
+      setSectionsLoading(true);
+      
+      const { error } = await supabase
+        .from('survey_sections')
+        .delete()
+        .eq('id', sectionId);
+      
+      if (error) throw error;
+      
+      setSections(sections.filter(s => s.id !== sectionId));
+      if (selectedSectionId === sectionId) {
+        setSelectedSectionId(null);
+      }
+      setToast({ message: 'Section deleted successfully', type: 'success' });
+    } catch (error: any) {
+      console.error('Error deleting section:', error);
+      setToast({ message: error.message || 'Failed to delete section', type: 'error' });
+    } finally {
+      setSectionsLoading(false);
+    }
+  };
+
   const toggleSurveyStatus = async () => {
     try {
       setLoadingSurveyStatus(true);
       const newStatus = !surveyIsActive;
-      const statusValue = newStatus ? 'active' : 'inactive';
+      // Keep status aligned with list view: active | draft
+      const statusValue: 'active' | 'draft' = newStatus ? 'active' : 'draft';
       
       // First update the local state immediately
       setSurveyIsActive(newStatus);
@@ -607,10 +720,15 @@ export default function SurveyBuilder() {
       // If there's an error, keep the local state updated anyway
       if (error) {
         console.warn('Error updating survey status in database:', error);
-        // Local state is already updated, just show success message
+        // Revert local state so UI matches DB
+        setSurveyIsActive(!newStatus);
+        setToast({ message: error.message || t.statusUpdateFailed, type: 'error' });
+        setLoadingSurveyStatus(false);
+        return;
       }
       
-      setToast({ message: t.statusUpdated, type: 'success' });
+      const successMessage = newStatus ? t.statusUpdated : `${t.disabled} ${t.surveys ?? 'survey'} set to draft`;
+      setToast({ message: successMessage, type: 'success' });
       setLoadingSurveyStatus(false);
     } catch (error) {
       console.error('Error updating survey status:', error);
@@ -700,18 +818,30 @@ export default function SurveyBuilder() {
 
       {/* Main Content */}
       <div className="p-4 md:p-8">
-        {/* Survey Info Section */}
-        <div className="mb-8 bg-indigo-50 rounded-lg border border-indigo-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Survey Information</h3>
-          
-          {/* Warning notice */}
-          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="text-sm text-blue-900">
-              {t.descriptionNote}
-            </div>
-          </div>
-          
-          <div className="space-y-4">
+        {/* Survey Info Section - Collapsible */}
+        <div className="mb-8 bg-indigo-50 rounded-lg border border-indigo-200 overflow-hidden">
+          {/* Header */}
+          <button
+            onClick={() => setSurveyInfoExpanded(!surveyInfoExpanded)}
+            className="w-full flex items-center justify-between p-6 hover:bg-indigo-100 transition-colors cursor-pointer"
+          >
+            <h3 className="text-lg font-semibold text-gray-900">Survey Information</h3>
+            <ChevronDown 
+              className={`w-5 h-5 text-gray-600 transition-transform ${surveyInfoExpanded ? 'rotate-180' : ''}`}
+            />
+          </button>
+
+          {/* Content */}
+          {surveyInfoExpanded && (
+            <div className="border-t border-indigo-200 p-6 bg-white">
+              {/* Warning notice */}
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="text-sm text-blue-900">
+                  {t.descriptionNote}
+                </div>
+              </div>
+              
+              <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Description
@@ -770,21 +900,294 @@ export default function SurveyBuilder() {
                 placeholder={t.defaultThankYouText}
               />
             </div>
-          </div>
+
+            {/* Show Survey Info Toggle */}
+            <div className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg">
+              <input
+                type="checkbox"
+                checked={showSurveyInfo}
+                onChange={(e) => {
+                  setShowSurveyInfo(e.target.checked);
+                  setSaveStatus('unsaved');
+                }}
+                id="show-survey-info"
+                className="w-4 h-4 rounded"
+              />
+              <label htmlFor="show-survey-info" className="text-sm font-medium text-gray-700">
+                Show survey information to respondents (description, time estimate)
+              </label>
+            </div>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Add Question Button at Top */}
+        {/* Sections Management - Collapsible */}
+        <div className="mb-8 bg-purple-50 rounded-lg border border-purple-200 overflow-hidden">
+          {/* Header */}
+          <button
+            onClick={() => setSectionsExpanded(!sectionsExpanded)}
+            className="w-full flex items-center justify-between p-6 hover:bg-purple-100 transition-colors cursor-pointer"
+          >
+            <h3 className="text-lg font-semibold text-gray-900">{t.section}s</h3>
+            <ChevronDown 
+              className={`w-5 h-5 text-gray-600 transition-transform ${sectionsExpanded ? 'rotate-180' : ''}`}
+            />
+          </button>
+
+          {/* Content */}
+          {sectionsExpanded && (
+            <div className="border-t border-purple-200 p-6 bg-white">
+              <div className="space-y-4">
+            {/* Add New Section */}
+            <div className="space-y-3 p-4 bg-white rounded-lg border border-purple-100">
+              <input
+                type="text"
+                value={newSectionName}
+                onChange={(e) => setNewSectionName(e.target.value)}
+                placeholder={t.sectionName}
+                disabled={sectionsLoading}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-50"
+              />
+              <textarea
+                value={newSectionDesc}
+                onChange={(e) => setNewSectionDesc(e.target.value)}
+                placeholder={t.sectionDescription}
+                rows={2}
+                disabled={sectionsLoading}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none disabled:bg-gray-50"
+              />
+              <button
+                onClick={addSection}
+                disabled={sectionsLoading}
+                className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+              >
+                {t.addSection}
+              </button>
+            </div>
+            
+            {/* Sections with their Questions */}
+            {sections.length > 0 && (
+              <div className="space-y-4">
+                {sections.map((section, sectionIndex) => (
+                  <div key={section.id} className="p-4 bg-white rounded-lg border border-purple-100">
+                    <div className="flex items-start justify-between gap-3 mb-4 pb-3 border-b border-purple-100">
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-gray-900">{section.name}</h4>
+                        {section.description && (
+                          <p className="text-sm text-gray-600 mt-1">{section.description}</p>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => deleteSection(section.id)}
+                        disabled={sectionsLoading}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                    
+                    {/* Add Question to Section Button */}
+                    <button
+                      onClick={() => {
+                        setSelectedSectionId(section.id);
+                        addQuestion();
+                      }}
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg transition-colors border border-purple-200 mb-3"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add Question
+                    </button>
+                    
+                    {/* Questions in this Section */}
+                    <div className="space-y-3 border-l-2 border-purple-200 pl-3">
+                      {questions.filter(q => q.section_id === section.id).length === 0 ? (
+                        <p className="text-sm text-gray-500 italic">No questions yet</p>
+                      ) : (
+                        questions.filter(q => q.section_id === section.id).map((question) => (
+                          <div key={question.id} className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
+                            {/* Question Header */}
+                            <div
+                              onClick={() => setExpandedQuestion(expandedQuestion === question.id ? null : question.id)}
+                              className="flex items-center gap-3 p-4 cursor-pointer hover:bg-gray-100 transition-colors"
+                            >
+                              <ChevronDown 
+                                className={`w-5 h-5 text-gray-400 transition-transform flex-shrink-0 ${expandedQuestion === question.id ? 'rotate-180' : ''}`}
+                              />
+                              <div className="flex-1">
+                                <p className="font-medium text-gray-900">{question.text || 'Untitled question'}</p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Copy 
+                                  onClick={(e) => { e.stopPropagation(); duplicateQuestion(question.id, questions.indexOf(question)); }}
+                                  className="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-pointer"
+                                />
+                                <Trash2 
+                                  onClick={(e) => { e.stopPropagation(); deleteQuestion(question.id); }}
+                                  className="w-4 h-4 text-gray-400 hover:text-red-600 cursor-pointer"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Question Editor (Expanded) */}
+                            {expandedQuestion === question.id && (
+                              <div className="p-4 border-t border-gray-200 bg-white">
+                                <div className="space-y-4">
+                                  {/* Section Selection */}
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                      {t.section}
+                                    </label>
+                                    <select
+                                      value={question.section_id || ''}
+                                      onChange={(e) => updateQuestion(question.id, 'section_id', e.target.value || undefined)}
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    >
+                                      <option value="">No Section</option>
+                                      {sections.map((sec) => (
+                                        <option key={sec.id} value={sec.id}>
+                                          {sec.name}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  
+                                  {/* Question Text */}
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                      {t.questionText}
+                                    </label>
+                                    <textarea
+                                      value={question.text}
+                                      onChange={(e) => updateQuestion(question.id, 'text', e.target.value)}
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                      rows={2}
+                                    />
+                                  </div>
+
+                                  {/* Question Type */}
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                      {t.questionType}
+                                    </label>
+                                    <select
+                                      value={question.type}
+                                      onChange={(e) => updateQuestion(question.id, 'type', e.target.value as any)}
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    >
+                                      <option value="single-choice">Single Choice (Radio)</option>
+                                      <option value="multiple-choice">Multiple Choice (Checkboxes)</option>
+                                      <option value="scale">Scale (1-5)</option>
+                                      <option value="text">Text Input</option>
+                                      <option value="yes-no">Yes/No</option>
+                                    </select>
+                                  </div>
+
+                                  {/* Options */}
+                                  {(question.type === 'single-choice' || question.type === 'multiple-choice' || question.type === 'yes-no') && (
+                                    <div>
+                                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        {t.options}
+                                      </label>
+                                      <div className="space-y-2">
+                                        {question.options?.map((option, idx) => (
+                                          <div key={idx} className="flex gap-2">
+                                            <input
+                                              type="text"
+                                              value={option}
+                                              onChange={(e) => {
+                                                const newOptions = [...(question.options || [])];
+                                                newOptions[idx] = e.target.value;
+                                                updateQuestion(question.id, 'options', newOptions);
+                                              }}
+                                              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                            />
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Required Checkbox */}
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="checkbox"
+                                      checked={question.required}
+                                      onChange={(e) => updateQuestion(question.id, 'required', e.target.checked)}
+                                      id={`required-${question.id}`}
+                                      className="w-4 h-4"
+                                    />
+                                    <label htmlFor={`required-${question.id}`} className="text-sm font-medium text-gray-700">
+                                      {t.requiredQuestion}
+                                    </label>
+                                  </div>
+
+                                  {/* Add Question After Button */}
+                                  <div className="pt-3 border-t border-gray-200 flex gap-2">
+                                    <button
+                                      onClick={() => {
+                                        const currentIndex = questions.findIndex(q => q.id === question.id);
+                                        addQuestion(currentIndex);
+                                        setSelectedSectionId(section.id);
+                                      }}
+                                      className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-colors border border-blue-200"
+                                    >
+                                      <Plus className="w-4 h-4" />
+                                      Add after this
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                    
+                    {/* Add Another Section After This One */}
+                    {sectionIndex === sections.length - 1 && (
+                      <div className="mt-4 pt-4 border-t border-green-100">
+                        <button
+                          onClick={() => {
+                            setNewSectionName('');
+                            setNewSectionDesc('');
+                            // Auto-focus could be added if using refs
+                          }}
+                          className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm bg-green-100 hover:bg-green-200 text-green-700 rounded-lg transition-colors border border-green-200"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Add Section
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {sections.length === 0 && (
+              <p className="text-sm text-gray-500 italic text-center py-4">No sections created. Add one above to start organizing questions.</p>
+            )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Add Question without Section Button */}
         <div className="mb-6">
           <button
-            onClick={() => addQuestion()}
+            onClick={() => {
+              setSelectedSectionId(null);
+              addQuestion();
+            }}
             className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium"
           >
             <Plus className="w-5 h-5" />
-            {t.addQuestion}
+            {t.addQuestion} (No Section)
           </button>
         </div>
 
-        {/* Questions List */}
+        {/* All Questions (including those without sections) */}
         <div className="space-y-4">
           {questions.map((question, index) => (
             <div 
@@ -824,6 +1227,25 @@ export default function SurveyBuilder() {
                 {expandedQuestion === question.id && (
                   <div className="p-4 border-t border-gray-200 bg-gray-50">
                     <div className="space-y-4">
+                      {/* Section Selection */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          {t.section}
+                        </label>
+                        <select
+                          value={question.section_id || ''}
+                          onChange={(e) => updateQuestion(question.id, 'section_id', e.target.value || undefined)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        >
+                          <option value="">No Section</option>
+                          {sections.map((section) => (
+                            <option key={section.id} value={section.id}>
+                              {section.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      
                       {/* Question Text */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1029,7 +1451,6 @@ export default function SurveyBuilder() {
         {/* Empty State */}
         {questions.length === 0 && (
           <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
-            <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">{t.noQuestions}</h3>
             <p className="text-sm text-gray-500 mb-4">{t.getStarted}</p>
             <button

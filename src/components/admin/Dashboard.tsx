@@ -51,87 +51,77 @@ export default function Dashboard() {
         .from('surveys')
         .select('*')
         .eq('owner_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(1);
+        .order('created_at', { ascending: false });
 
       if (surveysError) throw surveysError;
 
       if (surveys && surveys.length > 0) {
-        const survey = surveys[0];
+        // Get total stats from ALL surveys
+        const { data: allResponses, error: allResponsesError } = await supabase
+          .from('responses')
+          .select('respondent_email, opted_in, created_at, lng')
+          .in('survey_id', surveys.map(s => s.id));
+
+        if (allResponsesError) throw allResponsesError;
+
+        const totalResponsesCount = allResponses?.length || 0;
+        const totalEmailsCount = allResponses?.filter((r: any) => r.opted_in && r.respondent_email && r.respondent_email.trim() !== '').length || 0;
+        const lastResponseAt = allResponses && allResponses.length > 0 
+          ? allResponses.reduce((latest: any, current: any) => {
+              const latestDate = new Date(latest.created_at).getTime();
+              const currentDate = new Date(current.created_at).getTime();
+              return currentDate > latestDate ? current : latest;
+            }).created_at
+          : null;
+        const lastEmailAt = allResponses
+          ?.filter((r: any) => r.opted_in && r.respondent_email && r.respondent_email.trim() !== '')
+          .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]?.created_at || null;
+
+        // Find survey with most responses for display
+        let surveyWithMostResponses = surveys[0];
+        let maxResponseCount = 0;
+
+        for (const survey of surveys) {
+          const count = allResponses?.filter((r: any) => r.survey_id === survey.id).length || 0;
+          if (count > maxResponseCount) {
+            maxResponseCount = count;
+            surveyWithMostResponses = survey;
+          }
+        }
+
+        const survey = surveyWithMostResponses;
         
-        // Fetch responses count
-        const { count: responsesCount, error: responsesError } = await supabase
-          .from('responses')
-          .select('*', { count: 'exact', head: true })
-          .eq('survey_id', survey.id);
-
-        if (responsesError) throw responsesError;
-
-        // Fetch emails count
-        const { count: emailsCount, error: emailsError } = await supabase
-          .from('responses')
-          .select('*', { count: 'exact', head: true })
-          .eq('survey_id', survey.id)
-          .not('respondent_email', 'is', null);
-
-        if (emailsError) throw emailsError;
-
-        // Fetch language codes for breakdown
-        const { data: lngRows, error: lngError } = await supabase
-          .from('responses')
-          .select('*')
-          .eq('survey_id', survey.id);
-
-        if (lngError) throw lngError;
-
+        console.log('All surveys stats:', { totalResponses: totalResponsesCount, totalEmails: totalEmailsCount });
+        
+        // Get language breakdown from all responses
         const counts: Record<string, number> = {};
-        (lngRows || []).forEach((r: any) => {
-          const code = (r?.lng ?? r?.language ?? null) as string | null;
+        (allResponses || []).forEach((r: any) => {
+          const code = (r?.lng ?? null) as string | null;
           if (!code) return;
           counts[code] = (counts[code] || 0) + 1;
         });
         setLanguageCounts(counts);
 
-        // Fetch latest email collected timestamp
-        const { data: lastEmail, error: lastEmailError } = await supabase
-          .from('responses')
-          .select('created_at')
-          .eq('survey_id', survey.id)
-          .not('respondent_email', 'is', null)
-          .order('created_at', { ascending: false })
-          .limit(1);
+        if (allResponsesError) throw allResponsesError;
 
-        if (lastEmailError) throw lastEmailError;
-        const lastEmailAt = lastEmail && lastEmail.length > 0 ? (lastEmail[0] as any).created_at : null;
-
-        // Fetch last activity (latest response timestamp)
-        const { data: lastResp, error: lastRespError } = await supabase
-          .from('responses')
-          .select('*')
-          .eq('survey_id', survey.id)
-          .order('created_at', { ascending: false })
-          .limit(1);
-
-        if (lastRespError) throw lastRespError;
-
-        const lastCreatedAt = lastResp && lastResp.length > 0 ? (lastResp[0] as any).created_at : null;
+        // Old code removed - now using aggregated data from all surveys above
 
         setActiveSurvey({
           id: survey.id,
           title: survey.title,
-          responses_count: responsesCount || 0,
+          responses_count: maxResponseCount,
         });
 
         setMetrics({
-          totalResponses: responsesCount || 0,
-          emailsCollected: emailsCount || 0,
-          lastActivity: relativeTime(lastCreatedAt),
+          totalResponses: totalResponsesCount,
+          emailsCollected: totalEmailsCount,
+          lastActivity: relativeTime(lastResponseAt),
         });
 
         const activity: Array<{ label: string; when: string; tone: 'primary' | 'muted' }> = [];
 
-        if (lastCreatedAt) {
-          activity.push({ label: t.newResponseSubmitted, when: relativeTime(lastCreatedAt), tone: 'primary' });
+        if (lastResponseAt) {
+          activity.push({ label: t.newResponseSubmitted, when: relativeTime(lastResponseAt), tone: 'primary' });
         }
 
         if (lastEmailAt) {

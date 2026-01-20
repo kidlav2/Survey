@@ -20,6 +20,7 @@ export default function SurveyFlow() {
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [questions, setQuestions] = useState<any[]>([]);
+  const [sections, setSections] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [responseId, setResponseId] = useState<string | null>(null);
   const [startedAt, setStartedAt] = useState<number>(() => Date.now());
@@ -54,6 +55,13 @@ export default function SurveyFlow() {
             : Array.isArray(q?.options)
               ? q.options
               : []);
+    }
+
+    // Add "Other" option if hasOtherOption is true
+    const otherText = tQuestions.other || 'Other (please specify)';
+    const hasOtherOption = q?.hasOtherOption || q?.has_other_option || false;
+    if (hasOtherOption && !options.some(opt => opt?.toLowerCase?.().includes('other'))) {
+      options = [...options, otherText];
     }
 
     return { text, options };
@@ -111,6 +119,19 @@ export default function SurveyFlow() {
 
       if (error) throw error;
 
+      // Load sections for this survey
+      const { data: sectionsData, error: sectionsError } = await supabase
+        .from('survey_sections')
+        .select('*')
+        .eq('survey_id', id)
+        .order('order_index', { ascending: true });
+      
+      if (sectionsError && sectionsError.code !== '42703' && sectionsError.code !== 'PGRST116') {
+        console.error('Error loading sections:', sectionsError);
+      }
+      
+      setSections(sectionsData || []);
+
       console.log('Raw questions data:', data);
 
       const mapped = (data || []).map((row: any, idx: number) => {
@@ -133,6 +154,7 @@ export default function SurveyFlow() {
           required: payload.required ?? row.required ?? false,
           hasOtherOption:
             payload.hasOtherOption ?? row.has_other_option ?? row.hasOtherOption ?? false,
+          section_id: row.section_id,
         };
       });
 
@@ -224,6 +246,14 @@ export default function SurveyFlow() {
     answers[question?.id] !== undefined &&
     (Array.isArray(answers[question?.id]) ? answers[question?.id].length > 0 : true);
 
+  const canSkip = !question?.required;
+
+  const handleSkip = () => {
+    // Mark question as skipped (null value)
+    setAnswers({ ...answers, [question.id]: null });
+    handleNext();
+  };
+
   if (loading || !question) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
@@ -264,39 +294,89 @@ export default function SurveyFlow() {
 
         {/* Question Card */}
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-8 md:p-10">
+          {/* Section Header */}
+          {question?.section_id && (
+            <div className="mb-6 pb-4 border-b border-gray-200">
+              {sections.find(s => s.id === question.section_id) && (
+                <>
+                  <h3 className="text-sm font-semibold text-indigo-600 uppercase tracking-wide">
+                    {sections.find(s => s.id === question.section_id)?.name}
+                  </h3>
+                  {sections.find(s => s.id === question.section_id)?.description && (
+                    <p className="text-sm text-gray-600 mt-2">
+                      {sections.find(s => s.id === question.section_id)?.description}
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+          
           <h2 className="text-2xl font-semibold text-gray-900 mb-8">{localized.text}</h2>
 
           {/* Choice Questions */}
           {(question.type === 'multiple-choice' || question.type === 'single-choice') && (
             <div className="space-y-3">
-              {localized.options?.map((option: string) => {
+              {localized.options?.map((option: string, optionIndex: number) => {
                 const isMulti = question.type === 'multiple-choice';
                 const current = answers[question.id];
                 const isSelected = isMulti
                   ? (Array.isArray(current) ? current : []).includes(option)
                   : current === option;
+                
+                // Check if this is the "Other" option (last option when hasOtherOption is true)
+                const isOtherOption = question.hasOtherOption && optionIndex === (localized.options?.length - 1);
 
                 return (
-                  <button
-                    key={option}
-                    onClick={() => handleAnswer(option)}
-                    className={`w-full text-left px-6 py-4 rounded-lg border-2 transition-all ${
-                      isSelected
-                        ? 'border-indigo-600 bg-indigo-50 text-indigo-900'
-                        : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                          isSelected ? 'border-indigo-600' : 'border-gray-300'
-                        }`}
-                      >
-                        {isSelected && <div className="w-3 h-3 rounded-full bg-indigo-600" />}
+                  <div key={option}>
+                    <button
+                      onClick={() => handleAnswer(option)}
+                      className={`w-full text-left px-6 py-4 rounded-lg border-2 transition-all ${
+                        isSelected
+                          ? 'border-indigo-600 bg-indigo-50 text-indigo-900'
+                          : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        {isMulti ? (
+                          // Square checkbox for multiple-choice
+                          <div
+                            className={`w-5 h-5 border-2 flex items-center justify-center flex-shrink-0 ${
+                              isSelected ? 'border-indigo-600 bg-indigo-600' : 'border-gray-300'
+                            }`}
+                          >
+                            {isSelected && <div className="w-2 h-2 bg-white rounded-full" />}
+                          </div>
+                        ) : (
+                          // Round radio button for single-choice
+                          <div
+                            className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                              isSelected ? 'border-indigo-600' : 'border-gray-300'
+                            }`}
+                          >
+                            {isSelected && <div className="w-3 h-3 rounded-full bg-indigo-600" />}
+                          </div>
+                        )}
+                        <span>{option}</span>
                       </div>
-                      <span>{option}</span>
-                    </div>
-                  </button>
+                    </button>
+                    
+                    {/* Text input for "Other" option */}
+                    {isSelected && isOtherOption && (
+                      <textarea
+                        value={answers[`${question.id}_other`] || ''}
+                        onChange={(e) => {
+                          setAnswers({
+                            ...answers,
+                            [`${question.id}_other`]: e.target.value
+                          });
+                        }}
+                        placeholder={tQuestions.placeholder ?? 'Please specify...'}
+                        className="w-full mt-3 px-4 py-3 border border-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        rows={3}
+                      />
+                    )}
+                  </div>
                 );
               })}
             </div>
@@ -362,7 +442,7 @@ export default function SurveyFlow() {
         </div>
 
         {/* Navigation Buttons */}
-        <div className="mt-6 flex justify-between">
+        <div className="mt-6 flex justify-between items-center gap-3">
           <button
             onClick={handleBack}
             disabled={currentQuestion === 0}
@@ -376,18 +456,28 @@ export default function SurveyFlow() {
             {t.back}
           </button>
 
-          <button
-            onClick={handleNext}
-            disabled={!isAnswered}
-            className={`flex items-center gap-2 px-8 py-3 rounded-lg font-medium transition-colors ${
-              isAnswered
-                ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-            }`}
-          >
-            {currentQuestion < totalQuestions - 1 ? t.next : t.finish}
-            <ChevronRight className="w-5 h-5" />
-          </button>
+          <div className="flex gap-2">
+            {canSkip && (
+              <button
+                onClick={handleSkip}
+                className="px-6 py-3 rounded-lg font-medium border border-gray-300 hover:bg-gray-50 text-gray-700 transition-colors"
+              >
+                Skip
+              </button>
+            )}
+            <button
+              onClick={handleNext}
+              disabled={!isAnswered}
+              className={`flex items-center gap-2 px-8 py-3 rounded-lg font-medium transition-colors ${
+                isAnswered
+                  ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              }`}
+            >
+              {currentQuestion < totalQuestions - 1 ? t.next : t.finish}
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
         </div>
       </div>
     </div>

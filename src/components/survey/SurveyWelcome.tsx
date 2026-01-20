@@ -17,6 +17,7 @@ export default function SurveyWelcome() {
   const [language, setLanguage] = useState<'en' | 'ru' | 'fr' | 'es'>(initialLanguage);
   const [survey, setSurvey] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [showInfo, setShowInfo] = useState(true);
 
   useEffect(() => {
     checkSurveyStatus();
@@ -28,13 +29,14 @@ export default function SurveyWelcome() {
     try {
       const { data, error } = await supabase
         .from('surveys')
-        .select('id, title, description, estimated_time, status')
+        .select('id, title, description, estimated_time, status, show_survey_info')
         .eq('id', id)
         .single();
 
       if (error) throw error;
 
       setSurvey(data);
+      setShowInfo(data?.show_survey_info !== false);
 
       if (data?.status !== 'active') {
         navigate(`/survey/${id}/closed`, { replace: true });
@@ -72,21 +74,25 @@ export default function SurveyWelcome() {
             <h1 className="text-3xl font-semibold text-gray-900 mb-3">
               {survey?.title || t.title}
             </h1>
-            <p className="text-gray-600 leading-relaxed">
-              {survey?.description || t.description}
-            </p>
+            {showInfo && (
+              <p className="text-gray-600 leading-relaxed">
+                {survey?.description || t.description}
+              </p>
+            )}
           </div>
 
           {/* Info Box */}
-          <div className="bg-gray-50 rounded-lg p-6 mb-8 border border-gray-200">
-            <div className="flex items-start gap-4">
-              <Clock className="w-5 h-5 text-gray-600 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="text-sm font-medium text-gray-900 mb-1">{t.estimatedTime}</p>
-                <p className="text-sm text-gray-600">{survey?.estimated_time || '4'} {t.minutes || 'minutes'}</p>
+          {showInfo && (
+            <div className="bg-gray-50 rounded-lg p-6 mb-8 border border-gray-200">
+              <div className="flex items-start gap-4">
+                <Clock className="w-5 h-5 text-gray-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-gray-900 mb-1">{t.estimatedTime}</p>
+                  <p className="text-sm text-gray-600">{survey?.estimated_time || '4'} {t.minutes || 'minutes'}</p>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Privacy Note */}
           <div className="mb-8">
