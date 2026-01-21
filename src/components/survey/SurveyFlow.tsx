@@ -233,41 +233,46 @@ export default function SurveyFlow() {
       setQuestions(mapped);
       
       // Create response record in DB immediately when survey starts
-      const newResponseId = (id || '') + '_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+      // Don't generate ID manually - let DB create UUID automatically
       let insertError: any = null;
+      let createdResponseId: string | null = null;
       
       // Try with status column first
-      const { error: statusError } = await supabase
+      const { error: statusError, data: statusData } = await supabase
         .from('responses')
         .insert({
-          id: newResponseId,
           survey_id: id,
           answers: {},
           duration_seconds: 0,
           language: language,
           status: 'in_progress',
-        });
+        })
+        .select('id');
 
       if (statusError) {
         console.warn('Status column not available, trying without it:', statusError);
         // If status column doesn't exist, retry without it
-        const { error: fallbackError } = await supabase
+        const { error: fallbackError, data: fallbackData } = await supabase
           .from('responses')
           .insert({
-            id: newResponseId,
             survey_id: id,
             answers: {},
             duration_seconds: 0,
             language: language,
-          });
+          })
+          .select('id');
         insertError = fallbackError;
+        createdResponseId = fallbackData?.[0]?.id || null;
+      } else {
+        createdResponseId = statusData?.[0]?.id || null;
       }
 
       if (insertError) {
         console.error('Error creating response record:', insertError);
+        console.error('Error details:', insertError?.message, insertError?.details, insertError?.code);
       } else {
-        console.log('Response record created:', newResponseId);
-        setResponseId(newResponseId);
+        console.log('Response record created:', createdResponseId);
+        setResponseId(createdResponseId);
       }
 
       setLoading(false);
@@ -437,27 +442,18 @@ export default function SurveyFlow() {
         if (logic.end_survey) {
           console.log('Survey ended due to conditional logic');
           try {
-            // Update response with final status (try with status column first, then fallback)
-            const updateData: any = { answers, duration_seconds: Math.max(0, Math.round((Date.now() - startedAt) / 1000)) };
+            // Update response with final data
+            const updateData: any = { answers, duration_seconds: Math.max(0, Math.round((Date.now() - startedAt) / 1000)), completed: true };
             
             const { error: updateError } = await supabase
               .from('responses')
-              .update({
-                ...updateData,
-                status: 'completed',
-              })
+              .update(updateData)
               .eq('id', responseId);
 
-            if (updateError && String(updateError?.message || '').includes('status')) {
-              // Status column might not exist, try without it
-              console.warn('Status column update failed, trying without status:', updateError);
-              const { error: fallbackError } = await supabase
-                .from('responses')
-                .update(updateData)
-                .eq('id', responseId);
-              if (fallbackError) console.error('Error updating response:', fallbackError);
-            } else if (updateError) {
-              console.error('Error updating response status:', updateError);
+            if (updateError) {
+              console.error('Error updating response:', updateError);
+            } else {
+              console.log('Response updated successfully at survey end');
             }
 
             const newResponseId = responseId || makeUUID();
@@ -503,28 +499,18 @@ export default function SurveyFlow() {
         const updateData: any = {
           answers: finalAnswers,
           duration_seconds: finalDuration,
+          completed: true,
         };
 
         const { error: updateError } = await supabase
           .from('responses')
-          .update({
-            ...updateData,
-            status: 'completed',
-          })
+          .update(updateData)
           .eq('id', responseId);
 
-        if (updateError && String(updateError?.message || '').includes('status')) {
-          // Status column might not exist, try without it
-          console.warn('Status column update failed, trying without status:', updateError);
-          const { error: fallbackError } = await supabase
-            .from('responses')
-            .update(updateData)
-            .eq('id', responseId);
-          if (fallbackError) {
-            console.error('Error updating response:', fallbackError);
-          }
-        } else if (updateError) {
-          console.error('Error updating response status:', updateError);
+        if (updateError) {
+          console.error('Error updating response:', updateError);
+        } else {
+          console.log('Survey completed and response saved successfully');
         }
 
         navigate(`/survey/${id}/opt-in?lng=${encodeURIComponent(language)}&rid=${encodeURIComponent(responseId)}`, {

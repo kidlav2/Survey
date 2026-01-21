@@ -46,7 +46,38 @@ export default function Responses() {
 
   useEffect(() => {
     loadResponses();
+    
+    // Subscribe to real-time updates
+    const channel = supabase
+      .channel('responses-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'responses',
+        },
+        (payload) => {
+          console.log('Response changed:', payload);
+          // Reload responses when any change occurs
+          loadResponses();
+        }
+      )
+      .subscribe((status) => {
+        console.log('Subscription status:', status);
+      });
+
+    // Cleanup subscription on unmount
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
+
+  // Add this separate effect to debug the responses state
+  useEffect(() => {
+    console.log('Current responses count:', responses.length);
+    console.log('Current stats:', stats);
+  }, [responses]);
 
   const loadResponses = async () => {
     try {
@@ -56,6 +87,15 @@ export default function Responses() {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError || !user) throw new Error('Not authenticated');
 
+      console.log('Loading responses for user:', user.id);
+
+      // DEBUG: Try to get ALL surveys to see what's happening
+      const { data: allSurveysDebug } = await supabase
+        .from('surveys')
+        .select('id, title, owner_id');
+      
+      console.log('DEBUG - ALL surveys in DB:', allSurveysDebug?.map(s => ({ id: s.id, title: s.title, owner: s.owner_id })));
+
       // Fetch surveys for current user
       const { data: surveys, error: surveysError } = await supabase
         .from('surveys')
@@ -64,12 +104,16 @@ export default function Responses() {
 
       if (surveysError) throw surveysError;
 
+      console.log('Found surveys for user:', surveys?.length || 0);
+      console.log('Survey data:', surveys);
+
       // Store surveys in state for filtering
       setSurveys(surveys || []);
 
       const surveyIds = surveys?.map(s => s.id) || [];
 
       if (surveyIds.length === 0) {
+        console.log('No surveys found');
         setResponses([]);
         setLoading(false);
         return;
@@ -83,6 +127,24 @@ export default function Responses() {
         .order('created_at', { ascending: false });
 
       if (responsesError) throw responsesError;
+
+      console.log('Fetched responses:', allResponses?.length || 0);
+      console.log('Response data:', allResponses);
+      console.log('Survey IDs searched:', surveyIds);
+      
+      // Debug: Try fetching all responses to check RLS
+      const { data: debugAllResponses, error: debugError } = await supabase
+        .from('responses')
+        .select('id, survey_id, created_at, answers');
+      
+      console.log('DEBUG - All responses in DB:', debugAllResponses?.length || 0);
+      if (debugAllResponses) {
+        console.log('DEBUG - Full response list:', debugAllResponses);
+        const surveyIdList = debugAllResponses.map(r => r.survey_id);
+        console.log('DEBUG - All survey_ids in DB:', surveyIdList);
+        console.log('DEBUG - Missing survey ids:', surveyIds.filter(id => !surveyIdList.includes(id)));
+      }
+      if (debugError) console.log('DEBUG - Error:', debugError);
 
       setResponses(allResponses || []);
 
