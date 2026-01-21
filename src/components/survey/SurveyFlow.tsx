@@ -148,7 +148,9 @@ export default function SurveyFlow() {
         return {
           ...row,
           order: row.sort_order ?? row.order ?? idx,
-          options: row.options ?? [],
+          options: row.options 
+            ? (typeof row.options === 'string' ? JSON.parse(row.options) : row.options)
+            : [],
           type: payload.type ?? row.type,
           text: row.text ?? row.question_text ?? '',
           required: payload.required ?? row.required ?? false,

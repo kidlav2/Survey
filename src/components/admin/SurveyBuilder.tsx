@@ -375,9 +375,12 @@ export default function SurveyBuilder() {
 
       if (questionsError) throw questionsError;
 
-      // Parse conditional_logic from JSON strings
+      // Parse conditional_logic and options from JSON strings
       const parsedQuestions = (questionsData || []).map((q: any) => ({
         ...q,
+        options: q.options 
+          ? (typeof q.options === 'string' ? JSON.parse(q.options) : q.options)
+          : [],
         conditional_logic: q.conditional_logic 
           ? (typeof q.conditional_logic === 'string' ? JSON.parse(q.conditional_logic) : q.conditional_logic)
           : undefined
@@ -526,7 +529,7 @@ export default function SurveyBuilder() {
             survey_id: id,
             type: question.type,
             text: question.text,
-            options: question.options,
+            options: question.options ? JSON.stringify(question.options) : null,
             required: question.required,
             has_other_option: question.hasOtherOption,
             sort_order: question.order,
@@ -570,7 +573,7 @@ export default function SurveyBuilder() {
           const updateRow: any = {
             type: question.type,
             text: question.text,
-            options: question.options,
+            options: question.options ? JSON.stringify(question.options) : null,
             required: question.required,
             has_other_option: question.hasOtherOption,
             sort_order: question.order,
