@@ -483,16 +483,8 @@ export default function SurveyBuilder() {
 
   const deleteQuestion = async (questionId: string) => {
     try {
-      // If it's a saved question (not a temporary one), delete from DB
-      if (!questionId.startsWith('temp_')) {
-        const { error } = await supabase
-          .from('questions')
-          .delete()
-          .eq('id', questionId);
-
-        if (error) throw error;
-      }
-
+      // Just remove from local state, don't delete from DB yet
+      // DB deletion will happen during handleSave
       setQuestions(questions.filter(q => q.id !== questionId));
       setSaveStatus('unsaved');
     } catch (error) {
@@ -1660,6 +1652,16 @@ export default function SurveyBuilder() {
                     </div>
                     <p className="text-sm text-gray-700 truncate">{question.text || 'Untitled question'}</p>
                   </div>
+                  <div className="flex items-center gap-2">
+                    <Copy 
+                      onClick={(e) => { e.stopPropagation(); duplicateQuestion(question.id, questions.indexOf(question)); }}
+                      className="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-pointer flex-shrink-0"
+                    />
+                    <Trash2 
+                      onClick={(e) => { e.stopPropagation(); deleteQuestion(question.id); }}
+                      className="w-4 h-4 text-gray-400 hover:text-red-600 cursor-pointer flex-shrink-0"
+                    />
+                  </div>
                   {expandedQuestion === question.id ? (
                     <ChevronUp className="w-5 h-5 text-gray-400 flex-shrink-0" />
                   ) : (
@@ -1991,7 +1993,7 @@ export default function SurveyBuilder() {
           <div className="mt-6 flex flex-col sm:flex-row gap-3">
             <button
               onClick={() => addQuestion()}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium"
             >
               <Plus className="w-5 h-5" />
               {t.addQuestion}
