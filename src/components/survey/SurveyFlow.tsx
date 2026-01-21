@@ -115,7 +115,7 @@ export default function SurveyFlow() {
         .from('questions')
         .select('*')
         .eq('survey_id', id)
-        .order('sort_order', { ascending: true });
+        .order('created_at', { ascending: true });
 
       if (error) throw error;
 
@@ -133,6 +133,7 @@ export default function SurveyFlow() {
       setSections(sectionsData || []);
 
       console.log('Raw questions data:', data);
+      console.log('Sections data:', sectionsData);
 
       const mapped = (data || []).map((row: any, idx: number) => {
         const payload = row.payload || {};
@@ -144,6 +145,9 @@ export default function SurveyFlow() {
           options: options,
           conditional_logic: row.conditional_logic,
           payload: payload,
+          section_id: row.section_id,
+          sort_order: row.sort_order,
+          created_at: row.created_at,
         });
 
         return {
@@ -164,9 +168,66 @@ export default function SurveyFlow() {
         };
       });
 
+      // Sort questions properly: 
+      // 1. Questions without section_id come first (unsectioned)
+      // 2. Questions with section_id are sorted by section order, then by their sort_order within section
+      const sectionMap = new Map(sectionsData?.map(s => [s.id, s.order_index || 0]) || []);
+      
+      console.log('Section map:', Array.from(sectionMap.entries()));
+      console.log('Before sorting - questions:', mapped.map((q: any) => ({ 
+        id: q.id, 
+        section_id: q.section_id, 
+        sort_order: q.sort_order,
+        text: q.text.substring(0, 20)
+      })));
+      
+      mapped.sort((a, b) => {
+        // Both unsectioned
+        if (!a.section_id && !b.section_id) {
+          return (a.sort_order ?? 0) - (b.sort_order ?? 0);
+        }
+        
+        // Only a is unsectioned - comes first
+        if (!a.section_id) return -1;
+        if (!b.section_id) return 1;
+        
+        // Both sectioned
+        const sectionOrderA = sectionMap.get(a.section_id) ?? 999;
+        const sectionOrderB = sectionMap.get(b.section_id) ?? 999;
+        
+        if (sectionOrderA !== sectionOrderB) {
+          return sectionOrderA - sectionOrderB;
+        }
+        
+        // Same section - sort by sort_order
+        return (a.sort_order ?? 0) - (b.sort_order ?? 0);
+      });
+
+      console.log('After sorting - questions:', mapped.map((q: any) => ({ 
+        id: q.id, 
+        section_id: q.section_id, 
+        sort_order: q.sort_order,
+        order: q.order,
+        text: q.text.substring(0, 20)
+      })));
+
+      // Re-index the order field based on final sorted position
+      mapped.forEach((q, idx) => {
+        q.order = idx;
+      });
+
       console.log('Mapped questions:', mapped);
+      console.log('Total questions loaded:', mapped.length);
+      console.log('Questions by section:', 
+        mapped.reduce((acc: any, q: any) => {
+          const section = q.section_id || 'unsectioned';
+          if (!acc[section]) acc[section] = [];
+          acc[section].push(q.id);
+          return acc;
+        }, {})
+      );
       mapped.forEach((q: any) => {
-        console.log(`Question ${q.id} conditional_logic:`, q.conditional_logic);
+        console.log(`Question ${q.id} (section: ${q.section_id || 'none'}, order: ${q.order}) conditional_logic:`, q.conditional_logic);
       });
 
       setQuestions(mapped);
@@ -248,6 +309,13 @@ export default function SurveyFlow() {
     // First question is never branch-only
     if (qIdx === 0) return false;
     
+    // First question of a new section is never branch-only
+    const currentQ = questions[qIdx];
+    const prevQ = questions[qIdx - 1];
+    if (currentQ?.section_id !== prevQ?.section_id) {
+      return false; // Section change - this is a main sequence question
+    }
+    
     // Collect all question IDs that are branch targets
     const targetIds = new Set<string>();
     questions.forEach((q: any) => {
@@ -264,9 +332,7 @@ export default function SurveyFlow() {
     }
     
     // A question is branch-only if it's a target and immediately follows a question with conditional_logic
-    const prevQuestion = qIdx > 0 ? questions[qIdx - 1] : null;
-    
-    if (!prevQuestion?.conditional_logic?.length) {
+    if (!prevQ?.conditional_logic?.length) {
       return false; // Previous question doesn't have conditional_logic
     }
     
@@ -277,21 +343,33 @@ export default function SurveyFlow() {
   const question = questions[currentQuestion];
   const localized = question ? getLocalized(question, language) : { text: '', options: [] as string[] };
   
-  // Count only non-branch-only questions for progress tracking
-  const visibleQuestions = questions.filter((_, idx) => !isBranchOnly(questions[idx].id, idx));
+  // Count only non-branch-only questions across ALL sections for progress tracking
+  const visibleQuestions = questions.filter((_, idx) => {
+    const isBranch = isBranchOnly(questions[idx].id, idx);
+    return !isBranch;
+  });
   const totalQuestions = visibleQuestions.length;
   
-  // Calculate current question position in visible questions
+  // Calculate current question position in visible questions across all sections
   const currentVisibleIndex = visibleQuestions.findIndex(q => q.id === question?.id);
   const progress = totalQuestions > 0 ? ((Math.max(0, currentVisibleIndex) + 1) / totalQuestions) * 100 : 0;
   
   console.log('Progress calculation:', {
+    totalLoadedQuestions: questions.length,
     currentQuestion,
     currentQuestionId: question?.id,
+    currentQuestionSection: question?.section_id,
     visibleQuestionsCount: visibleQuestions.length,
-    visibleQuestionsIds: visibleQuestions.map(q => q.id),
+    visibleQuestionsIds: visibleQuestions.map((q: any) => ({ id: q.id, section: q.section_id, text: q.text.substring(0, 30) })),
     currentVisibleIndex,
-    progress: Math.round(progress)
+    progress: Math.round(progress),
+    branchOnlyQuestions: questions
+      .map((q: any, idx: number) => ({
+        id: q.id,
+        section: q.section_id,
+        isBranchOnly: isBranchOnly(q.id, idx)
+      }))
+      .filter((q: any) => q.isBranchOnly)
   });
 
   const normalizeYesNoAnswer = (localized: string): string => {

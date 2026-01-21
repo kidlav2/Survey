@@ -347,7 +347,7 @@ export default function Surveys() {
                   status: survey.status === 'active' ? 'Active' : 'Disabled',
                   responses: survey.responses_count || 0,
                   lastActivity: new Date(survey.created_at).toLocaleDateString(),
-                  link: `/survey/${survey.id}`,
+                  link: `${window.location.origin}/survey/${survey.id}`,
                 }}
                 onDelete={(id) => {
                   setSelectedSurvey(id);

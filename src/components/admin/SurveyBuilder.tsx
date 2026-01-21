@@ -519,17 +519,24 @@ export default function SurveyBuilder() {
   };
 
   const handlePreview = () => {
-    window.open(`/survey/${id}`, '_blank', 'noopener,noreferrer');
+    window.open(`${window.location.origin}/survey/${id}`, '_blank', 'noopener,noreferrer');
   };
 
   const handleSave = async () => {
     setSaveStatus('saving');
 
     try {
+      // Before saving, ensure all questions have correct sort_order based on their position
+      // and properly grouped by section
+      const questionsToSave = questions.map((q, idx) => ({
+        ...q,
+        order: idx
+      }));
+
       // Save all questions
       const updatedQuestions: Question[] = [];
 
-      for (const question of questions) {
+      for (const question of questionsToSave) {
         if (question.id.startsWith('temp_')) {
           // New question - insert and get the new id back
           const payload = await buildQuestionPayloadWithTranslations({
