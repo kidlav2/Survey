@@ -170,10 +170,76 @@ export default function SurveyFlow() {
       });
 
       setQuestions(mapped);
+      
+      // Create response record in DB immediately when survey starts
+      const newResponseId = (id || '') + '_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+      let insertError: any = null;
+      
+      // Try with status column first
+      const { error: statusError } = await supabase
+        .from('responses')
+        .insert({
+          id: newResponseId,
+          survey_id: id,
+          answers: {},
+          duration_seconds: 0,
+          language: language,
+          status: 'in_progress',
+        });
+
+      if (statusError) {
+        console.warn('Status column not available, trying without it:', statusError);
+        // If status column doesn't exist, retry without it
+        const { error: fallbackError } = await supabase
+          .from('responses')
+          .insert({
+            id: newResponseId,
+            survey_id: id,
+            answers: {},
+            duration_seconds: 0,
+            language: language,
+          });
+        insertError = fallbackError;
+      }
+
+      if (insertError) {
+        console.error('Error creating response record:', insertError);
+      } else {
+        console.log('Response record created:', newResponseId);
+        setResponseId(newResponseId);
+      }
+
       setLoading(false);
     } catch (error) {
       console.error('Error loading questions:', error);
       navigate(`/survey/${id}/closed`, { replace: true });
+    }
+  };
+
+  // Save progress to DB
+  const saveProgress = async (currentAnswers: Record<string, any>) => {
+    if (!responseId) {
+      console.warn('No responseId set, cannot save progress');
+      return;
+    }
+
+    try {
+      console.log('Saving progress for response:', responseId, 'with answers:', currentAnswers);
+      const { error } = await supabase
+        .from('responses')
+        .update({
+          answers: currentAnswers,
+          duration_seconds: Math.max(0, Math.round((Date.now() - startedAt) / 1000)),
+        })
+        .eq('id', responseId);
+
+      if (error) {
+        console.error('Error saving progress:', error);
+      } else {
+        console.log('Progress saved successfully');
+      }
+    } catch (error) {
+      console.error('Error in saveProgress:', error);
     }
   };
 
@@ -266,6 +332,9 @@ export default function SurveyFlow() {
   };
 
   const handleNext = async () => {
+    // Save progress to DB before moving to next question
+    await saveProgress(answers);
+
     // Check if current question has conditional logic
     if (question && question.conditional_logic && question.conditional_logic.length > 0) {
       let answer = answers[question.id];
@@ -290,43 +359,35 @@ export default function SurveyFlow() {
         if (logic.end_survey) {
           console.log('Survey ended due to conditional logic');
           try {
-            const newResponseId = makeUUID();
+            // Update response with final status (try with status column first, then fallback)
+            const updateData: any = { answers, duration_seconds: Math.max(0, Math.round((Date.now() - startedAt) / 1000)) };
+            
+            const { error: updateError } = await supabase
+              .from('responses')
+              .update({
+                ...updateData,
+                status: 'completed',
+              })
+              .eq('id', responseId);
 
-            const baseInsert = {
-              id: newResponseId,
-              survey_id: id,
-              answers: answers,
-              duration_seconds: Math.max(0, Math.round((Date.now() - startedAt) / 1000)),
-              language: language,
-            };
-
-            let error: any = null;
-
-            // Try with `lng` first (some schemas use this). IMPORTANT: no select() for anon users.
-            {
-              const res = await supabase
+            if (updateError && String(updateError?.message || '').includes('status')) {
+              // Status column might not exist, try without it
+              console.warn('Status column update failed, trying without status:', updateError);
+              const { error: fallbackError } = await supabase
                 .from('responses')
-                .insert({ ...baseInsert, lng: language });
-              error = res.error;
+                .update(updateData)
+                .eq('id', responseId);
+              if (fallbackError) console.error('Error updating response:', fallbackError);
+            } else if (updateError) {
+              console.error('Error updating response status:', updateError);
             }
 
-            // If `lng` column doesn't exist, retry without it
-            if (error?.code === 'PGRST204' && String(error?.message || '').toLowerCase().includes('lng')) {
-              const res2 = await supabase
-                .from('responses')
-                .insert(baseInsert);
-              error = res2.error;
-            }
-
-            if (error) throw error;
-
-            setResponseId(newResponseId);
-
+            const newResponseId = responseId || makeUUID();
             navigate(`/survey/${id}/opt-in?lng=${encodeURIComponent(language)}&rid=${encodeURIComponent(newResponseId)}`, {
               state: { lng: language, language, responseId: newResponseId },
             });
           } catch (error) {
-            console.error('Error submitting survey:', error);
+            console.error('Error ending survey:', error);
           }
           return;
         }
@@ -357,45 +418,42 @@ export default function SurveyFlow() {
     if (nextIdx < questions.length) {
       setCurrentQuestion(nextIdx);
     } else {
-      // Final submit: insert response with answers + duration + language
+      // Final submit: update response status to completed
       try {
-        const newResponseId = makeUUID();
-
-        const baseInsert = {
-          id: newResponseId,
-          survey_id: id,
-          answers: answers,
-          duration_seconds: Math.max(0, Math.round((Date.now() - startedAt) / 1000)),
-          language: language,
+        const finalAnswers = answers;
+        const finalDuration = Math.max(0, Math.round((Date.now() - startedAt) / 1000));
+        const updateData: any = {
+          answers: finalAnswers,
+          duration_seconds: finalDuration,
         };
 
-        let error: any = null;
+        const { error: updateError } = await supabase
+          .from('responses')
+          .update({
+            ...updateData,
+            status: 'completed',
+          })
+          .eq('id', responseId);
 
-        // Try with `lng` first (some schemas use this). IMPORTANT: no select() for anon users.
-        {
-          const res = await supabase
+        if (updateError && String(updateError?.message || '').includes('status')) {
+          // Status column might not exist, try without it
+          console.warn('Status column update failed, trying without status:', updateError);
+          const { error: fallbackError } = await supabase
             .from('responses')
-            .insert({ ...baseInsert, lng: language });
-          error = res.error;
+            .update(updateData)
+            .eq('id', responseId);
+          if (fallbackError) {
+            console.error('Error updating response:', fallbackError);
+          }
+        } else if (updateError) {
+          console.error('Error updating response status:', updateError);
         }
 
-        // If `lng` column doesn't exist, retry without it
-        if (error?.code === 'PGRST204' && String(error?.message || '').toLowerCase().includes('lng')) {
-          const res2 = await supabase
-            .from('responses')
-            .insert(baseInsert);
-          error = res2.error;
-        }
-
-        if (error) throw error;
-
-        setResponseId(newResponseId);
-
-        navigate(`/survey/${id}/opt-in?lng=${encodeURIComponent(language)}&rid=${encodeURIComponent(newResponseId)}`, {
-          state: { lng: language, language, responseId: newResponseId },
+        navigate(`/survey/${id}/opt-in?lng=${encodeURIComponent(language)}&rid=${encodeURIComponent(responseId)}`, {
+          state: { lng: language, language, responseId: responseId },
         });
       } catch (error) {
-        console.error('Error submitting survey:', error);
+        console.error('Error completing survey:', error);
         // stay on the page so the user can retry
       }
     }
