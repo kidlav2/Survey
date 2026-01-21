@@ -429,7 +429,8 @@ export default function SurveyBuilder() {
     return `temp_${uuid}`;
   };
 
-  const addQuestion = (afterIndex?: number) => {
+  const addQuestion = (afterIndex?: number, sectionId?: string) => {
+    console.log('Adding question with sectionId:', sectionId ?? selectedSectionId);
     const newQuestion: Question = {
       id: makeTempId(),
       type: 'single-choice',
@@ -438,8 +439,10 @@ export default function SurveyBuilder() {
       required: false,
       hasOtherOption: false,
       order: afterIndex !== undefined ? afterIndex + 1 : questions.length,
-      section_id: selectedSectionId || undefined,
+      section_id: sectionId ?? selectedSectionId ?? undefined,
     };
+
+    console.log('New question created:', newQuestion);
 
     let newQuestions: Question[];
     if (afterIndex !== undefined) {
@@ -775,6 +778,40 @@ export default function SurveyBuilder() {
       setSections([...sections, data[0]]);
       setNewSectionName('');
       setNewSectionDesc('');
+      setToast({ message: 'Section added successfully', type: 'success' });
+    } catch (error: any) {
+      console.error('Error adding section:', error);
+      setToast({ message: error.message || 'Failed to add section', type: 'error' });
+    } finally {
+      setSectionsLoading(false);
+    }
+  };
+
+  const addSectionWithName = async (name: string, description: string = '') => {
+    if (!name.trim()) {
+      setToast({ message: 'Section name is required', type: 'error' });
+      return;
+    }
+
+    console.log('Adding section with name:', name);
+
+    try {
+      setSectionsLoading(true);
+      const nextOrder = sections.length;
+      
+      const { data, error } = await supabase
+        .from('survey_sections')
+        .insert({
+          survey_id: id,
+          name: name.trim(),
+          description: description.trim(),
+          order_index: nextOrder,
+        })
+        .select();
+      
+      if (error) throw error;
+      
+      setSections([...sections, data[0]]);
       setToast({ message: 'Section added successfully', type: 'success' });
     } catch (error: any) {
       console.error('Error adding section:', error);
@@ -1177,8 +1214,7 @@ export default function SurveyBuilder() {
                     {/* Add Question to Section Button */}
                     <button
                       onClick={() => {
-                        setSelectedSectionId(section.id);
-                        addQuestion();
+                        addQuestion(undefined, section.id);
                       }}
                       className="w-max flex items-center justify-center gap-2 px-3 py-2 text-sm bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg transition-colors border border-purple-200 mb-3"
                     >
@@ -1518,8 +1554,7 @@ export default function SurveyBuilder() {
                                     <button
                                       onClick={() => {
                                         const currentIndex = questions.findIndex(q => q.id === question.id);
-                                        addQuestion(currentIndex);
-                                        setSelectedSectionId(section.id);
+                                        addQuestion(currentIndex, section.id);
                                       }}
                                       className="w-max flex items-center justify-center gap-2 px-3 py-2 text-sm bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-colors border border-blue-200"
                                     >
@@ -1540,11 +1575,14 @@ export default function SurveyBuilder() {
                       <div className="mt-4 pt-4 border-t border-green-100">
                         <button
                           onClick={() => {
-                            setNewSectionName('');
-                            setNewSectionDesc('');
-                            // Auto-focus could be added if using refs
+                            const sectionName = prompt('Enter section name:');
+                            if (sectionName && sectionName.trim()) {
+                              const sectionDesc = prompt('Enter section description (optional):') || '';
+                              addSectionWithName(sectionName, sectionDesc);
+                            }
                           }}
-                          className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm bg-green-100 hover:bg-green-200 text-green-700 rounded-lg transition-colors border border-green-200"
+                          disabled={sectionsLoading}
+                          className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm bg-green-100 hover:bg-green-200 text-green-700 rounded-lg transition-colors border border-green-200 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <Plus className="w-4 h-4" />
                           Add Section
