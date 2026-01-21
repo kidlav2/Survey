@@ -142,6 +142,7 @@ export default function SurveyFlow() {
           id: row.id,
           type: payload.type ?? row.type,
           options: options,
+          conditional_logic: row.conditional_logic,
           payload: payload,
         });
 
@@ -164,6 +165,9 @@ export default function SurveyFlow() {
       });
 
       console.log('Mapped questions:', mapped);
+      mapped.forEach((q: any) => {
+        console.log(`Question ${q.id} conditional_logic:`, q.conditional_logic);
+      });
 
       setQuestions(mapped);
       setLoading(false);
@@ -173,10 +177,78 @@ export default function SurveyFlow() {
     }
   };
 
+  // Check if a question is only used as a branch target (not in main sequential flow)
+  const isBranchOnly = (qId: string, qIdx: number) => {
+    // First question is never branch-only
+    if (qIdx === 0) return false;
+    
+    // Collect all question IDs that are branch targets
+    const targetIds = new Set<string>();
+    questions.forEach((q: any) => {
+      if (q.conditional_logic?.length > 0) {
+        q.conditional_logic.forEach((l: any) => {
+          if (l.next_question_id) targetIds.add(l.next_question_id);
+        });
+      }
+    });
+    
+    // If this question is NOT a branch target, it's not branch-only
+    if (!targetIds.has(qId)) {
+      return false;
+    }
+    
+    // A question is branch-only if it's a target and immediately follows a question with conditional_logic
+    const prevQuestion = qIdx > 0 ? questions[qIdx - 1] : null;
+    
+    if (!prevQuestion?.conditional_logic?.length) {
+      return false; // Previous question doesn't have conditional_logic
+    }
+    
+    // Previous question has conditional_logic - this is a branch target
+    return true; // Branch-only
+  };
+
   const question = questions[currentQuestion];
   const localized = question ? getLocalized(question, language) : { text: '', options: [] as string[] };
-  const totalQuestions = questions.length;
-  const progress = totalQuestions > 0 ? ((currentQuestion + 1) / totalQuestions) * 100 : 0;
+  
+  // Count only non-branch-only questions for progress tracking
+  const visibleQuestions = questions.filter((_, idx) => !isBranchOnly(questions[idx].id, idx));
+  const totalQuestions = visibleQuestions.length;
+  
+  // Calculate current question position in visible questions
+  const currentVisibleIndex = visibleQuestions.findIndex(q => q.id === question?.id);
+  const progress = totalQuestions > 0 ? ((Math.max(0, currentVisibleIndex) + 1) / totalQuestions) * 100 : 0;
+  
+  console.log('Progress calculation:', {
+    currentQuestion,
+    currentQuestionId: question?.id,
+    visibleQuestionsCount: visibleQuestions.length,
+    visibleQuestionsIds: visibleQuestions.map(q => q.id),
+    currentVisibleIndex,
+    progress: Math.round(progress)
+  });
+
+  const normalizeYesNoAnswer = (localized: string): string => {
+    // Normalize yes/no answers to English for conditional logic comparison
+    const yesLabels = new Set([
+      tQuestions.yes || 'Yes',
+      'Yes',
+      'Да',
+      'Oui',
+      'Sí'
+    ]);
+    const noLabels = new Set([
+      tQuestions.no || 'No',
+      'No',
+      'Нет',
+      'Non',
+      'No'
+    ]);
+    
+    if (yesLabels.has(localized)) return 'Yes';
+    if (noLabels.has(localized)) return 'No';
+    return localized;
+  };
 
   const handleAnswer = (value: any) => {
     const isMulti = question?.type === 'multiple-choice';
@@ -196,22 +268,94 @@ export default function SurveyFlow() {
   const handleNext = async () => {
     // Check if current question has conditional logic
     if (question && question.conditional_logic && question.conditional_logic.length > 0) {
-      const answer = answers[question.id];
+      let answer = answers[question.id];
+      
+      // Normalize yes/no answers for conditional logic matching
+      if (question.type === 'yes-no') {
+        answer = normalizeYesNoAnswer(answer);
+      }
+      
       const logic = question.conditional_logic.find((l: any) => l.answer === answer);
       
-      if (logic && logic.next_question_id) {
-        // Find the next question by ID
-        const nextQuestionIndex = questions.findIndex((q: any) => q.id === logic.next_question_id);
-        if (nextQuestionIndex >= 0) {
-          setCurrentQuestion(nextQuestionIndex);
+      console.log('Checking conditional logic:', {
+        questionId: question.id,
+        originalAnswer: answers[question.id],
+        normalizedAnswer: answer,
+        conditionalLogic: question.conditional_logic,
+        foundLogic: logic
+      });
+      
+      if (logic) {
+        // Check if this condition ends the survey
+        if (logic.end_survey) {
+          console.log('Survey ended due to conditional logic');
+          try {
+            const newResponseId = makeUUID();
+
+            const baseInsert = {
+              id: newResponseId,
+              survey_id: id,
+              answers: answers,
+              duration_seconds: Math.max(0, Math.round((Date.now() - startedAt) / 1000)),
+              language: language,
+            };
+
+            let error: any = null;
+
+            // Try with `lng` first (some schemas use this). IMPORTANT: no select() for anon users.
+            {
+              const res = await supabase
+                .from('responses')
+                .insert({ ...baseInsert, lng: language });
+              error = res.error;
+            }
+
+            // If `lng` column doesn't exist, retry without it
+            if (error?.code === 'PGRST204' && String(error?.message || '').toLowerCase().includes('lng')) {
+              const res2 = await supabase
+                .from('responses')
+                .insert(baseInsert);
+              error = res2.error;
+            }
+
+            if (error) throw error;
+
+            setResponseId(newResponseId);
+
+            navigate(`/survey/${id}/opt-in?lng=${encodeURIComponent(language)}&rid=${encodeURIComponent(newResponseId)}`, {
+              state: { lng: language, language, responseId: newResponseId },
+            });
+          } catch (error) {
+            console.error('Error submitting survey:', error);
+          }
           return;
+        }
+        
+        // Otherwise, branch to next_question_id
+        if (logic.next_question_id) {
+          // Find the next question by ID
+          const nextQuestionIndex = questions.findIndex((q: any) => q.id === logic.next_question_id);
+          console.log('Branching to question:', { nextQuestionIndex, targetId: logic.next_question_id });
+          if (nextQuestionIndex >= 0) {
+            // Jump to branch target - don't skip it even if branch-only
+            setCurrentQuestion(nextQuestionIndex);
+            return;
+          }
         }
       }
     }
 
-    // Default behavior - move to next question
-    if (currentQuestion < totalQuestions - 1) {
-      setCurrentQuestion(currentQuestion + 1);
+    // Default behavior - move to next non-branch-only question
+    let nextIdx = currentQuestion + 1;
+    while (nextIdx < questions.length && isBranchOnly(questions[nextIdx].id, nextIdx)) {
+      console.log('Skipping branch-only question at index:', nextIdx);
+      nextIdx++;
+    }
+    
+    console.log('Moving to next question:', { from: currentQuestion, to: nextIdx, isBranchOnly: nextIdx < questions.length && isBranchOnly(questions[nextIdx].id, nextIdx) });
+    
+    if (nextIdx < questions.length) {
+      setCurrentQuestion(nextIdx);
     } else {
       // Final submit: insert response with answers + duration + language
       try {
@@ -258,8 +402,12 @@ export default function SurveyFlow() {
   };
 
   const handleBack = () => {
-    if (currentQuestion > 0) {
-      setCurrentQuestion(currentQuestion - 1);
+    let prevIdx = currentQuestion - 1;
+    while (prevIdx >= 0 && isBranchOnly(questions[prevIdx].id, prevIdx)) {
+      prevIdx--;
+    }
+    if (prevIdx >= 0) {
+      setCurrentQuestion(prevIdx);
     }
   };
 
@@ -299,7 +447,7 @@ export default function SurveyFlow() {
         <div className="mb-8">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-gray-700">
-              {t.question} {currentQuestion + 1} {t.of} {totalQuestions}
+              {t.question} {Math.max(1, currentVisibleIndex + 1)} {t.of} {totalQuestions}
             </span>
             <span className="text-sm text-gray-500">
               {Math.round(progress)}% {t.complete}

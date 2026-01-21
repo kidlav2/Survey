@@ -18,7 +18,8 @@ interface Question {
   conditional_logic?: {
     condition_type: 'answer_equals';
     answer: string;
-    next_question_id: string;
+    next_question_id?: string;
+    end_survey?: boolean;
   }[];
 }
 
@@ -375,16 +376,28 @@ export default function SurveyBuilder() {
 
       if (questionsError) throw questionsError;
 
-      // Parse conditional_logic and options from JSON strings
-      const parsedQuestions = (questionsData || []).map((q: any) => ({
-        ...q,
-        options: q.options 
-          ? (typeof q.options === 'string' ? JSON.parse(q.options) : q.options)
-          : [],
-        conditional_logic: q.conditional_logic 
-          ? (typeof q.conditional_logic === 'string' ? JSON.parse(q.conditional_logic) : q.conditional_logic)
-          : undefined
-      }));
+      console.log('Raw questions from DB:', questionsData?.[0]); // Log first question to see all fields
+
+      // Parse conditional_logic from JSON strings
+      const parsedQuestions = (questionsData || []).map((q: any) => {
+        console.log('Loading question from DB:', {
+          id: q.id,
+          text: q.text,
+          type: q.type,
+          conditional_logic_raw: q.conditional_logic,
+          conditional_logic_parsed: q.conditional_logic 
+            ? (typeof q.conditional_logic === 'string' ? JSON.parse(q.conditional_logic) : q.conditional_logic)
+            : undefined
+        });
+        
+        return {
+          ...q,
+          options: Array.isArray(q.options) ? q.options : (q.options ? [q.options] : []),
+          conditional_logic: q.conditional_logic 
+            ? (typeof q.conditional_logic === 'string' ? JSON.parse(q.conditional_logic) : q.conditional_logic)
+            : undefined
+        };
+      });
 
       setQuestions(parsedQuestions);
       
@@ -529,7 +542,7 @@ export default function SurveyBuilder() {
             survey_id: id,
             type: question.type,
             text: question.text,
-            options: question.options ? JSON.stringify(question.options) : null,
+            options: question.options || [],
             required: question.required,
             has_other_option: question.hasOtherOption,
             sort_order: question.order,
@@ -537,15 +550,20 @@ export default function SurveyBuilder() {
             section_id: question.section_id || null,
             conditional_logic: (question.conditional_logic && question.conditional_logic.length > 0) ? JSON.stringify(question.conditional_logic) : null,
           };
+          
+          console.log('Saving new question with conditional_logic:', insertRow.conditional_logic);
 
           let data: any = null;
           let error: any = null;
 
-          // Try with payload first
+          // Try with payload and conditional_logic first
           {
             const res = await supabase.from('questions').insert([insertRow]).select('id').single();
             data = res.data;
             error = res.error;
+            if (error) {
+              console.error('Insert error (with conditional_logic):', error);
+            }
           }
 
           // If payload column doesn't exist, retry without it
@@ -554,6 +572,14 @@ export default function SurveyBuilder() {
             const res2 = await supabase.from('questions').insert([insertRow]).select('id').single();
             data = res2.data;
             error = res2.error;
+          }
+
+          // If conditional_logic column doesn't exist, retry without it
+          if (error?.code === 'PGRST204' && String(error?.message || '').toLowerCase().includes('conditional_logic')) {
+            delete insertRow.conditional_logic;
+            const res3 = await supabase.from('questions').insert([insertRow]).select('id').single();
+            data = res3.data;
+            error = res3.error;
           }
 
           if (error) throw error;
@@ -573,21 +599,32 @@ export default function SurveyBuilder() {
           const updateRow: any = {
             type: question.type,
             text: question.text,
-            options: question.options ? JSON.stringify(question.options) : null,
+            options: question.options || [],
             required: question.required,
             has_other_option: question.hasOtherOption,
             sort_order: question.order,
-            payload,
             section_id: question.section_id || null,
             conditional_logic: (question.conditional_logic && question.conditional_logic.length > 0) ? JSON.stringify(question.conditional_logic) : null,
           };
+          
+          console.log('Saving existing question with conditional_logic:', updateRow.conditional_logic, 'for question:', question.id);
 
           let error: any = null;
 
-          // Try with payload first
+          // Try with payload and conditional_logic first
           {
             const res = await supabase.from('questions').update(updateRow).eq('id', question.id);
             error = res.error;
+            if (error) {
+              console.error('Update error (with conditional_logic):', {
+                message: error.message,
+                code: error.code,
+                details: error.details,
+                hint: error.hint,
+                questionId: question.id,
+                updateRow: updateRow
+              });
+            }
           }
 
           // If payload column doesn't exist, retry without it
@@ -597,7 +634,20 @@ export default function SurveyBuilder() {
             error = res2.error;
           }
 
-          if (error) throw error;
+          // If conditional_logic column doesn't exist, retry without it
+          if (error?.code === 'PGRST204' && String(error?.message || '').toLowerCase().includes('conditional_logic')) {
+            console.warn('conditional_logic column not found, retrying without it');
+            delete updateRow.conditional_logic;
+            const res3 = await supabase.from('questions').update(updateRow).eq('id', question.id);
+            error = res3.error;
+          }
+
+          if (error) {
+            console.error('Final update error after retries:', error);
+            throw error;
+          }
+          
+          console.log('✓ Successfully saved question:', question.id, 'with conditional_logic:', updateRow.conditional_logic);
 
           updatedQuestions.push(question);
         }
@@ -808,7 +858,7 @@ export default function SurveyBuilder() {
         return;
       }
       
-      const successMessage = newStatus ? t.statusUpdated : `${t.disabled} ${t.surveys ?? 'survey'} set to draft`;
+      const successMessage = newStatus ? t.statusUpdated : `Survey set to draft`;
       setToast({ message: successMessage, type: 'success' });
       setLoadingSurveyStatus(false);
     } catch (error) {
@@ -1342,12 +1392,14 @@ export default function SurveyBuilder() {
                                   </div>
 
                                   {/* Conditional Logic */}
+                                  {console.log('DEBUG: Checking conditional logic section for question:', { id: question.id, type: question.type, showSection: (question.type === 'yes-no' || question.type === 'single-choice') })}
                                   {(question.type === 'yes-no' || question.type === 'single-choice') && (
                                     <div className="pt-3 border-t border-gray-200">
                                       <label className="block text-sm font-medium text-gray-700 mb-3">
                                         Conditional Logic (Branch this question)
                                       </label>
                                       <div className="space-y-3">
+                                        {console.log('DEBUG: Conditional logic items:', { id: question.id, count: (question.conditional_logic || []).length, logic: question.conditional_logic })}
                                         {(question.conditional_logic || []).map((logic, idx) => (
                                           <div key={idx} className="p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
                                             <div className="flex items-center justify-between">
@@ -1362,71 +1414,100 @@ export default function SurveyBuilder() {
                                                 <Trash2 className="w-4 h-4" />
                                               </button>
                                             </div>
-                                            <div>
-                                              <label className="text-xs text-gray-600 mb-1 block">Show next question:</label>
-                                              <select
-                                                value={logic.next_question_id}
-                                                onChange={(e) => {
-                                                  const newLogic = [...(question.conditional_logic || [])];
-                                                  newLogic[idx].next_question_id = e.target.value;
-                                                  updateQuestion(question.id, 'conditional_logic', newLogic);
-                                                }}
-                                                className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                              >
-                                                <option value="">-- Select question --</option>
-                                                {questions
-                                                  .filter((q: any) => q.id !== question.id && q.order > question.order)
-                                                  .sort((a: any, b: any) => a.order - b.order)
-                                                  .map((q: any) => (
-                                                    <option key={q.id} value={q.id}>
-                                                      Q{q.order}: {q.text.substring(0, 50)}...
-                                                    </option>
-                                                  ))}
-                                              </select>
+                                            <div className="space-y-2">
+                                              <label className="text-xs text-gray-600 mb-2 block font-medium">Then:</label>
+                                              <div className="flex gap-2">
+                                                <select
+                                                  value={logic.end_survey ? '' : (logic.next_question_id || '')}
+                                                  onChange={(e) => {
+                                                    const newLogic = [...(question.conditional_logic || [])];
+                                                    if (e.target.value) {
+                                                      newLogic[idx].next_question_id = e.target.value;
+                                                      newLogic[idx].end_survey = false;
+                                                    }
+                                                    updateQuestion(question.id, 'conditional_logic', newLogic);
+                                                  }}
+                                                  disabled={logic.end_survey}
+                                                  className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+                                                >
+                                                  <option value="">-- Select next question --</option>
+                                                  {questions
+                                                    .filter((q: any) => q.id !== question.id && q.sort_order > question.sort_order)
+                                                    .sort((a: any, b: any) => a.sort_order - b.sort_order)
+                                                    .map((q: any) => (
+                                                      <option key={q.id} value={q.id}>
+                                                        Q{q.sort_order}: {q.text.substring(0, 50)}...
+                                                      </option>
+                                                    ))}
+                                                </select>
+                                                <button
+                                                  onClick={() => {
+                                                    const newLogic = [...(question.conditional_logic || [])];
+                                                    if (logic.end_survey) {
+                                                      newLogic[idx].end_survey = false;
+                                                      newLogic[idx].next_question_id = '';
+                                                    } else {
+                                                      newLogic[idx].end_survey = true;
+                                                      delete newLogic[idx].next_question_id;
+                                                    }
+                                                    updateQuestion(question.id, 'conditional_logic', newLogic);
+                                                  }}
+                                                  className={`px-3 py-1.5 rounded text-xs font-medium whitespace-nowrap transition-colors ${
+                                                    logic.end_survey
+                                                      ? 'bg-red-600 hover:bg-red-700 text-white'
+                                                      : 'bg-red-100 hover:bg-red-200 text-red-700'
+                                                  }`}
+                                                >
+                                                  {logic.end_survey ? 'End Survey' : 'End Survey'}
+                                                </button>
+                                              </div>
                                             </div>
                                           </div>
                                         ))}
-                                        <div className="flex gap-2">
-                                          {question.type === 'yes-no' && (
-                                            <>
-                                              {!(question.conditional_logic || []).some(l => l.answer === 'Yes') && (
-                                                <button
-                                                  onClick={() => {
-                                                    const newLogic = [...(question.conditional_logic || []), { condition_type: 'answer_equals' as const, answer: 'Yes', next_question_id: '' }];
+                                        <div className="flex flex-col gap-2">
+                                          <p className="text-xs text-gray-600 font-medium">Add new condition:</p>
+                                          <div className="flex gap-2">
+                                            {question.type === 'yes-no' && (
+                                              <>
+                                                {!(question.conditional_logic || []).some(l => l.answer === 'Yes') && (
+                                                  <button
+                                                    onClick={() => {
+                                                      const newLogic = [...(question.conditional_logic || []), { condition_type: 'answer_equals' as const, answer: 'Yes' }];
+                                                      updateQuestion(question.id, 'conditional_logic', newLogic);
+                                                    }}
+                                                    className="text-sm px-2 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded"
+                                                  >
+                                                    + Add Yes condition
+                                                  </button>
+                                                )}
+                                                {!(question.conditional_logic || []).some(l => l.answer === 'No') && (
+                                                  <button
+                                                    onClick={() => {
+                                                      const newLogic = [...(question.conditional_logic || []), { condition_type: 'answer_equals' as const, answer: 'No' }];
+                                                      updateQuestion(question.id, 'conditional_logic', newLogic);
+                                                    }}
+                                                    className="text-sm px-2 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded"
+                                                  >
+                                                    + Add No condition
+                                                  </button>
+                                                )}
+                                              </>
+                                            )}
+                                            {question.type === 'single-choice' && (
+                                              <button
+                                                onClick={() => {
+                                                  const answer = prompt('Enter the answer value to match:');
+                                                  if (answer && !(question.conditional_logic || []).some(l => l.answer === answer)) {
+                                                    const newLogic = [...(question.conditional_logic || []), { condition_type: 'answer_equals' as const, answer }];
                                                     updateQuestion(question.id, 'conditional_logic', newLogic);
-                                                  }}
-                                                  className="text-sm px-2 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded"
-                                                >
-                                                  + Add Yes condition
-                                                </button>
-                                              )}
-                                              {!(question.conditional_logic || []).some(l => l.answer === 'No') && (
-                                                <button
-                                                  onClick={() => {
-                                                    const newLogic = [...(question.conditional_logic || []), { condition_type: 'answer_equals' as const, answer: 'No', next_question_id: '' }];
-                                                    updateQuestion(question.id, 'conditional_logic', newLogic);
-                                                  }}
-                                                  className="text-sm px-2 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded"
-                                                >
-                                                  + Add No condition
-                                                </button>
-                                              )}
-                                            </>
-                                          )}
-                                          {question.type === 'single-choice' && (
-                                            <button
-                                              onClick={() => {
-                                                const answer = prompt('Enter the answer value to match:');
-                                                if (answer && !(question.conditional_logic || []).some(l => l.answer === answer)) {
-                                                  const newLogic = [...(question.conditional_logic || []), { condition_type: 'answer_equals' as const, answer, next_question_id: '' }];
-                                                  updateQuestion(question.id, 'conditional_logic', newLogic);
-                                                }
-                                              }}
-                                              className="text-sm px-2 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded"
-                                            >
-                                              + Add condition
-                                            </button>
-                                          )}
+                                                  }
+                                                }}
+                                                className="text-sm px-2 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded"
+                                              >
+                                                + Add condition
+                                              </button>
+                                            )}
+                                          </div>
                                         </div>
                                       </div>
                                     </div>
@@ -1736,27 +1817,53 @@ export default function SurveyBuilder() {
                                     <Trash2 className="w-4 h-4" />
                                   </button>
                                 </div>
-                                <div>
-                                  <label className="text-xs text-gray-600 mb-1 block">Show next question:</label>
-                                  <select
-                                    value={logic.next_question_id}
-                                    onChange={(e) => {
-                                      const newLogic = [...(question.conditional_logic || [])];
-                                      newLogic[idx].next_question_id = e.target.value;
-                                      updateQuestion(question.id, 'conditional_logic', newLogic);
-                                    }}
-                                    className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                  >
-                                    <option value="">-- Select question --</option>
-                                    {questions
-                                      .filter((q: any) => q.id !== question.id && q.order > question.order)
-                                      .sort((a: any, b: any) => a.order - b.order)
-                                      .map((q: any) => (
-                                        <option key={q.id} value={q.id}>
-                                          Q{q.order}: {q.text.substring(0, 50)}...
-                                        </option>
-                                      ))}
-                                  </select>
+                                <div className="space-y-2">
+                                  <label className="text-xs text-gray-600 mb-2 block font-medium">Then:</label>
+                                  <div className="flex gap-2">
+                                    <select
+                                      value={logic.end_survey ? '' : (logic.next_question_id || '')}
+                                      onChange={(e) => {
+                                        const newLogic = [...(question.conditional_logic || [])];
+                                        if (e.target.value) {
+                                          newLogic[idx].next_question_id = e.target.value;
+                                          newLogic[idx].end_survey = false;
+                                        }
+                                        updateQuestion(question.id, 'conditional_logic', newLogic);
+                                      }}
+                                      disabled={logic.end_survey}
+                                      className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+                                    >
+                                      <option value="">-- Select next question --</option>
+                                      {questions
+                                        .filter((q: any) => q.id !== question.id && q.sort_order > question.sort_order)
+                                        .sort((a: any, b: any) => a.sort_order - b.sort_order)
+                                        .map((q: any) => (
+                                          <option key={q.id} value={q.id}>
+                                            Q{q.sort_order}: {q.text.substring(0, 50)}...
+                                          </option>
+                                        ))}
+                                    </select>
+                                    <button
+                                      onClick={() => {
+                                        const newLogic = [...(question.conditional_logic || [])];
+                                        if (logic.end_survey) {
+                                          newLogic[idx].end_survey = false;
+                                          newLogic[idx].next_question_id = '';
+                                        } else {
+                                          newLogic[idx].end_survey = true;
+                                          delete newLogic[idx].next_question_id;
+                                        }
+                                        updateQuestion(question.id, 'conditional_logic', newLogic);
+                                      }}
+                                      className={`px-3 py-1.5 rounded text-xs font-medium whitespace-nowrap transition-colors ${
+                                        logic.end_survey
+                                          ? 'bg-red-600 hover:bg-red-700 text-white'
+                                          : 'bg-red-100 hover:bg-red-200 text-red-700'
+                                      }`}
+                                    >
+                                      {logic.end_survey ? 'End Survey' : 'End Survey'}
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
                             ))}
