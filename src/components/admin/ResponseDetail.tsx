@@ -31,9 +31,7 @@ export default function ResponseDetail() {
   const [loading, setLoading] = useState(true);
 
   const isCompleted = (r: ResponseData) => {
-    if (r.completed === true) return true;
-    const a = r.answers;
-    return a && typeof a === 'object' && Object.keys(a).length > 0;
+    return r.completed === true;
   };
 
   const formatDuration = (seconds?: number | null) => {
@@ -238,7 +236,7 @@ export default function ResponseDetail() {
                     isCompleted(response) ? 'bg-green-600' : 'bg-yellow-600'
                   }`}
                 ></div>
-                {isCompleted(response) ? 'Completed' : 'In Progress'}
+                {isCompleted(response) ? 'Completed' : 'Not Completed'}
               </span>
             </div>
           </div>

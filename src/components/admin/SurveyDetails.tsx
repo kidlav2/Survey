@@ -220,7 +220,7 @@ export default function SurveyDetails() {
     }
   };
 
-  const handleExport = async (type: 'CSV' | 'JSON') => {
+  const handleExport = async (type: 'CSV' | 'JSON', exportOptions?: { includeResponses: boolean; includeContacts: boolean; dateRange: string }) => {
     try {
       // Fetch responses for export
       const { data: responses, error: responsesError } = await supabase
@@ -239,15 +239,57 @@ export default function SurveyDetails() {
 
       if (questionsError) throw questionsError;
 
+      // Determine what to export based on options
+      if (exportOptions) {
+        if (!exportOptions.includeResponses && exportOptions.includeContacts) {
+          // Only export contact information (emails from opt-ins)
+          const contactData = (responses || [])
+            .filter(r => r.respondent_email && r.opted_in === true)
+            .map(r => ({ email: r.respondent_email, opted_in_date: r.created_at }));
+
+          if (type === 'CSV') {
+            const csv = [
+              ['Email', 'Opted In Date'],
+              ...contactData.map(c => [c.email, new Date(c.opted_in_date).toLocaleString()])
+            ]
+              .map(row => row.map(cell => `"${cell}"`).join(','))
+              .join('\n');
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `contacts_${survey?.title}_${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+          } else if (type === 'JSON') {
+            const json = JSON.stringify(contactData, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `contacts_${survey?.title}_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+          }
+          return;
+        } else if (!exportOptions.includeResponses) {
+          // Nothing selected, show error
+          setToast({ message: 'Please select at least one export option', type: 'error' });
+          return;
+        }
+      }
+
       if (type === 'CSV') {
         const csv = [
-          ['ID', 'Date', 'Email', 'Status', 'Duration'],
+          ['ID', 'Date', 'Email', 'Status', 'Duration', 'Answers'],
           ...(responses || []).map(r => [
             r.id,
             new Date(r.created_at).toLocaleString(),
-            r.email || 'Not provided',
-            r.completed ? 'Completed' : 'In Progress',
-            r.duration_seconds ? `${Math.round(r.duration_seconds / 60)} minutes` : 'N/A'
+            r.respondent_email || r.email || 'Not provided',
+            r.completed ? 'Completed' : 'Not Completed',
+            r.duration_seconds ? `${Math.round(r.duration_seconds / 60)} minutes` : 'N/A',
+            r.answers ? JSON.stringify(r.answers) : ''
           ])
         ]
           .map(row => row.map(cell => `"${cell}"`).join(','))
@@ -291,7 +333,7 @@ export default function SurveyDetails() {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `answers_${survey?.title}_${new Date().toISOString().split('T')[0]}.json`;
+        a.download = `responses_${survey?.title}_${new Date().toISOString().split('T')[0]}.json`;
         a.click();
         window.URL.revokeObjectURL(url);
       }
@@ -564,9 +606,10 @@ export default function SurveyDetails() {
                   }
                 }}
                 className="flex items-center gap-2 px-4 py-3 border border-green-300 hover:bg-green-50 text-green-700 rounded-lg transition-colors font-medium justify-center"
+                title="Export only respondent emails and their answers (without metadata)"
               >
                 <FileJson className="w-4 h-4" />
-                Answers Only
+                Export Answers Only
               </button>
 
               <button
@@ -668,7 +711,7 @@ export default function SurveyDetails() {
           isOpen={true}
           onClose={() => setExportModalType(null)}
           type={exportModalType}
-          onExport={() => handleExport(exportModalType)}
+          onExport={(options) => handleExport(exportModalType, options)}
         />
       )}
 

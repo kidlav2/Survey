@@ -5,7 +5,7 @@ interface ExportModalProps {
   isOpen: boolean;
   onClose: () => void;
   type: 'CSV' | 'JSON';
-  onExport: () => void;
+  onExport: (options: { includeResponses: boolean; includeContacts: boolean; dateRange: string }) => void;
 }
 
 export default function ExportModal({ isOpen, onClose, type, onExport }: ExportModalProps) {
@@ -23,7 +23,7 @@ export default function ExportModal({ isOpen, onClose, type, onExport }: ExportM
     // Simulate export delay
     await new Promise(resolve => setTimeout(resolve, 1500));
     setIsExporting(false);
-    onExport();
+    onExport(exportOptions);
     onClose();
   };
 

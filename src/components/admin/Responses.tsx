@@ -150,11 +150,7 @@ export default function Responses() {
 
       // Calculate stats
       const totalResponses = allResponses?.length || 0;
-      const completedResponses = allResponses?.filter((r: any) => {
-        if (r.completed === true) return true;
-        const a = r.answers;
-        return a && typeof a === 'object' && Object.keys(a).length > 0;
-      }).length || 0;
+      const completedResponses = allResponses?.filter((r: any) => r.completed === true).length || 0;
       const completionRate = totalResponses > 0 ? Math.round((completedResponses / totalResponses) * 100) : 0;
 
       // Count today
@@ -186,42 +182,84 @@ export default function Responses() {
     }
   };
 
-  const handleExport = (type: 'CSV' | 'JSON') => {
+  const handleExport = (type: 'CSV' | 'JSON', exportOptions?: { includeResponses: boolean; includeContacts: boolean; dateRange: string }) => {
     try {
       // Apply current filters and sort to exported data
       let filteredResponses = responses.filter(r => filterSurvey === 'all' || r.survey_id === filterSurvey);
       let sortedResponses = sortBy === 'newest' ? filteredResponses : [...filteredResponses].reverse();
 
-      if (type === 'CSV') {
-        const csv = [
-          [t.id, t.date, t.email, t.status, t.duration],
-          ...sortedResponses.map(r => [
-            r.id,
-            new Date(r.created_at).toLocaleString(),
-            r.respondent_email || t.notProvided,
-            r.completed ? t.completed : t.inProgress,
-            r.duration_seconds ? `${Math.round(r.duration_seconds / 60)} ${t.minutes}` : 'N/A'
-          ])
-        ]
-          .map(row => row.map(cell => `"${cell}"`).join(','))
-          .join('\n');
+      // Determine what to export based on options
+      if (exportOptions) {
+        if (!exportOptions.includeResponses && exportOptions.includeContacts) {
+          // Only export contact information (emails from opt-ins)
+          const contactData = sortedResponses
+            .filter(r => r.respondent_email && r.opted_in === true)
+            .map(r => ({ email: r.respondent_email, opted_in_date: r.created_at }));
 
-        const blob = new Blob([csv], { type: 'text/csv' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `responses_${new Date().toISOString().split('T')[0]}.csv`;
-        a.click();
-        window.URL.revokeObjectURL(url);
-      } else if (type === 'JSON') {
-        const json = JSON.stringify(sortedResponses, null, 2);
-        const blob = new Blob([json], { type: 'application/json' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `responses_${new Date().toISOString().split('T')[0]}.json`;
-        a.click();
-        window.URL.revokeObjectURL(url);
+          if (type === 'CSV') {
+            const csv = [
+              ['Email', 'Opted In Date'],
+              ...contactData.map(c => [c.email, new Date(c.opted_in_date).toLocaleString()])
+            ]
+              .map(row => row.map(cell => `"${cell}"`).join(','))
+              .join('\n');
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `contacts_${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+          } else if (type === 'JSON') {
+            const json = JSON.stringify(contactData, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `contacts_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+          }
+        } else if (!exportOptions.includeResponses) {
+          // Nothing selected, show error
+          setToast({ message: 'Please select at least one export option', type: 'error' });
+          return;
+        } else {
+          // Export survey responses (with or without contacts appended)
+          if (type === 'CSV') {
+            const csv = [
+              [t.id, t.date, t.email, t.status, t.duration, 'Answers'],
+              ...sortedResponses.map(r => [
+                r.id,
+                new Date(r.created_at).toLocaleString(),
+                r.respondent_email || t.notProvided,
+                r.completed ? t.completed : t.inProgress,
+                r.duration_seconds ? `${Math.round(r.duration_seconds / 60)} ${t.minutes}` : 'N/A',
+                r.answers ? JSON.stringify(r.answers) : ''
+              ])
+            ]
+              .map(row => row.map(cell => `"${cell}"`).join(','))
+              .join('\n');
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `responses_${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+          } else if (type === 'JSON') {
+            const json = JSON.stringify(sortedResponses, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `responses_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+          }
+        }
       }
 
       setToast({ 
@@ -288,6 +326,7 @@ export default function Responses() {
             <button 
               onClick={() => setExportModalType('CSV')}
               className="flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium"
+              title="Export all response data including answers"
             >
               <Download className="w-4 h-4" />
               Export CSV
@@ -295,6 +334,7 @@ export default function Responses() {
             <button 
               onClick={() => setExportModalType('JSON')}
               className="flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium"
+              title="Export all response data including answers"
             >
               <FileJson className="w-4 h-4" />
               Export JSON
@@ -363,7 +403,7 @@ export default function Responses() {
                   const filtered = responses.filter(r => filterSurvey === 'all' || r.survey_id === filterSurvey);
                   const sorted = sortBy === 'newest' ? filtered : [...filtered].reverse();
                   return sorted.map((response) => {
-                  const isCompleted = response.completed === true || (response.answers && typeof response.answers === 'object' && Object.keys(response.answers).length > 0);
+                  const isCompleted = response.completed === true;
                   return (
                   <div key={response.id} className="p-4 border-b border-gray-200 last:border-b-0">
                     <div className="flex items-center justify-between mb-2">
@@ -434,7 +474,7 @@ export default function Responses() {
                       const filtered = responses.filter(r => filterSurvey === 'all' || r.survey_id === filterSurvey);
                       const sorted = sortBy === 'newest' ? filtered : [...filtered].reverse();
                       return sorted.map((response) => {
-                      const isCompleted = response.completed === true || (response.answers && typeof response.answers === 'object' && Object.keys(response.answers).length > 0);
+                      const isCompleted = response.completed === true;
                       return (
                       <tr key={response.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
@@ -486,7 +526,7 @@ export default function Responses() {
           isOpen={true}
           onClose={() => setExportModalType(null)}
           type={exportModalType}
-          onExport={() => handleExport(exportModalType)}
+          onExport={(options) => handleExport(exportModalType, options)}
         />
       )}
 
