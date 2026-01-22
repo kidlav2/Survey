@@ -38,6 +38,30 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadDashboardData();
+
+    // Subscribe to real-time updates on responses
+    const channel = supabase
+      .channel('dashboard-responses')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'responses',
+        },
+        (payload) => {
+          console.log('Response changed, reloading dashboard:', payload);
+          loadDashboardData();
+        }
+      )
+      .subscribe((status) => {
+        console.log('Dashboard subscription status:', status);
+      });
+
+    // Cleanup subscription on unmount
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const loadDashboardData = async () => {
@@ -61,7 +85,7 @@ export default function Dashboard() {
         // Get total stats from ALL surveys
         const { data: allResponses, error: allResponsesError } = await supabase
           .from('responses')
-          .select('respondent_email, opted_in, created_at, lng, survey_id')
+          .select('respondent_email, opted_in, created_at, language, survey_id')
           .in('survey_id', surveys.map(s => s.id));
 
         if (allResponsesError) throw allResponsesError;
@@ -95,13 +119,15 @@ export default function Dashboard() {
         
         console.log('All surveys stats:', { totalResponses: totalResponsesCount, totalEmails: totalEmailsCount });
         
-        // Get language breakdown from all responses
+        // Get language breakdown ONLY for the active survey
         const counts: Record<string, number> = {};
-        (allResponses || []).forEach((r: any) => {
-          const code = (r?.lng ?? null) as string | null;
-          if (!code) return;
-          counts[code] = (counts[code] || 0) + 1;
-        });
+        (allResponses || [])
+          .filter((r: any) => r.survey_id === survey.id)
+          .forEach((r: any) => {
+            const code = (r?.language ?? null) as string | null;
+            if (!code) return;
+            counts[code] = (counts[code] || 0) + 1;
+          });
         setLanguageCounts(counts);
 
         if (allResponsesError) throw allResponsesError;
