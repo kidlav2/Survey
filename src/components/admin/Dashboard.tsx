@@ -103,19 +103,28 @@ export default function Dashboard() {
           ?.filter((r: any) => r.opted_in && r.respondent_email && r.respondent_email.trim() !== '')
           .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]?.created_at || null;
 
-        // Find survey with most responses for display
-        let surveyWithMostResponses = surveys[0];
-        let maxResponseCount = 0;
-
+        // Find survey with most recent activity (last response)
+        let surveyWithLatestActivity = surveys[0];
+        let latestResponseTime = new Date(0);
+        
         for (const survey of surveys) {
-          const count = allResponses?.filter((r: any) => r.survey_id === survey.id).length || 0;
-          if (count > maxResponseCount) {
-            maxResponseCount = count;
-            surveyWithMostResponses = survey;
+          const surveyResponses = allResponses?.filter((r: any) => r.survey_id === survey.id) || [];
+          if (surveyResponses.length > 0) {
+            const latestResponse = surveyResponses.reduce((latest: any, current: any) => {
+              const latestDate = new Date(latest.created_at).getTime();
+              const currentDate = new Date(current.created_at).getTime();
+              return currentDate > latestDate ? current : latest;
+            });
+            const responseTime = new Date(latestResponse.created_at);
+            if (responseTime > latestResponseTime) {
+              latestResponseTime = responseTime;
+              surveyWithLatestActivity = survey;
+            }
           }
         }
 
-        const survey = surveyWithMostResponses;
+        const survey = surveyWithLatestActivity;
+        const surveyResponseCount = allResponses?.filter((r: any) => r.survey_id === survey.id).length || 0;
         
         console.log('All surveys stats:', { totalResponses: totalResponsesCount, totalEmails: totalEmailsCount });
         
@@ -137,7 +146,7 @@ export default function Dashboard() {
         setActiveSurvey({
           id: survey.id,
           title: survey.title,
-          responses_count: maxResponseCount,
+          responses_count: surveyResponseCount,
         });
 
         setMetrics({
