@@ -139,9 +139,14 @@ export default function SurveyFlow() {
         const payload = row.payload || {};
         const options = Array.isArray(row.options) ? row.options : [];
 
+        // If payload doesn't have type, reconstruct it from row
+        const questionType = payload.type ?? row.type ?? 'single-choice';
+
         console.log(`Question ${idx}:`, {
           id: row.id,
-          type: payload.type ?? row.type,
+          type: questionType,
+          row_type: row.type,
+          payload_type: payload.type,
           options: options,
           conditional_logic: row.conditional_logic,
           payload: payload,
@@ -156,7 +161,8 @@ export default function SurveyFlow() {
           options: row.options 
             ? (typeof row.options === 'string' ? JSON.parse(row.options) : row.options)
             : [],
-          type: payload.type ?? row.type,
+          type: questionType,
+          payload: payload,
           text: row.text ?? row.question_text ?? '',
           required: payload.required ?? row.required ?? false,
           hasOtherOption:
@@ -218,6 +224,7 @@ export default function SurveyFlow() {
 
       console.log('Mapped questions:', mapped);
       console.log('Total questions loaded:', mapped.length);
+      console.log('Question types:', mapped.map(q => ({ id: q.id, type: q.type, text: q.text.substring(0, 30) })));
       console.log('Questions by section:', 
         mapped.reduce((acc: any, q: any) => {
           const section = q.section_id || 'unsectioned';
@@ -227,7 +234,7 @@ export default function SurveyFlow() {
         }, {})
       );
       mapped.forEach((q: any) => {
-        console.log(`Question ${q.id} (section: ${q.section_id || 'none'}, order: ${q.order}) conditional_logic:`, q.conditional_logic);
+        console.log(`Question ${q.id} (section: ${q.section_id || 'none'}, order: ${q.order}, type: ${q.type}) conditional_logic:`, q.conditional_logic);
       });
 
       setQuestions(mapped);
@@ -611,6 +618,7 @@ export default function SurveyFlow() {
             </div>
           )}
           
+          {console.log('Rendering question:', { id: question.id, type: question.type, text: question.text.substring(0, 30) })}
           <h2 className="text-2xl font-semibold text-gray-900 mb-8">{localized.text}</h2>
 
           {/* Choice Questions */}
@@ -684,6 +692,26 @@ export default function SurveyFlow() {
           {/* Scale */}
           {question.type === 'scale' && (
             <div className="space-y-6">
+              {/* Min and Max Labels */}
+              {(question.payload?.scaleMin || question.payload?.scaleMax) && (
+                <div className="flex justify-between text-sm text-gray-600 px-2">
+                  {question.payload?.scaleMin && (
+                    <span>
+                      {typeof question.payload.scaleMin === 'object'
+                        ? question.payload.scaleMin[language] || question.payload.scaleMin[question.payload.baseLanguage] || ''
+                        : question.payload.scaleMin}
+                    </span>
+                  )}
+                  {question.payload?.scaleMax && (
+                    <span>
+                      {typeof question.payload.scaleMax === 'object'
+                        ? question.payload.scaleMax[language] || question.payload.scaleMax[question.payload.baseLanguage] || ''
+                        : question.payload.scaleMax}
+                    </span>
+                  )}
+                </div>
+              )}
+              
               <div className="flex justify-between gap-3">
                 {Array.from({ length: 5 }, (_, i) => i + 1).map((value) => (
                   <button

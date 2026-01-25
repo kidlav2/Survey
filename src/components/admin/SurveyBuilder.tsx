@@ -15,6 +15,8 @@ interface Question {
   hasOtherOption?: boolean;
   order: number;
   section_id?: string;
+  scaleMin?: string;  // Description for value 1
+  scaleMax?: string;  // Description for value 5
   conditional_logic?: {
     condition_type: 'answer_equals';
     answer: string;
@@ -65,8 +67,10 @@ async function buildQuestionPayloadWithTranslations(args: {
   type: Question['type'];
   required: boolean;
   hasOtherOption?: boolean;
+  scaleMin?: string;
+  scaleMax?: string;
 }) {
-const { baseLanguage, text, options = [], type, required, hasOtherOption } = args;
+const { baseLanguage, text, options = [], type, required, hasOtherOption, scaleMin, scaleMax } = args;
 
 // Auto-detect base language (RU/EN) to avoid wrong translations when you type Russian text
 const resolvedBaseLanguage = (baseLanguage === 'fr' || baseLanguage === 'es')
@@ -83,6 +87,8 @@ const resolvedBaseLanguage = (baseLanguage === 'fr' || baseLanguage === 'es')
     hasOtherOption: !!hasOtherOption,
     text: { [resolvedBaseLanguage]: text },
     options: { [resolvedBaseLanguage]: options },
+    scaleMin: { [resolvedBaseLanguage]: scaleMin },
+    scaleMax: { [resolvedBaseLanguage]: scaleMax },
     translations: {},
   };
 
@@ -91,9 +97,18 @@ const resolvedBaseLanguage = (baseLanguage === 'fr' || baseLanguage === 'es')
     const translatedOptions = type === 'single-choice' || type === 'multiple-choice'
       ? await translateArrayMyMemory(options, resolvedBaseLanguage, lng)
       : [];
+    
+    const translatedScaleMin = scaleMin
+      ? await translateMyMemory(scaleMin, resolvedBaseLanguage, lng)
+      : '';
+    const translatedScaleMax = scaleMax
+      ? await translateMyMemory(scaleMax, resolvedBaseLanguage, lng)
+      : '';
 
     payload.text[lng] = translatedText;
     payload.options[lng] = translatedOptions;
+    payload.scaleMin[lng] = translatedScaleMin;
+    payload.scaleMax[lng] = translatedScaleMax;
     payload.translations[lng] = { text: translatedText, options: translatedOptions };
   }
 
@@ -401,10 +416,14 @@ export default function SurveyBuilder() {
             : undefined
         });
         
+        const payload = q.payload || {};
+        
         return {
           ...q,
           order: q.sort_order,
           options: Array.isArray(q.options) ? q.options : (q.options ? [q.options] : []),
+          scaleMin: payload.scaleMin || '',
+          scaleMax: payload.scaleMax || '',
           conditional_logic: q.conditional_logic 
             ? (typeof q.conditional_logic === 'string' ? JSON.parse(q.conditional_logic) : q.conditional_logic)
             : undefined
@@ -454,6 +473,8 @@ export default function SurveyBuilder() {
       hasOtherOption: false,
       order: afterIndex !== undefined ? afterIndex + 1 : questions.length,
       section_id: sectionId ?? selectedSectionId ?? undefined,
+      scaleMin: '',
+      scaleMax: '',
     };
 
     console.log('New question created:', newQuestion);
@@ -517,6 +538,11 @@ export default function SurveyBuilder() {
           updatedQ.options = [t.yes, t.no];
         }
         
+        // When changing to scale type, clear options
+        if (key === 'type' && value === 'scale') {
+          updatedQ.options = [];
+        }
+        
         return updatedQ;
       }
       return q;
@@ -539,6 +565,8 @@ export default function SurveyBuilder() {
         type: question.type,
         required: question.required,
         hasOtherOption: question.hasOtherOption,
+        scaleMin: question.scaleMin,
+        scaleMax: question.scaleMax,
       });
     }
 
@@ -546,8 +574,10 @@ export default function SurveyBuilder() {
     if (originalQuestion) {
       const textChanged = question.text !== originalQuestion.text;
       const optionsChanged = JSON.stringify(question.options) !== JSON.stringify(originalQuestion.options);
+      const scaleMinChanged = question.scaleMin !== originalQuestion.scaleMin;
+      const scaleMaxChanged = question.scaleMax !== originalQuestion.scaleMax;
       
-      if (!textChanged && !optionsChanged && originalQuestion.payload) {
+      if (!textChanged && !optionsChanged && !scaleMinChanged && !scaleMaxChanged && originalQuestion.payload) {
         console.log('Reusing cached payload for question:', question.id);
         return originalQuestion.payload;
       }
@@ -561,6 +591,8 @@ export default function SurveyBuilder() {
       type: question.type,
       required: question.required,
       hasOtherOption: question.hasOtherOption,
+      scaleMin: question.scaleMin,
+      scaleMax: question.scaleMax,
     });
   };
 
@@ -602,6 +634,7 @@ export default function SurveyBuilder() {
             conditional_logic: (question.conditional_logic && question.conditional_logic.length > 0) ? JSON.stringify(question.conditional_logic) : null,
           };
           
+          console.log('Saving new question:', { questionId: question.id, type: question.type, text: question.text.substring(0, 30), insertRow });
           console.log('Saving new question with conditional_logic:', insertRow.conditional_logic);
 
           let data: any = null;
@@ -646,10 +679,11 @@ export default function SurveyBuilder() {
             has_other_option: question.hasOtherOption,
             sort_order: question.order,
             section_id: question.section_id || null,
+            payload: payload,
             conditional_logic: (question.conditional_logic && question.conditional_logic.length > 0) ? JSON.stringify(question.conditional_logic) : null,
           };
           
-          console.log('Saving existing question with conditional_logic:', updateRow.conditional_logic, 'for question:', question.id);
+          console.log('Updating existing question:', { questionId: question.id, type: question.type, text: question.text.substring(0, 30), updateRow });          console.log('Saving existing question with conditional_logic:', updateRow.conditional_logic, 'for question:', question.id);
 
           let error: any = null;
 
@@ -1487,6 +1521,36 @@ export default function SurveyBuilder() {
                                             </div>
                                           </>
                                         )}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Scale Descriptions */}
+                                  {question.type === 'scale' && (
+                                    <div className="grid grid-cols-2 gap-4">
+                                      <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                          Description for 1 (Minimum)
+                                        </label>
+                                        <input
+                                          type="text"
+                                          value={question.scaleMin || ''}
+                                          onChange={(e) => updateQuestion(question.id, 'scaleMin', e.target.value)}
+                                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                          placeholder="e.g., Not at all"
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                          Description for 5 (Maximum)
+                                        </label>
+                                        <input
+                                          type="text"
+                                          value={question.scaleMax || ''}
+                                          onChange={(e) => updateQuestion(question.id, 'scaleMax', e.target.value)}
+                                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                          placeholder="e.g., Very much"
+                                        />
                                       </div>
                                     </div>
                                   )}
