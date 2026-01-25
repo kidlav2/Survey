@@ -118,6 +118,7 @@ const resolvedBaseLanguage = (baseLanguage === 'fr' || baseLanguage === 'es')
 const translations = {
   en: {
     addOption: 'Add Option',
+    pasteOption: 'Paste Option',
     addOther: 'Add Other',
     other: 'Other (please specify)',
     duplicateQuestion: 'Duplicate Question',
@@ -165,6 +166,7 @@ const translations = {
   },
   ru: {
     addOption: 'Добавить вариант',
+    pasteOption: 'Вставить вариант',
     addOther: 'Добавить "Другое"',
     other: 'Другое (укажите)',
     duplicateQuestion: 'Дублировать вопрос',
@@ -212,6 +214,7 @@ const translations = {
   },
   fr: {
     addOption: 'Ajouter une option',
+    pasteOption: 'Coller une option',
     addOther: 'Ajouter Autre',
     other: 'Autre (veuillez préciser)',
     duplicateQuestion: 'Dupliquer la question',
@@ -259,6 +262,7 @@ const translations = {
   },
   es: {
     addOption: 'Agregar opción',
+    pasteOption: 'Pegar opción',
     addOther: 'Agregar Otro',
     other: 'Otro (por favor especifique)',
     duplicateQuestion: 'Duplicar pregunta',
@@ -576,6 +580,30 @@ export default function SurveyBuilder() {
 
     setQuestions(newQuestions);
     setSaveStatus('unsaved');
+  };
+
+  const pasteOptionFromClipboard = async (questionId: string) => {
+    try {
+      const clipboardText = await navigator.clipboard.readText();
+      const trimmedText = clipboardText.trim();
+      
+      if (!trimmedText) {
+        setToast({ message: 'Clipboard is empty', type: 'error' });
+        return;
+      }
+
+      const question = questions.find(q => q.id === questionId);
+      if (!question) return;
+
+      // Add the pasted text as a new option
+      const newOptions = [...(question.options || []), trimmedText];
+      updateQuestion(questionId, 'options', newOptions);
+      setToast({ message: 'Option pasted successfully', type: 'success' });
+    } catch (error) {
+      // Handle errors (permission denied, no clipboard access, etc.)
+      setToast({ message: 'Failed to read clipboard. Please allow clipboard access.', type: 'error' });
+      console.error('Clipboard error:', error);
+    }
   };
 
   const updateQuestion = (questionId: string, key: keyof Question, value: any) => {
@@ -1582,6 +1610,13 @@ export default function SurveyBuilder() {
                                                 + {t.addOption}
                                               </button>
                                               
+                                              <button
+                                                onClick={() => pasteOptionFromClipboard(question.id)}
+                                                className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                                              >
+                                                📋 {t.pasteOption}
+                                              </button>
+                                              
                                               {!question.hasOtherOption && (
                                                 <button
                                                   onClick={() => updateQuestion(question.id, 'hasOtherOption', true)}
@@ -2030,6 +2065,13 @@ export default function SurveyBuilder() {
                                     className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
                                   >
                                     + {t.addOption}
+                                  </button>
+                                  
+                                  <button
+                                    onClick={() => pasteOptionFromClipboard(question.id)}
+                                    className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                                  >
+                                    📋 {t.pasteOption}
                                   </button>
                                   
                                   {!question.hasOtherOption && (
