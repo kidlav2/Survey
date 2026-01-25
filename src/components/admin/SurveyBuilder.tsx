@@ -317,6 +317,7 @@ export default function SurveyBuilder() {
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
   const [sectionsLoading, setSectionsLoading] = useState(false);
   const otherInputRef = useRef<HTMLInputElement | null>(null);
+  const newQuestionRef = useRef<HTMLDivElement | null>(null);
   const [otherValues, setOtherValues] = useState<Record<string, string>>({});
   const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
   const [editingSectionName, setEditingSectionName] = useState('');
@@ -335,6 +336,15 @@ export default function SurveyBuilder() {
       otherInputRef.current.focus();
     }
   }, [expandedQuestion, questions.map(q => q.hasOtherOption).join()]);
+
+  // Scroll to new question
+  useEffect(() => {
+    if (expandedQuestion && newQuestionRef.current) {
+      setTimeout(() => {
+        newQuestionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
+  }, [expandedQuestion]);
 
   const loadQuestions = async () => {
     try {
@@ -1228,7 +1238,10 @@ export default function SurveyBuilder() {
                         <p className="text-sm text-gray-500 italic">No questions yet</p>
                       ) : (
                         questions.filter(q => q.section_id === section.id).map((question) => (
-                          <div key={question.id} className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
+                          <div 
+                            key={question.id} 
+                            ref={expandedQuestion === question.id ? newQuestionRef : null}
+                            className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
                             {/* Question Header */}
                             <div
                               onClick={() => setExpandedQuestion(expandedQuestion === question.id ? null : question.id)}
@@ -1635,6 +1648,7 @@ export default function SurveyBuilder() {
             return (
             <div 
               key={question.id}
+              ref={expandedQuestion === question.id ? newQuestionRef : null}
               draggable
               onDragStart={(e) => handleDragStart(e, actualIndex)}
               onDragOver={(e) => handleDragOver(e, actualIndex)}
