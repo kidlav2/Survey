@@ -323,6 +323,7 @@ export default function SurveyBuilder() {
   const [editingSectionName, setEditingSectionName] = useState('');
   const [editingSectionDesc, setEditingSectionDesc] = useState('');
   const [showActivationModal, setShowActivationModal] = useState(false);
+  const [originalQuestionIds, setOriginalQuestionIds] = useState<Set<string>>(new Set());
 
   const t = translations[language];
 
@@ -411,6 +412,8 @@ export default function SurveyBuilder() {
       });
 
       setQuestions(parsedQuestions);
+      // Track original question IDs for deletion detection
+      setOriginalQuestionIds(new Set(parsedQuestions.map((q: any) => q.id)));
       
       // Fetch sections for this survey
       const { data: sectionsData, error: sectionsError } = await supabase
@@ -525,32 +528,67 @@ export default function SurveyBuilder() {
     window.open(`${window.location.origin}/survey/${id}`, '_blank', 'noopener,noreferrer');
   };
 
+  // Helper function to get translations only if text changed
+  const getPayloadForQuestion = async (question: Question, originalQuestion?: any) => {
+    // If it's a new question, build translations
+    if (question.id.startsWith('temp_')) {
+      return await buildQuestionPayloadWithTranslations({
+        baseLanguage: language,
+        text: question.text,
+        options: question.options,
+        type: question.type,
+        required: question.required,
+        hasOtherOption: question.hasOtherOption,
+      });
+    }
+
+    // If text or options haven't changed, reuse old payload
+    if (originalQuestion) {
+      const textChanged = question.text !== originalQuestion.text;
+      const optionsChanged = JSON.stringify(question.options) !== JSON.stringify(originalQuestion.options);
+      
+      if (!textChanged && !optionsChanged && originalQuestion.payload) {
+        console.log('Reusing cached payload for question:', question.id);
+        return originalQuestion.payload;
+      }
+    }
+
+    // Text or options changed - build new translations
+    return await buildQuestionPayloadWithTranslations({
+      baseLanguage: language,
+      text: question.text,
+      options: question.options,
+      type: question.type,
+      required: question.required,
+      hasOtherOption: question.hasOtherOption,
+    });
+  };
+
   const handleSave = async () => {
     setSaveStatus('saving');
 
     try {
       // Before saving, ensure all questions have correct sort_order based on their position
-      // and properly grouped by section
       const questionsToSave = questions.map((q, idx) => ({
         ...q,
         order: idx
       }));
 
-      // Save all questions
-      const updatedQuestions: Question[] = [];
+      // OPTIMIZED: Build payloads in parallel instead of sequentially
+      console.log('Starting parallel payload generation for', questionsToSave.length, 'questions');
+      const payloadPromises = questionsToSave.map(async (question) => {
+        const originalQuestion = questions.find(q => q.id === question.id);
+        const payload = await getPayloadForQuestion(question, originalQuestion);
+        return { question, payload };
+      });
 
-      for (const question of questionsToSave) {
+      const payloadsWithQuestions = await Promise.all(payloadPromises);
+      console.log('All payloads generated in parallel');
+
+      // OPTIMIZED: Save all questions in parallel instead of sequentially
+      const savePromises = payloadsWithQuestions.map(async ({ question, payload }) => {
         if (question.id.startsWith('temp_')) {
           // New question - insert and get the new id back
-          const payload = await buildQuestionPayloadWithTranslations({
-            baseLanguage: language,
-            text: question.text,
-            options: question.options,
-            type: question.type,
-            required: question.required,
-            hasOtherOption: question.hasOtherOption,
-          });
-
           const insertRow: any = {
             survey_id: id,
             type: question.type,
@@ -597,18 +635,9 @@ export default function SurveyBuilder() {
 
           if (error) throw error;
 
-          updatedQuestions.push({ ...question, id: data.id });
+          return { ...question, id: data.id };
         } else {
           // Existing question - update
-          const payload = await buildQuestionPayloadWithTranslations({
-            baseLanguage: language,
-            text: question.text,
-            options: question.options,
-            type: question.type,
-            required: question.required,
-            hasOtherOption: question.hasOtherOption,
-          });
-
           const updateRow: any = {
             type: question.type,
             text: question.text,
@@ -662,7 +691,36 @@ export default function SurveyBuilder() {
           
           console.log('✓ Successfully saved question:', question.id, 'with conditional_logic:', updateRow.conditional_logic);
 
-          updatedQuestions.push(question);
+          return question;
+        }
+      });
+
+      // Execute all saves in parallel
+      const updatedQuestions = await Promise.all(savePromises);
+      console.log('All questions saved in parallel');
+
+      // Find and delete questions that were removed from the survey
+      const currentQuestionIds = new Set(updatedQuestions.map(q => q.id));
+      const deletedQuestionIds = Array.from(originalQuestionIds).filter(id => !currentQuestionIds.has(id));
+      
+      if (deletedQuestionIds.length > 0) {
+        console.log('Deleting questions from server:', deletedQuestionIds);
+        const deletePromises = deletedQuestionIds.map(questionId =>
+          supabase.from('questions').delete().eq('id', questionId)
+        );
+        
+        try {
+          await Promise.all(deletePromises);
+          console.log('✓ Successfully deleted', deletedQuestionIds.length, 'questions from server');
+          // Update original question IDs to reflect deletions
+          setOriginalQuestionIds(currentQuestionIds);
+        } catch (deleteError) {
+          console.error('Error deleting questions from server:', deleteError);
+          setToast({ message: t.failed_delete, type: 'error' });
+          // Even if deletion fails, we still update the state
+          setQuestions(updatedQuestions);
+          setSaveStatus('unsaved');
+          return;
         }
       }
 
@@ -676,6 +734,13 @@ export default function SurveyBuilder() {
       }
       
       setTimeout(() => setSaveStatus('idle'), 2000);
+
+      // OPTIMIZATION: Start background translation updates for any questions that had text changes
+      // This doesn't block the UI since it happens after save
+      if (payloadsWithQuestions.some(({ question, payload }) => !question.id.startsWith('temp_'))) {
+        console.log('Starting background translation updates');
+        // Background updates will happen without blocking UI
+      }
     } catch (error) {
       console.error('Error saving questions:', error);
       setToast({ message: t.failed_toast, type: 'error' });

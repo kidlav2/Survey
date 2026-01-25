@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { ChevronRight, ChevronLeft } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
@@ -349,15 +349,23 @@ export default function SurveyFlow() {
   const localized = question ? getLocalized(question, language) : { text: '', options: [] as string[] };
   
   // Count only non-branch-only questions across ALL sections for progress tracking
-  const visibleQuestions = questions.filter((_, idx) => {
-    const isBranch = isBranchOnly(questions[idx].id, idx);
-    return !isBranch;
-  });
+  // Memoize to prevent recalculation on language changes
+  const visibleQuestions = useMemo(() => {
+    return questions.filter((_, idx) => {
+      const isBranch = isBranchOnly(questions[idx].id, idx);
+      return !isBranch;
+    });
+  }, [questions]);
+  
   const totalQuestions = visibleQuestions.length;
   
   // Calculate current question position in visible questions across all sections
-  const currentVisibleIndex = visibleQuestions.findIndex(q => q.id === question?.id);
-  const progress = totalQuestions > 0 ? ((Math.max(0, currentVisibleIndex) + 1) / totalQuestions) * 100 : 0;
+  // Memoize to prevent recalculation on language changes
+  const { currentVisibleIndex, progress } = useMemo(() => {
+    const idx = visibleQuestions.findIndex(q => q.id === question?.id);
+    const prog = totalQuestions > 0 ? ((Math.max(0, idx) + 1) / totalQuestions) * 100 : 0;
+    return { currentVisibleIndex: idx, progress: prog };
+  }, [visibleQuestions, question?.id, totalQuestions]);
   
   console.log('Progress calculation:', {
     totalLoadedQuestions: questions.length,
