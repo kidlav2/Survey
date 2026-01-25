@@ -528,6 +528,56 @@ export default function SurveyBuilder() {
     }
   };
 
+  const moveQuestionUp = (questionId: string) => {
+    const index = questions.findIndex(q => q.id === questionId);
+    if (index <= 0) return; // Can't move first question up
+
+    const question = questions[index];
+    const prevQuestion = questions[index - 1];
+
+    // Only allow moving within same section
+    if (question.section_id !== prevQuestion.section_id) {
+      return;
+    }
+
+    // Swap the questions
+    const newQuestions = [...questions];
+    [newQuestions[index], newQuestions[index - 1]] = [newQuestions[index - 1], newQuestions[index]];
+
+    // Update order values
+    newQuestions.forEach((q, idx) => {
+      q.order = idx;
+    });
+
+    setQuestions(newQuestions);
+    setSaveStatus('unsaved');
+  };
+
+  const moveQuestionDown = (questionId: string) => {
+    const index = questions.findIndex(q => q.id === questionId);
+    if (index >= questions.length - 1) return; // Can't move last question down
+
+    const question = questions[index];
+    const nextQuestion = questions[index + 1];
+
+    // Only allow moving within same section
+    if (question.section_id !== nextQuestion.section_id) {
+      return;
+    }
+
+    // Swap the questions
+    const newQuestions = [...questions];
+    [newQuestions[index], newQuestions[index + 1]] = [newQuestions[index + 1], newQuestions[index]];
+
+    // Update order values
+    newQuestions.forEach((q, idx) => {
+      q.order = idx;
+    });
+
+    setQuestions(newQuestions);
+    setSaveStatus('unsaved');
+  };
+
   const updateQuestion = (questionId: string, key: keyof Question, value: any) => {
     setQuestions(questions.map(q => {
       if (q.id === questionId) {
@@ -1336,16 +1386,38 @@ export default function SurveyBuilder() {
                       {questions.filter(q => q.section_id === section.id).length === 0 ? (
                         <p className="text-sm text-gray-500 italic">No questions yet</p>
                       ) : (
-                        questions.filter(q => q.section_id === section.id).map((question) => (
-                          <div 
-                            key={question.id} 
-                            ref={expandedQuestion === question.id ? newQuestionRef : null}
-                            className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
+                        questions.filter(q => q.section_id === section.id).map((question, sectionQuestionIndex) => {
+                          const actualIndex = questions.indexOf(question);
+                          return (
+                            <div 
+                              key={question.id} 
+                              ref={expandedQuestion === question.id ? newQuestionRef : null}
+                              draggable
+                              onDragStart={(e) => handleDragStart(e, actualIndex)}
+                              onDragOver={(e) => handleDragOver(e, actualIndex)}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                if (draggedIndex !== null && draggedIndex !== actualIndex) {
+                                  const draggedQuestion = questions[draggedIndex];
+                                  const targetQuestion = questions[actualIndex];
+                                  // Only allow dragging within same section
+                                  if (draggedQuestion.section_id === targetQuestion.section_id) {
+                                    moveQuestion(draggedIndex, actualIndex);
+                                  }
+                                }
+                                setDraggedIndex(null);
+                              }}
+                              onDragEnd={handleDragEnd}
+                              className={`bg-gray-50 rounded-lg border border-gray-200 overflow-hidden transition-opacity cursor-grab active:cursor-grabbing ${draggedIndex === actualIndex ? 'opacity-50' : ''}`}
+                            >
                             {/* Question Header */}
                             <div
                               onClick={() => setExpandedQuestion(expandedQuestion === question.id ? null : question.id)}
                               className="flex items-center gap-3 p-4 cursor-pointer hover:bg-gray-100 transition-colors"
                             >
+                              <GripVertical 
+                                className="w-5 h-5 text-gray-400 flex-shrink-0"
+                              />
                               <ChevronDown 
                                 className={`w-5 h-5 text-gray-400 transition-transform flex-shrink-0 ${expandedQuestion === question.id ? 'rotate-180' : ''}`}
                               />
@@ -1714,7 +1786,8 @@ export default function SurveyBuilder() {
                               </div>
                             )}
                           </div>
-                        ))
+                          );
+                        })
                       )}
                     </div>
                     
@@ -1783,7 +1856,7 @@ export default function SurveyBuilder() {
               onDragOver={(e) => handleDragOver(e, actualIndex)}
               onDrop={(e) => handleDrop(e, actualIndex)}
               onDragEnd={handleDragEnd}
-              className={draggedIndex === actualIndex ? 'opacity-50' : ''}
+              className={`transition-opacity cursor-grab active:cursor-grabbing ${draggedIndex === actualIndex ? 'opacity-50' : ''}`}
             >
               {/* Question Card */}
               <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -1792,7 +1865,7 @@ export default function SurveyBuilder() {
                   onClick={() => toggleQuestion(question.id)}
                   className="flex items-center gap-3 p-4 cursor-pointer hover:bg-gray-50 transition-colors"
                 >
-                  <GripVertical className="w-5 h-5 text-gray-400 flex-shrink-0 cursor-move" />
+                  <GripVertical className="w-5 h-5 text-gray-400 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-sm font-medium text-gray-900">Question {actualIndex + 1}</span>
@@ -2120,6 +2193,24 @@ export default function SurveyBuilder() {
 
                       {/* Action Buttons */}
                       <div className="pt-4 border-t border-gray-200 flex gap-2 flex-wrap">
+                        <button
+                          onClick={() => moveQuestionUp(question.id)}
+                          disabled={actualIndex === 0 || (actualIndex > 0 && questions[actualIndex - 1]?.section_id !== question.section_id)}
+                          className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-2 border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-gray-700 rounded-lg transition-colors font-medium"
+                          title="Move question up within section"
+                        >
+                          <ChevronUp className="w-4 h-4" />
+                        </button>
+
+                        <button
+                          onClick={() => moveQuestionDown(question.id)}
+                          disabled={actualIndex === questions.length - 1 || (actualIndex < questions.length - 1 && questions[actualIndex + 1]?.section_id !== question.section_id)}
+                          className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-2 border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-gray-700 rounded-lg transition-colors font-medium"
+                          title="Move question down within section"
+                        >
+                          <ChevronDown className="w-4 h-4" />
+                        </button>
+
                         <button
                           onClick={() => duplicateQuestion(question.id, actualIndex)}
                           className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium"
