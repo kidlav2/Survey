@@ -1,15 +1,18 @@
 import React, { useContext } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, FileText, Inbox, Users, Settings, X } from 'lucide-react';
+import { LayoutDashboard, FileText, Inbox, Users, Settings, X, ChevronLeft, Menu } from 'lucide-react';
 import { adminTranslations } from './adminTranslations';
 import { AdminLanguageContext } from './AdminLayout';
 
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
+  onOpen?: () => void;
+  isDesktopVisible?: boolean;
+  onDesktopToggle?: () => void;
 }
 
-export default function Sidebar({ isOpen, onClose }: SidebarProps) {
+export default function Sidebar({ isOpen, onClose, onOpen, isDesktopVisible = true, onDesktopToggle }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { language, setLanguage } = useContext(AdminLanguageContext);
@@ -31,11 +34,21 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex w-64 bg-white border-r border-gray-200 min-h-screen flex-shrink-0 flex-col">
-        <div className="p-6">
-          <h1 className="text-xl font-semibold text-gray-900">{t.surveyResearch}</h1>
-          <p className="text-sm text-gray-500 mt-1">{t.adminPortal}</p>
-        </div>
+      {isDesktopVisible && (
+        <aside className="hidden lg:flex w-64 bg-white border-r border-gray-200 min-h-screen flex-shrink-0 flex-col">
+          <div className="p-6 flex items-center justify-between">
+            <div>
+              <h1 className="text-xl font-semibold text-gray-900">{t.surveyResearch}</h1>
+              <p className="text-sm text-gray-500 mt-1">{t.adminPortal}</p>
+            </div>
+            <button
+              onClick={onDesktopToggle}
+              className="p-1 hover:bg-gray-100 rounded transition-colors"
+              title="Hide sidebar"
+            >
+              <ChevronLeft className="w-5 h-5 text-gray-600" />
+            </button>
+          </div>
         
         <nav className="px-3 space-y-1 flex-1">
           {navItems.map((item) => {
@@ -78,6 +91,20 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           </div>
         </div>
       </aside>
+      )}
+
+      {/* Desktop Toggle Button (when sidebar is hidden) */}
+      {!isDesktopVisible && (
+        <div className="hidden lg:flex flex-col items-center justify-start w-16 bg-white border-r border-gray-200 min-h-screen flex-shrink-0 py-4 gap-4 relative z-50">
+          <button
+            onClick={() => onDesktopToggle?.()}
+            className="p-2 hover:bg-gray-100 rounded transition-colors"
+            title="Open sidebar"
+          >
+            <Menu className="w-5 h-5 text-gray-600" />
+          </button>
+        </div>
+      )}
 
       {/* Mobile Sidebar */}
       <aside

@@ -1,4 +1,4 @@
-import React, { useState, createContext } from 'react';
+import React, { useState, createContext, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 
@@ -12,12 +12,26 @@ export const AdminLanguageContext = createContext<{
 
 export default function AdminLayout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isDesktopSidebarVisible, setIsDesktopSidebarVisible] = useState(() => {
+    const saved = localStorage.getItem('adminSidebarVisible');
+    return saved !== null ? saved === 'true' : true;
+  });
   const [language, setLanguage] = useState<'en' | 'ru' | 'fr' | 'es'>('en');
+
+  useEffect(() => {
+    localStorage.setItem('adminSidebarVisible', String(isDesktopSidebarVisible));
+  }, [isDesktopSidebarVisible]);
 
   return (
     <AdminLanguageContext.Provider value={{ language, setLanguage }}>
       <div className="flex min-h-screen bg-gray-50">
-        <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+        <Sidebar 
+          isOpen={isSidebarOpen} 
+          onClose={() => setIsSidebarOpen(false)}
+          onOpen={() => setIsSidebarOpen(true)}
+          isDesktopVisible={isDesktopSidebarVisible}
+          onDesktopToggle={() => setIsDesktopSidebarVisible(!isDesktopSidebarVisible)}
+        />
         
         {/* Overlay for mobile */}
         {isSidebarOpen && (

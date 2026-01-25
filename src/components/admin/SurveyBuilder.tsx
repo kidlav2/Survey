@@ -392,6 +392,7 @@ export default function SurveyBuilder() {
         
         return {
           ...q,
+          order: q.sort_order,
           options: Array.isArray(q.options) ? q.options : (q.options ? [q.options] : []),
           conditional_logic: q.conditional_logic 
             ? (typeof q.conditional_logic === 'string' ? JSON.parse(q.conditional_logic) : q.conditional_logic)
@@ -1427,14 +1428,20 @@ export default function SurveyBuilder() {
                                   </div>
 
                                   {/* Conditional Logic */}
-                                  {console.log('DEBUG: Checking conditional logic section for question:', { id: question.id, type: question.type, showSection: (question.type === 'yes-no' || question.type === 'single-choice') })}
                                   {(question.type === 'yes-no' || question.type === 'single-choice') && (
                                     <div className="pt-3 border-t border-gray-200">
                                       <label className="block text-sm font-medium text-gray-700 mb-3">
                                         Conditional Logic (Branch this question)
                                       </label>
+                                      
+                                      {/* Info Alert */}
+                                      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                        <p className="text-sm text-blue-800">
+                                          <strong>Note:</strong> When you create conditional logic, the questions that follow this condition will appear <strong>after</strong> this question in the survey flow.
+                                        </p>
+                                      </div>
+                                      
                                       <div className="space-y-3">
-                                        {console.log('DEBUG: Conditional logic items:', { id: question.id, count: (question.conditional_logic || []).length, logic: question.conditional_logic })}
                                         {(question.conditional_logic || []).map((logic, idx) => (
                                           <div key={idx} className="p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
                                             <div className="flex items-center justify-between">
@@ -1467,11 +1474,11 @@ export default function SurveyBuilder() {
                                                 >
                                                   <option value="">-- Select next question --</option>
                                                   {questions
-                                                    .filter((q: any) => q.id !== question.id && q.sort_order > question.sort_order)
-                                                    .sort((a: any, b: any) => a.sort_order - b.sort_order)
+                                                    .filter((q: any) => q.id !== question.id && q.order > question.order)
+                                                    .sort((a: any, b: any) => a.order - b.order)
                                                     .map((q: any) => (
                                                       <option key={q.id} value={q.id}>
-                                                        Q{q.sort_order}: {q.text.substring(0, 50)}...
+                                                        Q{q.order}: {q.text.substring(0, 50)}...
                                                       </option>
                                                     ))}
                                                 </select>
@@ -1849,6 +1856,14 @@ export default function SurveyBuilder() {
                           <label className="block text-sm font-medium text-gray-700 mb-3">
                             Conditional Logic (Branch this question)
                           </label>
+                          
+                          {/* Info Alert */}
+                          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                            <p className="text-sm text-blue-800">
+                              <strong>Note:</strong> When you create conditional logic, the questions that follow this condition will appear <strong>after</strong> this question in the survey flow.
+                            </p>
+                          </div>
+                          
                           <div className="space-y-3">
                             {(question.conditional_logic || []).map((logic, idx) => (
                               <div key={idx} className="p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
@@ -1882,11 +1897,11 @@ export default function SurveyBuilder() {
                                     >
                                       <option value="">-- Select next question --</option>
                                       {questions
-                                        .filter((q: any) => q.id !== question.id && q.sort_order > question.sort_order)
-                                        .sort((a: any, b: any) => a.sort_order - b.sort_order)
+                                        .filter((q: any) => q.id !== question.id && q.order > question.order)
+                                        .sort((a: any, b: any) => a.order - b.order)
                                         .map((q: any) => (
                                           <option key={q.id} value={q.id}>
-                                            Q{q.sort_order}: {q.text.substring(0, 50)}...
+                                            Q{q.order}: {q.text.substring(0, 50)}...
                                           </option>
                                         ))}
                                     </select>
