@@ -1811,7 +1811,7 @@ export default function SurveyBuilder() {
                                         const currentIndex = questions.findIndex(q => q.id === question.id);
                                         addQuestion(currentIndex, section.id);
                                       }}
-                                      className="w-max flex items-center justify-center gap-2 mt-4 px-5 py-2 text-sm bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-colors border border-blue-200"
+                                      className="w-max flex items-center justify-center gap-2 mt-4 px-3 py-2 text-sm bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-colors border border-blue-200"
                                     >
                                       <Plus className="w-4 h-4" />
                                       Add after this
