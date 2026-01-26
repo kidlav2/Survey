@@ -1610,13 +1610,6 @@ export default function SurveyBuilder() {
                                                 + {t.addOption}
                                               </button>
                                               
-                                              <button
-                                                onClick={() => pasteOptionFromClipboard(question.id)}
-                                                className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
-                                              >
-                                                📋 {t.pasteOption}
-                                              </button>
-                                              
                                               {!question.hasOtherOption && (
                                                 <button
                                                   onClick={() => updateQuestion(question.id, 'hasOtherOption', true)}
@@ -1625,6 +1618,13 @@ export default function SurveyBuilder() {
                                                   + {t.addOther}
                                                 </button>
                                               )}
+                                              
+                                              <button
+                                                onClick={() => pasteOptionFromClipboard(question.id)}
+                                                className="px-3 py-1 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 font-medium"
+                                              >
+                                                {t.pasteOption}
+                                              </button>
                                             </div>
                                           </>
                                         )}
@@ -1811,7 +1811,7 @@ export default function SurveyBuilder() {
                                         const currentIndex = questions.findIndex(q => q.id === question.id);
                                         addQuestion(currentIndex, section.id);
                                       }}
-                                      className="w-max flex items-center justify-center gap-2 px-3 py-2 text-sm bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-colors border border-blue-200"
+                                      className="w-max flex items-center justify-center gap-2 mt-4 px-5 py-2 text-sm bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-colors border border-blue-200"
                                     >
                                       <Plus className="w-4 h-4" />
                                       Add after this
@@ -2067,13 +2067,6 @@ export default function SurveyBuilder() {
                                     + {t.addOption}
                                   </button>
                                   
-                                  <button
-                                    onClick={() => pasteOptionFromClipboard(question.id)}
-                                    className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
-                                  >
-                                    📋 {t.pasteOption}
-                                  </button>
-                                  
                                   {!question.hasOtherOption && (
                                     <button
                                       onClick={() => updateQuestion(question.id, 'hasOtherOption', true)}
@@ -2082,6 +2075,13 @@ export default function SurveyBuilder() {
                                       + {t.addOther}
                                     </button>
                                   )}
+                                  
+                                  <button
+                                    onClick={() => pasteOptionFromClipboard(question.id)}
+                                    className="px-3 py-1 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 font-medium"
+                                  >
+                                    {t.pasteOption}
+                                  </button>
                                 </div>
                               </>
                             )}
