@@ -102,6 +102,35 @@ export default function ResponseDetail() {
     }
   };
 
+  const resetAllQuestions = async () => {
+    if (!response) return;
+    
+    const confirmReset = window.confirm(
+      `Are you sure you want to reset all questions for the "${response.surveyTitle}" survey?\n\nThis will delete all questions but keep the survey.`
+    );
+    
+    if (!confirmReset) return;
+
+    try {
+      setLoading(true);
+      
+      // Delete all questions for this survey
+      const { error } = await supabase
+        .from('questions')
+        .delete()
+        .eq('survey_id', response.survey_id);
+
+      if (error) throw error;
+
+      // Reload and go back to responses
+      navigate('/admin/responses');
+    } catch (error) {
+      console.error('Error resetting questions:', error);
+      alert('Failed to reset questions. Please try again.');
+      setLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <main className="flex-1">
@@ -294,12 +323,19 @@ export default function ResponseDetail() {
         </div>
 
         {/* Back Button - Mobile */}
-        <div className="mt-6">
+        <div className="mt-6 flex flex-col sm:flex-row gap-3">
           <button
             onClick={() => navigate('/admin/responses')}
-            className="w-full sm:w-auto px-6 py-2.5 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium"
+            className="flex-1 sm:flex-none px-6 py-2.5 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium"
           >
             Back to Responses
+          </button>
+          <button
+            onClick={resetAllQuestions}
+            disabled={loading}
+            className="flex-1 sm:flex-none px-6 py-2.5 border border-red-300 hover:bg-red-50 text-red-700 rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Reset All Questions
           </button>
         </div>
       </div>

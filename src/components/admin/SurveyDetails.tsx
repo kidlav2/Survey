@@ -15,7 +15,7 @@ interface SurveyData {
   id: string;
   title: string;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
   languages?: string[];
 }
 
@@ -217,6 +217,50 @@ export default function SurveyDetails() {
     } catch (error) {
       console.error('Error renaming survey:', error);
       setToast({ message: 'Failed to rename survey', type: 'error' });
+    }
+  };
+
+  const handleResetQuestions = async () => {
+    const confirmReset = window.confirm(
+      `Are you sure you want to reset all responses for "${survey?.title}"?\n\nThis will delete all responses but keep the questions.`
+    );
+    
+    if (!confirmReset) return;
+
+    try {
+      console.log('Survey ID:', id);
+      
+      // First check how many responses exist
+      const { data: checkData, error: checkError } = await supabase
+        .from('responses')
+        .select('id', { count: 'exact' })
+        .eq('survey_id', id);
+
+      console.log('Responses check:', { count: checkData?.length, error: checkError });
+
+      // Delete all responses for this survey
+      const { data, error } = await supabase
+        .from('responses')
+        .delete()
+        .eq('survey_id', id)
+        .select();
+
+      console.log('Delete response:', { data, error, deletedCount: data?.length });
+
+      if (error) {
+        console.error('Delete error details:', error);
+        throw error;
+      }
+
+      if (data && data.length > 0) {
+        setToast({ message: `Deleted ${data.length} responses`, type: 'success' });
+        setTimeout(() => loadSurveyDetails(), 500);
+      } else {
+        setToast({ message: 'No responses to delete', type: 'error' });
+      }
+    } catch (error) {
+      console.error('Error resetting responses:', error);
+      setToast({ message: `Failed to reset responses: ${error instanceof Error ? error.message : 'Unknown error'}`, type: 'error' });
     }
   };
 
@@ -627,7 +671,13 @@ export default function SurveyDetails() {
                 <Trash2 className="w-4 h-4" />
                 {t.deleteSurvey}
               </button>
-            </div>
+              <button
+                onClick={handleResetQuestions}
+                className="flex items-center gap-2 px-4 py-3 border border-red-300 hover:bg-red-50 text-red-700 rounded-lg transition-colors font-medium justify-center"
+              >
+                <Trash2 className="w-4 h-4" />
+                Clear All Responses
+              </button>            </div>
           </div>
         </div>
       </div>

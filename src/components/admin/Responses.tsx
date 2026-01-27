@@ -17,6 +17,7 @@ interface Response {
   // Optional columns if you add them later
   completed?: boolean | null;
   duration_seconds?: number | null;
+  opted_in?: boolean | null;
 }
 
 interface ResponseStats {
