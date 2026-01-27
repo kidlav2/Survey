@@ -583,9 +583,21 @@ export default function SurveyFlow() {
         {/* Progress Bar */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-700">
-              {t.question} {Math.max(1, currentVisibleIndex + 1)} {t.of} {totalQuestions}
-            </span>
+            <div className="flex-1">
+              <span className="text-sm font-medium text-gray-700">
+                {t.question} {Math.max(1, currentVisibleIndex + 1)} {t.of} {totalQuestions}
+              </span>
+              {/* Show message based on question type */}
+              {question?.id && isBranchOnly(question.id, questions.findIndex(q => q.id === question.id)) ? (
+                <div className="text-xs text-gray-600 mt-1">
+                  Additional question
+                </div>
+              ) : question?.conditional_logic && question.conditional_logic.length > 0 && (
+                <div className="text-xs text-amber-600 mt-1">
+                  Additional questions based on your answer
+                </div>
+              )}
+            </div>
             <span className="text-sm text-gray-500">
               {Math.round(progress)}% {t.complete}
             </span>
