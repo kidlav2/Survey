@@ -559,14 +559,48 @@ export default function SurveyFlow() {
         answer = normalizeYesNoAnswer(answer);
       }
       
-      const logic = question.conditional_logic.find((l: any) => l.answer === answer);
+      // IMPORTANT: Find conditional logic match by option INDEX, not by text value
+      // This ensures conditional logic works correctly regardless of language
+      let logic = question.conditional_logic.find((l: any) => l.answer === answer);
+      
+      // If direct match not found, try to find by option index (for multi-language support)
+      if (!logic && (question.type === 'single-choice' || question.type === 'multiple-choice')) {
+        // Find which English option matches the user's selected answer
+        const currentLanguageOptions = question.payload?.options?.[language] || [];
+        const englishOptions = question.payload?.options?.en || [];
+        
+        const answerIndex = currentLanguageOptions.indexOf(answer);
+        
+        if (answerIndex >= 0 && answerIndex < englishOptions.length) {
+          const englishAnswer = englishOptions[answerIndex];
+          logic = question.conditional_logic.find((l: any) => l.answer === englishAnswer);
+          
+          console.log('🔍 Found logic by option index:', { 
+            language,
+            answerIndex, 
+            localizedAnswer: answer, 
+            englishAnswer,
+            currentLanguageOptions: currentLanguageOptions.slice(0, 2),
+            englishOptions: englishOptions.slice(0, 2),
+            foundLogic: !!logic 
+          });
+        } else {
+          console.log('⚠️ Answer index not found:', {
+            answer,
+            answerIndex,
+            currentLanguageOptions,
+            language
+          });
+        }
+      }
       
       console.log('Checking conditional logic:', {
         questionId: question.id,
         originalAnswer: answers[question.id],
         normalizedAnswer: answer,
         conditionalLogic: question.conditional_logic,
-        foundLogic: logic
+        foundLogic: logic,
+        language: language
       });
       
       if (logic) {
