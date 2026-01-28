@@ -33,7 +33,9 @@ const MYMEMORY_EMAIL = ''; // optional: put your email here to increase daily qu
 type SupportedLng = 'en' | 'ru' | 'fr' | 'es';
 
 async function translateMyMemory(text: string, from: SupportedLng, to: SupportedLng) {
-  const trimmed = (text ?? '').trim();
+  // Ensure text is a string (handle cases where it might be object or null)
+  const safeText = typeof text === 'string' ? text : String(text ?? '');
+  const trimmed = safeText.trim();
   if (!trimmed) return '';
 
   const baseUrl = 'https://api.mymemory.translated.net/get';
@@ -51,7 +53,9 @@ async function translateMyMemory(text: string, from: SupportedLng, to: Supported
 async function translateArrayMyMemory(items: string[], from: SupportedLng, to: SupportedLng) {
   const out: string[] = [];
   for (const item of items) {
-    out.push(await translateMyMemory(item, from, to));
+    // Ensure item is a string
+    const safeItem = typeof item === 'string' ? item : String(item ?? '');
+    out.push(await translateMyMemory(safeItem, from, to));
   }
   return out;
 }
@@ -72,7 +76,10 @@ async function buildQuestionPayloadWithTranslations(args: {
   scaleMin?: string;
   scaleMax?: string;
 }) {
-const { baseLanguage, text, options = [], type, required, hasOtherOption, scaleMin, scaleMax } = args;
+const { baseLanguage, text, options = [], type, required, hasOtherOption } = args;
+// Ensure scaleMin and scaleMax are strings (handle case where they might be objects)
+const scaleMin = typeof args.scaleMin === 'string' ? args.scaleMin : '';
+const scaleMax = typeof args.scaleMax === 'string' ? args.scaleMax : '';
 
 // Auto-detect base language (RU/EN) to avoid wrong translations when you type Russian text
 const resolvedBaseLanguage = (baseLanguage === 'fr' || baseLanguage === 'es')
@@ -695,9 +702,68 @@ export default function SurveyBuilder() {
       const scaleMinChanged = question.scaleMin !== originalQuestion.scaleMin;
       const scaleMaxChanged = question.scaleMax !== originalQuestion.scaleMax;
       
+      // CRITICAL: Check if payload type mismatches question type (e.g., payload says yes-no but question is multiple-choice)
+      const payloadTypeChanged = originalQuestion.payload && originalQuestion.payload.type && 
+                                  (originalQuestion.payload.type !== question.type);
+      
+      console.log(`🔍 Payload cache check for ${question.id}:`, {
+        textChanged,
+        typeChanged,
+        optionsChanged,
+        scaleMinChanged,
+        scaleMaxChanged,
+        payloadTypeChanged,
+        hasPayload: !!originalQuestion.payload,
+        payloadType: originalQuestion.payload?.type,
+        originalType: originalQuestion.type,
+        newType: question.type,
+        originalOptions: originalQuestion.options?.slice(0, 2),
+        newOptions: question.options?.slice(0, 2),
+      });
+      
+      // CRITICAL: Check if payload text mismatches question text (e.g., user edited the question text)
+      const payloadTextChanged = originalQuestion.payload && originalQuestion.payload.text && 
+                                  (originalQuestion.payload.text.en !== question.text);
+      
+      // If payload type doesn't match current question type, MUST regenerate
+      if (payloadTypeChanged) {
+        console.log('🚨 PAYLOAD TYPE MISMATCH - REGENERATING payload for question:', question.id, 
+                    'payload.type:', originalQuestion.payload?.type, 'vs question.type:', question.type);
+        return await buildQuestionPayloadWithTranslations({
+          baseLanguage: language,
+          text: question.text,
+          options: question.options,
+          type: question.type,
+          required: question.required,
+          hasOtherOption: question.hasOtherOption,
+          scaleMin: question.scaleMin,
+          scaleMax: question.scaleMax,
+        });
+      }
+      
+      // If payload text doesn't match current question text, MUST regenerate
+      if (payloadTextChanged) {
+        console.log('🚨 PAYLOAD TEXT MISMATCH - REGENERATING payload for question:', question.id, 
+                    'payload.text.en:', originalQuestion.payload?.text?.en, 'vs question.text:', question.text);
+        return await buildQuestionPayloadWithTranslations({
+          baseLanguage: language,
+          text: question.text,
+          options: question.options,
+          type: question.type,
+          required: question.required,
+          hasOtherOption: question.hasOtherOption,
+          scaleMin: question.scaleMin,
+          scaleMax: question.scaleMax,
+        });
+      }
+      
       if (!textChanged && !typeChanged && !optionsChanged && !scaleMinChanged && !scaleMaxChanged && originalQuestion.payload) {
-        console.log('Reusing cached payload for question:', question.id);
+        console.log('✅ Reusing cached payload for question:', question.id);
         return originalQuestion.payload;
+      }
+      
+      if (textChanged || typeChanged || optionsChanged) {
+        console.log('🔄 REGENERATING payload for question:', question.id, '- textChanged:', textChanged, 'typeChanged:', typeChanged, 'optionsChanged:', optionsChanged);
       }
     }
 
@@ -797,8 +863,8 @@ export default function SurveyBuilder() {
             has_other_option: question.hasOtherOption,
             sort_order: question.order,
             section_id: question.section_id || null,
-            // Don't send payload on UPDATE - it causes issues with type changes
-            // payload: payload,
+            // Include payload with translations on UPDATE
+            payload: payload,
             conditional_logic: (question.conditional_logic && question.conditional_logic.length > 0) ? JSON.stringify(question.conditional_logic) : null,
           };
           
@@ -1032,6 +1098,30 @@ export default function SurveyBuilder() {
       setSectionsLoading(true);
       const nextOrder = sections.length;
       
+      // Build payload with translations for section name and description
+      const payload: any = {
+        baseLanguage: detectBaseLanguage(newSectionName, [newSectionDesc]),
+        name: { en: '' },
+        description: { en: '' },
+      };
+
+      const base = detectBaseLanguage(newSectionName, [newSectionDesc]);
+      payload.baseLanguage = base;
+      payload.name[base] = newSectionName.trim();
+      payload.description[base] = newSectionDesc.trim();
+
+      // Translate section name and description to other languages
+      const langs: SupportedLng[] = ['en', 'ru', 'fr', 'es'];
+      const targets = langs.filter((l) => l !== base);
+
+      for (const lng of targets) {
+        const translatedName = await translateMyMemory(newSectionName.trim(), base, lng);
+        const translatedDesc = newSectionDesc.trim() ? await translateMyMemory(newSectionDesc.trim(), base, lng) : '';
+        
+        payload.name[lng] = translatedName;
+        payload.description[lng] = translatedDesc;
+      }
+      
       const { data, error } = await supabase
         .from('survey_sections')
         .insert({
@@ -1039,6 +1129,7 @@ export default function SurveyBuilder() {
           name: newSectionName.trim(),
           description: newSectionDesc.trim(),
           order_index: nextOrder,
+          payload,
         })
         .select();
       
@@ -1068,6 +1159,30 @@ export default function SurveyBuilder() {
       setSectionsLoading(true);
       const nextOrder = sections.length;
       
+      // Build payload with translations for section name and description
+      const payload: any = {
+        baseLanguage: detectBaseLanguage(name, [description]),
+        name: { en: '' },
+        description: { en: '' },
+      };
+
+      const base = detectBaseLanguage(name, [description]);
+      payload.baseLanguage = base;
+      payload.name[base] = name.trim();
+      payload.description[base] = description.trim();
+
+      // Translate section name and description to other languages
+      const langs: SupportedLng[] = ['en', 'ru', 'fr', 'es'];
+      const targets = langs.filter((l) => l !== base);
+
+      for (const lng of targets) {
+        const translatedName = await translateMyMemory(name.trim(), base, lng);
+        const translatedDesc = description.trim() ? await translateMyMemory(description.trim(), base, lng) : '';
+        
+        payload.name[lng] = translatedName;
+        payload.description[lng] = translatedDesc;
+      }
+      
       const { data, error } = await supabase
         .from('survey_sections')
         .insert({
@@ -1075,6 +1190,7 @@ export default function SurveyBuilder() {
           name: name.trim(),
           description: description.trim(),
           order_index: nextOrder,
+          payload,
         })
         .select();
       
@@ -1118,15 +1234,39 @@ export default function SurveyBuilder() {
     try {
       setSectionsLoading(true);
       
+      // Build payload with translations for section name and description
+      const payload: any = {
+        baseLanguage: detectBaseLanguage(name, [description]),
+        name: { en: '' },
+        description: { en: '' },
+      };
+
+      const base = detectBaseLanguage(name, [description]);
+      payload.baseLanguage = base;
+      payload.name[base] = name;
+      payload.description[base] = description;
+
+      // Translate section name and description to other languages
+      const langs: SupportedLng[] = ['en', 'ru', 'fr', 'es'];
+      const targets = langs.filter((l) => l !== base);
+
+      for (const lng of targets) {
+        const translatedName = await translateMyMemory(name, base, lng);
+        const translatedDesc = description ? await translateMyMemory(description, base, lng) : '';
+        
+        payload.name[lng] = translatedName;
+        payload.description[lng] = translatedDesc;
+      }
+
       const { error } = await supabase
         .from('survey_sections')
-        .update({ name, description })
+        .update({ name, description, payload })
         .eq('id', sectionId);
       
       if (error) throw error;
       
       setSections(sections.map(s => 
-        s.id === sectionId ? { ...s, name, description } : s
+        s.id === sectionId ? { ...s, name, description, payload } : s
       ));
       setEditingSectionId(null);
       setToast({ message: 'Section updated successfully', type: 'success' });

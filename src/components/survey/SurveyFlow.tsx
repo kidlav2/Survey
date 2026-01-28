@@ -46,21 +46,60 @@ export default function SurveyFlow() {
     // For yes-no questions, always return empty options so translations are used
     let options: any[] = [];
     if (q?.type !== 'yes-no') {
-      // Always use the options from the questions table (q.options)
-      // Don't use payload options as they might be outdated
-      options = Array.isArray(q?.options) ? q.options : [];
+      // Use translated options from payload if available, otherwise fall back to q.options
+      const payloadOptions = p.options;
+      if (payloadOptions && typeof payloadOptions === 'object' && !Array.isArray(payloadOptions)) {
+        // payload.options is a map like { en: [...], ru: [...], ... }
+        // Check explicitly if array exists (not just ||) because empty arrays are falsy in JS
+        options = (Array.isArray(payloadOptions[lng]) && payloadOptions[lng].length > 0 ? payloadOptions[lng] : 
+                   Array.isArray(payloadOptions[base]) ? payloadOptions[base] : 
+                   Array.isArray(q?.options) ? q.options : []);
+      } else if (Array.isArray(payloadOptions)) {
+        // payload.options is a direct array (older format) - treat as base language options
+        options = payloadOptions;
+      } else if (Array.isArray(q?.options)) {
+        // Fall back to q.options (used for backward compatibility)
+        options = q.options;
+      }
+    } else {
+      // For yes-no questions, log why we're not loading options
+      console.log(`🔍 Skipping options for yes-no question ${q?.id} - type is yes-no, will use hardcoded Yes/No`);
     }
 
     // Add "Other" option if hasOtherOption is true
-    const otherText = tQuestions.other || 'Other (please specify)';
+    // Use a special marker object so we can identify it later in the UI
     const hasOtherOption = q?.hasOtherOption || q?.has_other_option || false;
-    if (hasOtherOption && !options.some(opt => opt?.toLowerCase?.().includes('other'))) {
-      options = [...options, otherText];
+    let hasOther = false;
+    if (hasOtherOption && !options.some(opt => opt && typeof opt === 'object' && opt.__isOtherOption)) {
+      const otherText = tQuestions.other || 'Other (please specify)';
+      options = [...options, { __text: otherText, __isOtherOption: true }];
+      hasOther = true;
     }
 
-    return { text, options };
+    return { text, options, hasOtherOption };
 
   }, [tQuestions]);
+
+  const getLocalizedSection = useCallback((section: any, lng: Lng) => {
+    const p = section?.payload || {};
+    const base = (p.baseLanguage || p.base_language || 'en') as Lng;
+
+    // Get section name
+    const nameMap = p.name || p.text;
+    const name =
+      (nameMap && typeof nameMap === 'object' ? (nameMap[lng] || nameMap[base]) : null) ||
+      (typeof section?.name === 'string' ? section.name : '') ||
+      '';
+
+    // Get section description
+    const descMap = p.description;
+    const description =
+      (descMap && typeof descMap === 'object' ? (descMap[lng] || descMap[base]) : null) ||
+      (typeof section?.description === 'string' ? section.description : '') ||
+      '';
+
+    return { name, description };
+  }, []);
 
   const makeUUID = () => {
     // Use browser crypto when available
@@ -72,23 +111,9 @@ export default function SurveyFlow() {
     return `${s4()}${s4()}-${s4()}-${s4()}-${s4()}-${s4()}${s4()}${s4()}`;
   };
 
-  useEffect(() => {
-    setStartedAt(Date.now());
-    if (id) {
-      localStorage.setItem(`survey_lng_${id}`, language);
-    }
-    loadSurveyQuestions();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
-
-  useEffect(() => {
-    if (id) {
-      localStorage.setItem(`survey_lng_${id}`, language);
-    }
-  }, [id, language]);
-
-  const loadSurveyQuestions = async () => {
+  const loadSurveyQuestions = useCallback(async () => {
     try {
+      console.log('📥 loadSurveyQuestions called');
       // First check survey status
       const { data: surveyData, error: surveyError } = await supabase
         .from('surveys')
@@ -110,6 +135,10 @@ export default function SurveyFlow() {
         .select('*')
         .eq('survey_id', id)
         .order('created_at', { ascending: true });
+      
+      // Add debug info for caching issues
+      const timestamp = new Date().toISOString();
+      console.log(`📨 Questions loaded at ${timestamp}, count: ${data?.length}`);
 
       if (error) throw error;
 
@@ -232,7 +261,22 @@ export default function SurveyFlow() {
         console.log(`Question ${q.id} (section: ${q.section_id || 'none'}, order: ${q.order}, type: ${q.type}) conditional_logic:`, q.conditional_logic);
       });
 
-      setQuestions(mapped);
+      console.log('Setting questions with new data - ABOUT TO UPDATE STATE');
+      
+      // Create fresh array to ensure React detects changes
+      const freshMapped = mapped.map(q => ({...q}));
+      
+      console.log('🔄 SETQUESTIONS - Old vs New:');
+      console.log('  Old questions[0].text:', questions[0]?.text?.substring(0, 40));
+      console.log('  New freshMapped[0].text:', freshMapped[0]?.text?.substring(0, 40));
+      
+      setQuestions(freshMapped);
+      
+      console.log('Questions state updated');
+      console.log('✅ Sample of fresh questions:');
+      freshMapped.slice(0, 3).forEach(q => {
+        console.log(`  Q ${q.id.slice(0, 8)}: text="${q.text?.substring(0, 40)}" | payload.text=${!!q.payload?.text}`);
+      });
       
       // Create response record in DB immediately when survey starts
       // Don't generate ID manually - let DB create UUID automatically
@@ -282,7 +326,77 @@ export default function SurveyFlow() {
       console.error('Error loading questions:', error);
       navigate(`/survey/${id}/closed`, { replace: true });
     }
-  };
+  }, [id, navigate, language]);
+
+  useEffect(() => {
+    setStartedAt(Date.now());
+    if (id) {
+      localStorage.setItem(`survey_lng_${id}`, language);
+    }
+    loadSurveyQuestions();
+  }, [id, language, loadSurveyQuestions]);
+
+  // Reload questions when page becomes visible (user returns to tab)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        // Page became visible - reload questions to get any updates
+        loadSurveyQuestions();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [loadSurveyQuestions]);
+
+  // Periodic refresh of questions to catch updates from admin panel
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      if (!document.hidden) {
+        // Only refresh if page is visible
+        console.log('⏰ Periodic refresh - checking for question updates...');
+        loadSurveyQuestions();
+      }
+    }, 30000); // Check for updates every 30 seconds (less frequent to avoid issues)
+
+    return () => clearInterval(intervalId);
+  }, [loadSurveyQuestions]);
+
+  // Subscribe to real-time updates of questions
+  useEffect(() => {
+    if (!id) return;
+
+    console.log('🔔 Setting up real-time subscription for questions...');
+    
+    // Subscribe to changes in questions table
+    const channel = supabase
+      .channel(`questions:${id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'questions',
+          filter: `survey_id=eq.${id}`,
+        },
+        (payload) => {
+          console.log('🔄 Real-time update received:', {
+            event: payload.eventType,
+            tableName: payload.schema,
+            newRecord: payload.new ? { id: payload.new.id, type: payload.new.type, text: payload.new.text?.substring(0, 30), options: payload.new.options } : null,
+            oldRecord: payload.old ? { id: payload.old.id, type: payload.old.type, text: payload.old.text?.substring(0, 30), options: payload.old.options } : null,
+          });
+          // Reload all questions when any question changes
+          loadSurveyQuestions();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log('🔌 Unsubscribing from real-time updates');
+      supabase.removeChannel(channel);
+    };
+  }, [id, loadSurveyQuestions]);
 
   // Save progress to DB
   const saveProgress = async (currentAnswers: Record<string, any>) => {
@@ -348,7 +462,15 @@ export default function SurveyFlow() {
   };
 
   const question = questions[currentQuestion];
-  const localized = question ? getLocalized(question, language) : { text: '', options: [] as string[] };
+  const localized = question ? getLocalized(question, language) : { text: '', options: [] as string[], hasOtherOption: false };
+  
+  console.log('🔍 Current question state:', {
+    currentQuestion,
+    questionId: question?.id,
+    questionText: question?.text,
+    localized: localized.text.substring(0, 50),
+    questionsArrayLength: questions.length
+  });
   
   // Count only non-branch-only questions across ALL sections for progress tracking
   // Memoize to prevent recalculation on language changes
@@ -612,14 +734,22 @@ export default function SurveyFlow() {
             <div className="mb-6 pb-4 border-b border-gray-200">
               {sections.find(s => s.id === question.section_id) && (
                 <>
-                  <h3 className="text-sm font-semibold text-indigo-600 uppercase tracking-wide">
-                    {sections.find(s => s.id === question.section_id)?.name}
-                  </h3>
-                  {sections.find(s => s.id === question.section_id)?.description && (
-                    <p className="text-sm text-gray-600 mt-2">
-                      {sections.find(s => s.id === question.section_id)?.description}
-                    </p>
-                  )}
+                  {(() => {
+                    const section = sections.find(s => s.id === question.section_id);
+                    const localized = getLocalizedSection(section, language);
+                    return (
+                      <>
+                        <h3 className="text-sm font-semibold text-indigo-600 uppercase tracking-wide">
+                          {localized.name}
+                        </h3>
+                        {localized.description && (
+                          <p className="text-sm text-gray-600 mt-2">
+                            {localized.description}
+                          </p>
+                        )}
+                      </>
+                    );
+                  })()}
                 </>
               )}
             </div>
@@ -631,20 +761,22 @@ export default function SurveyFlow() {
           {/* Choice Questions */}
           {(question.type === 'multiple-choice' || question.type === 'single-choice') && (
             <div className="space-y-3">
-              {localized.options?.map((option: string, optionIndex: number) => {
+              {localized.options?.map((option: any, optionIndex: number) => {
                 const isMulti = question.type === 'multiple-choice';
                 const current = answers[question.id];
-                const isSelected = isMulti
-                  ? (Array.isArray(current) ? current : []).includes(option)
-                  : current === option;
                 
-                // Check if this is the "Other" option (last option when hasOtherOption is true)
-                const isOtherOption = question.hasOtherOption && optionIndex === (localized.options?.length - 1);
+                // Handle both string and object options (object has __isOtherOption flag)
+                const optionText = typeof option === 'object' ? option.__text : option;
+                const isOtherOption = typeof option === 'object' && option.__isOtherOption;
+                
+                const isSelected = isMulti
+                  ? (Array.isArray(current) ? current : []).includes(optionText)
+                  : current === optionText;
 
                 return (
-                  <div key={option}>
+                  <div key={optionText}>
                     <button
-                      onClick={() => handleAnswer(option)}
+                      onClick={() => handleAnswer(optionText)}
                       className={`w-full text-left px-6 py-4 rounded-lg border-2 transition-all ${
                         isSelected
                           ? 'border-indigo-600 bg-indigo-50 text-indigo-900'
@@ -671,7 +803,7 @@ export default function SurveyFlow() {
                             {isSelected && <div className="w-3 h-3 rounded-full bg-indigo-600" />}
                           </div>
                         )}
-                        <span>{option}</span>
+                        <span>{optionText}</span>
                       </div>
                     </button>
                     
@@ -688,6 +820,7 @@ export default function SurveyFlow() {
                         placeholder={tQuestions.placeholder ?? 'Please specify...'}
                         className="w-full mt-3 px-4 py-3 border border-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         rows={3}
+                        autoFocus
                       />
                     )}
                   </div>
