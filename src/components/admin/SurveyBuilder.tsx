@@ -645,14 +645,27 @@ export default function SurveyBuilder() {
       if (q.id === questionId) {
         const updatedQ = { ...q, [key]: value };
         
-        // When changing to yes-no type, set options to Yes/No
-        if (key === 'type' && value === 'yes-no') {
-          updatedQ.options = [t.yes, t.no];
-        }
-        
-        // When changing to scale type, clear options
-        if (key === 'type' && value === 'scale') {
-          updatedQ.options = [];
+        // When changing type, handle options appropriately
+        if (key === 'type') {
+          console.log('Question type changed from', q.type, 'to', value);
+          
+          if (value === 'yes-no') {
+            // When changing to yes-no type, set options to Yes/No
+            updatedQ.options = [t.yes, t.no];
+          } else if (value === 'scale') {
+            // When changing to scale type, clear options
+            updatedQ.options = [];
+          } else if (value === 'text') {
+            // When changing to text type, clear options
+            updatedQ.options = [];
+          } else {
+            // For single-choice and multiple-choice, keep existing options or set defaults
+            if (!updatedQ.options || updatedQ.options.length === 0) {
+              updatedQ.options = ['Option 1', 'Option 2'];
+            }
+          }
+          
+          console.log('Updated options:', updatedQ.options);
         }
         
         return updatedQ;
@@ -685,11 +698,12 @@ export default function SurveyBuilder() {
     // If text or options haven't changed, reuse old payload
     if (originalQuestion) {
       const textChanged = question.text !== originalQuestion.text;
+      const typeChanged = question.type !== originalQuestion.type;
       const optionsChanged = JSON.stringify(question.options) !== JSON.stringify(originalQuestion.options);
       const scaleMinChanged = question.scaleMin !== originalQuestion.scaleMin;
       const scaleMaxChanged = question.scaleMax !== originalQuestion.scaleMax;
       
-      if (!textChanged && !optionsChanged && !scaleMinChanged && !scaleMaxChanged && originalQuestion.payload) {
+      if (!textChanged && !typeChanged && !optionsChanged && !scaleMinChanged && !scaleMaxChanged && originalQuestion.payload) {
         console.log('Reusing cached payload for question:', question.id);
         return originalQuestion.payload;
       }
@@ -791,20 +805,50 @@ export default function SurveyBuilder() {
             has_other_option: question.hasOtherOption,
             sort_order: question.order,
             section_id: question.section_id || null,
-            payload: payload,
+            // Don't send payload on UPDATE - it causes issues with type changes
+            // payload: payload,
             conditional_logic: (question.conditional_logic && question.conditional_logic.length > 0) ? JSON.stringify(question.conditional_logic) : null,
           };
           
-          console.log('Updating existing question:', { questionId: question.id, type: question.type, text: question.text.substring(0, 30), updateRow });          console.log('Saving existing question with conditional_logic:', updateRow.conditional_logic, 'for question:', question.id);
+          console.log('🔄 UPDATING EXISTING QUESTION:', { 
+            questionId: question.id,
+            type: question.type,
+            options: question.options,
+            text: question.text.substring(0, 50)
+          });
+          console.log('  - Full updateRow:', updateRow);
+          console.log('  - Type being sent:', updateRow.type);
+          console.log('  - Options being sent:', updateRow.options);
+          console.log('  - All fields:', JSON.stringify(updateRow));
 
           let error: any = null;
 
           // Try with payload and conditional_logic first
           {
-            const res = await supabase.from('questions').update(updateRow).eq('id', question.id);
+            const res = await supabase.from('questions').update(updateRow).eq('id', question.id).select();
             error = res.error;
+            
+            console.log('📊 Update response:', {
+              questionId: question.id,
+              rowCount: res.data?.length,
+              status: res.status,
+              statusText: res.statusText,
+              hasError: !!error,
+              errorCode: error?.code,
+              errorMessage: error?.message
+            });
+            
+            // Log what was actually returned from DB
+            if (res.data && res.data.length > 0) {
+              console.log('📦 Data returned from DB after update:', {
+                type: res.data[0].type,
+                text: res.data[0].text,
+                options: res.data[0].options
+              });
+            }
+            
             if (error) {
-              console.error('Update error (with conditional_logic):', {
+              console.error('❌ Update error (with conditional_logic):', {
                 message: error.message,
                 code: error.code,
                 details: error.details,
@@ -812,13 +856,24 @@ export default function SurveyBuilder() {
                 questionId: question.id,
                 updateRow: updateRow
               });
+            } else if (!res.data || res.data.length === 0) {
+              console.warn('⚠️ Update returned no rows - RLS policy may have blocked it:', {
+                questionId: question.id,
+                type: question.type
+              });
+            } else {
+              console.log('✅ Question updated successfully:', { 
+                questionId: question.id, 
+                type: question.type,
+                rowsAffected: res.data.length 
+              });
             }
           }
 
           // If payload column doesn't exist, retry without it
           if (error?.code === 'PGRST204' && String(error?.message || '').toLowerCase().includes('payload')) {
             delete updateRow.payload;
-            const res2 = await supabase.from('questions').update(updateRow).eq('id', question.id);
+            const res2 = await supabase.from('questions').update(updateRow).eq('id', question.id).select();
             error = res2.error;
           }
 
@@ -826,7 +881,7 @@ export default function SurveyBuilder() {
           if (error?.code === 'PGRST204' && String(error?.message || '').toLowerCase().includes('conditional_logic')) {
             console.warn('conditional_logic column not found, retrying without it');
             delete updateRow.conditional_logic;
-            const res3 = await supabase.from('questions').update(updateRow).eq('id', question.id);
+            const res3 = await supabase.from('questions').update(updateRow).eq('id', question.id).select();
             error = res3.error;
           }
 

@@ -46,15 +46,9 @@ export default function SurveyFlow() {
     // For yes-no questions, always return empty options so translations are used
     let options: any[] = [];
     if (q?.type !== 'yes-no') {
-      const optMap = p.options;
-      options =
-        (optMap && typeof optMap === 'object' && !Array.isArray(optMap)
-          ? (optMap[lng] || optMap[base] || [])
-          : Array.isArray(optMap)
-            ? optMap
-            : Array.isArray(q?.options)
-              ? q.options
-              : []);
+      // Always use the options from the questions table (q.options)
+      // Don't use payload options as they might be outdated
+      options = Array.isArray(q?.options) ? q.options : [];
     }
 
     // Add "Other" option if hasOtherOption is true
@@ -139,8 +133,9 @@ export default function SurveyFlow() {
         const payload = row.payload || {};
         const options = Array.isArray(row.options) ? row.options : [];
 
-        // If payload doesn't have type, reconstruct it from row
-        const questionType = payload.type ?? row.type ?? 'single-choice';
+        // Use row.type as primary source (it's what we just updated in the DB)
+        // Only fall back to payload.type if row.type doesn't exist (legacy data)
+        const questionType = row.type ?? payload.type ?? 'single-choice';
 
         console.log(`Question ${idx}:`, {
           id: row.id,
