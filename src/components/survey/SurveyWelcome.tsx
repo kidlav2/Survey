@@ -67,17 +67,23 @@ export default function SurveyWelcome() {
       <div className="max-w-2xl w-full">
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-8 md:p-12">
           {/* Header */}
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-50 rounded-full mb-4">
-              <FileText className="w-8 h-8 text-indigo-600" />
+          <div className="mb-8">
+            <div className="flex justify-center mb-4">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-50 rounded-full">
+                <FileText className="w-8 h-8 text-indigo-600" />
+              </div>
             </div>
-            <h1 className="text-3xl font-semibold text-gray-900 mb-3">
+            <h1 className="text-3xl font-semibold text-gray-900 mb-3 text-center">
               {survey?.title || t.title}
             </h1>
             {showInfo && (
-              <p className="text-gray-600 leading-relaxed">
-                {survey?.description || t.description}
-              </p>
+              <div className="text-gray-600 leading-relaxed text-left space-y-4">
+                {(survey?.description || t.description).split('\n').map((paragraph: string, index: number) => (
+                  paragraph.trim() ? (
+                    <p key={index}>{paragraph}</p>
+                  ) : null
+                ))}
+              </div>
             )}
           </div>
 

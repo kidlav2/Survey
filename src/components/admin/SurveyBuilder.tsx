@@ -905,7 +905,7 @@ export default function SurveyBuilder() {
       
       // Only include description if it's not empty
       if (surveyDescription.trim()) {
-        updateData.description = surveyDescription.trim();
+        updateData.description = surveyDescription;
       }
       
       // Always include estimated_time
@@ -1206,10 +1206,10 @@ export default function SurveyBuilder() {
               <textarea
                 value={surveyDescription}
                 onChange={(e) => setSurveyDescription(e.target.value)}
-                rows={3}
+                rows={6}
                 disabled={surveyInfoLoading}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg 
-                         focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none disabled:bg-gray-50 disabled:text-gray-500"
+                         focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-vertical disabled:bg-gray-50 disabled:text-gray-500"
                 placeholder="Survey description shown to respondents at the start..."
               />
             </div>
