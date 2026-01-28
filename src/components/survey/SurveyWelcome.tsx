@@ -51,6 +51,24 @@ export default function SurveyWelcome() {
 
   const t = translations[language]?.welcome || translations.en.welcome;
 
+  // Get description in the current language
+  const getDescriptionForLanguage = () => {
+    if (!survey?.description) return t.description;
+    
+    try {
+      const parsed = JSON.parse(survey.description);
+      if (typeof parsed === 'object' && parsed !== null) {
+        // Return translation for current language, or fallback to English
+        return parsed[language] || parsed['en'] || t.description;
+      }
+    } catch {
+      // Not JSON, return as is
+      return survey.description;
+    }
+    
+    return t.description;
+  };
+
   const handleStart = () => {
     navigate(`/survey/${id}/questions?lng=${encodeURIComponent(language)}`, {
       state: { lng: language, language },
@@ -78,7 +96,7 @@ export default function SurveyWelcome() {
             </h1>
             {showInfo && (
               <div className="text-gray-600 leading-relaxed text-left space-y-4">
-                {(survey?.description || t.description).split('\n').map((paragraph: string, index: number) => (
+                {getDescriptionForLanguage().split('\n').map((paragraph: string, index: number) => (
                   paragraph.trim() ? (
                     <p key={index}>{paragraph}</p>
                   ) : null

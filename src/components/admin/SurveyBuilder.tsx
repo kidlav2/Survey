@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, Plus, Trash2, GripVertical, ChevronDown, ChevronUp, FileText, Copy } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import Toast from '../common/Toast';
 import SkeletonQuestion from '../common/SkeletonQuestion';
+import { AdminLanguageContext } from './AdminLayout';
+import { adminTranslations } from './adminTranslations';
 
 
 interface Question {
@@ -313,17 +315,24 @@ const translations = {
 export default function SurveyBuilder() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { language } = useContext(AdminLanguageContext);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [expandedQuestion, setExpandedQuestion] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved' | 'idle'>('idle');
   const [loading, setLoading] = useState(true);
-  const [language, setLanguage] = useState<'en' | 'ru' | 'fr' | 'es'>('en');
+  const [descriptionLanguage, setDescriptionLanguage] = useState<'en' | 'ru' | 'fr' | 'es'>('en');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [surveyIsActive, setSurveyIsActive] = useState<boolean>(true);
   const [loadingSurveyStatus, setLoadingSurveyStatus] = useState(false);
   const [surveyTitle, setSurveyTitle] = useState('');
   const [surveyDescription, setSurveyDescription] = useState('');
+  const [surveyDescriptions, setSurveyDescriptions] = useState<Record<'en' | 'ru' | 'fr' | 'es', string>>({
+    en: '',
+    ru: '',
+    fr: '',
+    es: '',
+  });
   const [estimatedTime, setEstimatedTime] = useState('4');
   const [thankYouMessage, setThankYouMessage] = useState('');
   const [showSurveyInfo, setShowSurveyInfo] = useState(true);
@@ -345,6 +354,7 @@ export default function SurveyBuilder() {
   const [originalQuestionIds, setOriginalQuestionIds] = useState<Set<string>>(new Set());
 
   const t = translations[language];
+  const adminT = adminTranslations[language];
 
   useEffect(() => {
     loadQuestions();
@@ -385,6 +395,30 @@ export default function SurveyBuilder() {
         if (surveyData) {
           setSurveyIsActive(surveyData.status === 'active');
           setSurveyTitle(surveyData.title || '');
+          
+          // Parse description - it could be JSON or plain text
+          let parsedDescriptions: Record<'en' | 'ru' | 'fr' | 'es', string> = {
+            en: '',
+            ru: '',
+            fr: '',
+            es: '',
+          };
+          
+          if (surveyData.description) {
+            try {
+              const parsed = JSON.parse(surveyData.description);
+              if (typeof parsed === 'object' && parsed !== null) {
+                parsedDescriptions = { ...parsedDescriptions, ...parsed };
+              } else {
+                parsedDescriptions.en = surveyData.description;
+              }
+            } catch {
+              // If not JSON, treat as plain English text
+              parsedDescriptions.en = surveyData.description;
+            }
+          }
+          
+          setSurveyDescriptions(parsedDescriptions);
           setSurveyDescription(surveyData.description || '');
           setEstimatedTime(surveyData.estimated_time?.toString() || '4');
           setThankYouMessage(surveyData.thank_you_message || '');
@@ -903,9 +937,10 @@ export default function SurveyBuilder() {
       
       const updateData: any = {};
       
-      // Only include description if it's not empty
-      if (surveyDescription.trim()) {
-        updateData.description = surveyDescription;
+      // Check if any description is not empty, then save as JSON
+      const hasAnyDescription = Object.values(surveyDescriptions).some(desc => desc.trim());
+      if (hasAnyDescription) {
+        updateData.description = JSON.stringify(surveyDescriptions);
       }
       
       // Always include estimated_time
@@ -1182,7 +1217,7 @@ export default function SurveyBuilder() {
             onClick={() => setSurveyInfoExpanded(!surveyInfoExpanded)}
             className="w-full flex items-center justify-between p-6 hover:bg-indigo-100 transition-colors cursor-pointer"
           >
-            <h3 className="text-lg font-semibold text-gray-900">Survey Information</h3>
+            <h3 className="text-lg font-semibold text-gray-900">{adminT.surveyInformation}</h3>
             <ChevronDown 
               className={`w-5 h-5 text-gray-600 transition-transform ${surveyInfoExpanded ? 'rotate-180' : ''}`}
             />
@@ -1203,14 +1238,32 @@ export default function SurveyBuilder() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Description
               </label>
+              
+              {/* Language Tabs */}
+              <div className="flex gap-2 mb-3 border-b border-gray-300">
+                {(['en', 'ru', 'fr', 'es'] as const).map((lang) => (
+                  <button
+                    key={lang}
+                    onClick={() => setDescriptionLanguage(lang)}
+                    className={`px-4 py-2 font-medium transition-colors border-b-2 ${
+                      descriptionLanguage === lang
+                        ? 'border-indigo-600 text-indigo-600'
+                        : 'border-transparent text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    {lang.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+              
               <textarea
-                value={surveyDescription}
-                onChange={(e) => setSurveyDescription(e.target.value)}
+                value={surveyDescriptions[descriptionLanguage]}
+                onChange={(e) => setSurveyDescriptions({ ...surveyDescriptions, [descriptionLanguage]: e.target.value })}
                 rows={6}
                 disabled={surveyInfoLoading}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg 
                          focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-vertical disabled:bg-gray-50 disabled:text-gray-500"
-                placeholder="Survey description shown to respondents at the start..."
+                placeholder={`Survey description in ${descriptionLanguage.toUpperCase()} shown to respondents at the start...`}
               />
             </div>
             
@@ -1478,7 +1531,7 @@ export default function SurveyBuilder() {
                                       onChange={(e) => updateQuestion(question.id, 'section_id', e.target.value || undefined)}
                                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                     >
-                                      <option value="">No Section</option>
+                                      <option value="">{adminT.noSection}</option>
                                       {sections.map((sec) => (
                                         <option key={sec.id} value={sec.id}>
                                           {sec.name}
@@ -1871,7 +1924,7 @@ export default function SurveyBuilder() {
             className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium"
           >
             <Plus className="w-5 h-5" />
-            {t.addQuestion} (No Section)
+            {t.addQuestion} ({adminT.noSection})
           </button>
         </div>
 
@@ -1941,7 +1994,7 @@ export default function SurveyBuilder() {
                           onChange={(e) => updateQuestion(question.id, 'section_id', e.target.value || undefined)}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         >
-                          <option value="">No Section</option>
+                          <option value="">{adminT.noSection}</option>
                           {sections.map((section) => (
                             <option key={section.id} value={section.id}>
                               {section.name}

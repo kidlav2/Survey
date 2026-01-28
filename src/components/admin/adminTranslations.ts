@@ -177,6 +177,7 @@ export const adminTranslations = {
     addSection: 'Add Section',
     deleteSection: 'Delete Section',
     selectSection: 'Select Section',
+    noSection: 'No Section',
   },
   ru: {
     // Navigation & Layout
@@ -356,6 +357,7 @@ export const adminTranslations = {
     addSection: 'Добавить раздел',
     deleteSection: 'Удалить раздел',
     selectSection: 'Выберите раздел',
+    noSection: 'Без раздела',
   },
   fr: {
     // Navigation & Layout
@@ -534,6 +536,7 @@ export const adminTranslations = {
     addSection: 'Ajouter une section',
     deleteSection: 'Supprimer la section',
     selectSection: 'Sélectionner une section',
+    noSection: 'Pas de section',
   },
   es: {
     // Navigation & Layout
@@ -713,5 +716,6 @@ export const adminTranslations = {
     addSection: 'Añadir sección',
     deleteSection: 'Eliminar sección',
     selectSection: 'Seleccionar sección',
+    noSection: 'Sin sección',
   },
 };
