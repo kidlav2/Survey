@@ -367,14 +367,6 @@ export default function SurveyBuilder() {
     }
   }, [expandedQuestion, questions.map(q => q.hasOtherOption).join()]);
 
-  // Scroll to new question
-  useEffect(() => {
-    if (expandedQuestion && newQuestionRef.current) {
-      setTimeout(() => {
-        newQuestionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 100);
-    }
-  }, [expandedQuestion]);
 
   const loadQuestions = async () => {
     try {
@@ -1440,8 +1432,29 @@ export default function SurveyBuilder() {
             {/* Sections with their Questions */}
             {sections.length > 0 && (
               <div className="space-y-4">
-                {sections.map((section, sectionIndex) => (
-                  <div key={section.id} className="p-4 bg-white rounded-lg border border-purple-100">
+                {sections.map((section, sectionIndex) => {
+                  // Different background colors for each section
+                  const bgColors = [
+                    'bg-blue-50',
+                    'bg-green-50',
+                    'bg-yellow-50',
+                    'bg-pink-50',
+                    'bg-purple-50',
+                    'bg-indigo-50',
+                  ];
+                  const borderColors = [
+                    'border-blue-200',
+                    'border-green-200',
+                    'border-yellow-200',
+                    'border-pink-200',
+                    'border-purple-200',
+                    'border-indigo-200',
+                  ];
+                  const bgColor = bgColors[sectionIndex % bgColors.length];
+                  const borderColor = borderColors[sectionIndex % borderColors.length];
+                  
+                  return (
+                  <div key={section.id} className={`p-4 rounded-lg border ${bgColor} ${borderColor}`}>
                     <div className="flex items-start justify-between gap-3 mb-4 pb-3 border-b border-purple-100">
                       <div className="flex-1">
                         {editingSectionId === section.id ? (
@@ -1558,7 +1571,10 @@ export default function SurveyBuilder() {
                                 className={`w-5 h-5 text-gray-400 transition-transform flex-shrink-0 ${expandedQuestion === question.id ? 'rotate-180' : ''}`}
                               />
                               <div className="flex-1">
-                                <p className="font-medium text-gray-900">{question.text || 'Untitled question'}</p>
+                                <p className="font-medium text-gray-900">
+                                  <span className="text-gray-500 font-normal">Q{actualIndex + 1}. </span>
+                                  {question.text || 'Untitled question'}
+                                </p>
                               </div>
                               <div className="flex items-center gap-2">
                                 <Copy 
@@ -1957,7 +1973,8 @@ export default function SurveyBuilder() {
                       </div>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
             

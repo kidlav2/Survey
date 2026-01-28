@@ -36,7 +36,7 @@ export default function Sidebar({ isOpen, onClose, onOpen, isDesktopVisible = tr
       {/* Desktop Sidebar */}
       {isDesktopVisible && (
         <aside className="hidden lg:flex w-64 bg-white border-r border-gray-200 min-h-screen flex-shrink-0 flex-col">
-          <div className="p-6 flex items-center justify-between">
+          <div className="p-6 flex items-center justify-between flex-shrink-0">
             <div>
               <h1 className="text-xl font-semibold text-gray-900">{t.surveyResearch}</h1>
               <p className="text-sm text-gray-500 mt-1">{t.adminPortal}</p>
@@ -50,7 +50,7 @@ export default function Sidebar({ isOpen, onClose, onOpen, isDesktopVisible = tr
             </button>
           </div>
         
-        <nav className="px-3 space-y-1 flex-1">
+        <nav className="px-3 space-y-1 min-h-0 overflow-y-auto">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;
@@ -73,7 +73,7 @@ export default function Sidebar({ isOpen, onClose, onOpen, isDesktopVisible = tr
         </nav>
 
         {/* Language Selector */}
-        <div className="px-3 py-4 border-t border-gray-200">
+        <div className="px-3 py-4 border-t border-gray-200 flex-shrink-0">
           <div className="flex gap-1">
             {(['en', 'ru', 'fr', 'es'] as const).map((lang) => (
               <button
@@ -108,11 +108,11 @@ export default function Sidebar({ isOpen, onClose, onOpen, isDesktopVisible = tr
 
       {/* Mobile Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 w-64 bg-white border-r border-gray-200 z-30 transform transition-transform duration-300 ease-in-out lg:hidden ${
+        className={`fixed top-0 left-0 w-64 bg-white border-r border-gray-200 z-30 transform transition-transform duration-300 ease-in-out lg:hidden flex flex-col max-h-screen ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="p-6 flex items-center justify-between">
+        <div className="p-6 flex items-center justify-between flex-shrink-0">
           <div>
             <h1 className="text-xl font-semibold text-gray-900">{t.surveyResearch}</h1>
             <p className="text-sm text-gray-500 mt-1">{t.adminPortal}</p>
@@ -125,7 +125,7 @@ export default function Sidebar({ isOpen, onClose, onOpen, isDesktopVisible = tr
           </button>
         </div>
         
-        <nav className="px-3 space-y-1">
+        <nav className="px-3 space-y-1 min-h-0 overflow-y-auto">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;
@@ -148,7 +148,7 @@ export default function Sidebar({ isOpen, onClose, onOpen, isDesktopVisible = tr
         </nav>
 
         {/* Language Selector */}
-        <div className="p-3 border-t border-gray-200">
+        <div className="p-3 border-t border-gray-200 flex-shrink-0">
           <div className="flex gap-1">
             {(['en', 'ru', 'fr', 'es'] as const).map((lang) => (
               <button
