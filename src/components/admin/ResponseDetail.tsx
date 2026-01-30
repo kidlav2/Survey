@@ -256,38 +256,107 @@ export default function ResponseDetail() {
           <div className="p-4 md:p-6">
             {response.answers && Object.keys(response.answers).length > 0 ? (
               <div className="space-y-6">
-                {Object.entries(response.answers).map(([key, answer], index) => {
-                  const question = questions[key];
-                  const questionText = question?.text || key;
-                  
-                  return (
-                    <div key={key} className="pb-6 border-b border-gray-200 last:border-b-0 last:pb-0">
-                      <div className="mb-3">
-                        <div className="flex items-start gap-3">
-                          <span className="flex-shrink-0 w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-xs font-semibold flex items-center justify-center">
-                            {index + 1}
-                          </span>
-                          <div className="flex-1">
-                            <p className="text-sm md:text-base font-medium text-gray-900">
-                              {questionText}
-                            </p>
+                {(() => {
+                  // Track which answers we've displayed
+                  const displayedKeys = new Set<string>();
+                  const entries: React.ReactNode[] = [];
+                  let questionIndex = 1;
+
+                  // First pass: display all non-_other answers with their associated _other responses
+                  Object.entries(response.answers).forEach(([key, answer]) => {
+                    if (!key.endsWith('_other') && answer !== undefined && answer !== null) {
+                      const question = questions[key];
+                      const questionText = question?.text || key;
+                      
+                      // Check if there's an "_other" response for this question
+                      const otherAnswerKey = `${key}_other`;
+                      const otherAnswer = response.answers?.[otherAnswerKey];
+                      const hasOtherAnswer = otherAnswer && typeof otherAnswer === 'string' && otherAnswer.trim().length > 0;
+                      
+                      entries.push(
+                        <div key={key} className="pb-6 border-b border-gray-200 last:border-b-0 last:pb-0">
+                          <div className="mb-3">
+                            <div className="flex items-start gap-3">
+                              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-xs font-semibold flex items-center justify-center">
+                                {questionIndex}
+                              </span>
+                              <div className="flex-1">
+                                <p className="text-sm md:text-base font-medium text-gray-900">
+                                  {questionText}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="ml-9 space-y-3">
+                            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                              <p className="text-sm md:text-base text-gray-900">
+                                {Array.isArray(answer)
+                                  ? answer.join(', ')
+                                  : typeof answer === 'string'
+                                  ? answer
+                                  : JSON.stringify(answer)}
+                              </p>
+                            </div>
+                            {hasOtherAnswer && (
+                              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                <p className="text-xs md:text-sm font-semibold text-blue-700 mb-2">Other (please specify):</p>
+                                <p className="text-sm md:text-base text-gray-900 whitespace-pre-wrap">
+                                  {otherAnswer}
+                                </p>
+                              </div>
+                            )}
                           </div>
                         </div>
-                      </div>
-                      <div className="ml-9">
-                        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                          <p className="text-sm md:text-base text-gray-900">
-                            {Array.isArray(answer)
-                              ? answer.join(', ')
-                              : typeof answer === 'string'
-                              ? answer
-                              : JSON.stringify(answer)}
-                          </p>
+                      );
+                      
+                      displayedKeys.add(key);
+                      if (hasOtherAnswer) {
+                        displayedKeys.add(otherAnswerKey);
+                      }
+                      questionIndex++;
+                    }
+                  });
+
+                  // Second pass: display any orphaned _other answers (those without a main answer)
+                  Object.entries(response.answers).forEach(([key, answer]) => {
+                    if (key.endsWith('_other') && !displayedKeys.has(key) && answer && typeof answer === 'string' && answer.trim().length > 0) {
+                      // Extract the question ID (remove _other suffix)
+                      const questionId = key.slice(0, -6); // Remove "_other"
+                      const question = questions[questionId];
+                      const questionText = question?.text || questionId;
+                      
+                      entries.push(
+                        <div key={key} className="pb-6 border-b border-gray-200 last:border-b-0 last:pb-0">
+                          <div className="mb-3">
+                            <div className="flex items-start gap-3">
+                              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-xs font-semibold flex items-center justify-center">
+                                {questionIndex}
+                              </span>
+                              <div className="flex-1">
+                                <p className="text-sm md:text-base font-medium text-gray-900">
+                                  {questionText}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="ml-9">
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                              <p className="text-xs md:text-sm font-semibold text-blue-700 mb-2">Other (please specify):</p>
+                              <p className="text-sm md:text-base text-gray-900 whitespace-pre-wrap">
+                                {answer}
+                              </p>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                      );
+                      
+                      displayedKeys.add(key);
+                      questionIndex++;
+                    }
+                  });
+
+                  return entries;
+                })()}
               </div>
             ) : (
               <p className="text-gray-500">No answers recorded</p>

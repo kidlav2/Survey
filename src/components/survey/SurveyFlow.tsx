@@ -278,47 +278,60 @@ export default function SurveyFlow() {
         console.log(`  Q ${q.id.slice(0, 8)}: text="${q.text?.substring(0, 40)}" | payload.text=${!!q.payload?.text}`);
       });
       
-      // Create response record in DB immediately when survey starts
-      // Don't generate ID manually - let DB create UUID automatically
-      let insertError: any = null;
-      let createdResponseId: string | null = null;
+      // Check if we already have a responseId for this survey session
+      // This prevents creating duplicate responses when user changes language mid-survey
+      const existingResponseId = id ? localStorage.getItem(`survey_response_${id}`) : null;
       
-      // Try with status column first
-      const { error: statusError, data: statusData } = await supabase
-        .from('responses')
-        .insert({
-          survey_id: id,
-          answers: {},
-          duration_seconds: 0,
-          language: language,
-          status: 'in_progress',
-        })
-        .select('id');
-
-      if (statusError) {
-        console.warn('Status column not available, trying without it:', statusError);
-        // If status column doesn't exist, retry without it
-        const { error: fallbackError, data: fallbackData } = await supabase
+      if (existingResponseId) {
+        console.log('Found existing response session:', existingResponseId);
+        setResponseId(existingResponseId);
+      } else {
+        // Create response record in DB immediately when survey starts
+        // Don't generate ID manually - let DB create UUID automatically
+        let insertError: any = null;
+        let createdResponseId: string | null = null;
+        
+        // Try with status column first
+        const { error: statusError, data: statusData } = await supabase
           .from('responses')
           .insert({
             survey_id: id,
             answers: {},
             duration_seconds: 0,
             language: language,
+            status: 'in_progress',
           })
           .select('id');
-        insertError = fallbackError;
-        createdResponseId = fallbackData?.[0]?.id || null;
-      } else {
-        createdResponseId = statusData?.[0]?.id || null;
-      }
 
-      if (insertError) {
-        console.error('Error creating response record:', insertError);
-        console.error('Error details:', insertError?.message, insertError?.details, insertError?.code);
-      } else {
-        console.log('Response record created:', createdResponseId);
-        setResponseId(createdResponseId);
+        if (statusError) {
+          console.warn('Status column not available, trying without it:', statusError);
+          // If status column doesn't exist, retry without it
+          const { error: fallbackError, data: fallbackData } = await supabase
+            .from('responses')
+            .insert({
+              survey_id: id,
+              answers: {},
+              duration_seconds: 0,
+              language: language,
+            })
+            .select('id');
+          insertError = fallbackError;
+          createdResponseId = fallbackData?.[0]?.id || null;
+        } else {
+          createdResponseId = statusData?.[0]?.id || null;
+        }
+
+        if (insertError) {
+          console.error('Error creating response record:', insertError);
+          console.error('Error details:', insertError?.message, insertError?.details, insertError?.code);
+        } else {
+          console.log('Response record created:', createdResponseId);
+          setResponseId(createdResponseId);
+          // Save responseId to localStorage to avoid creating duplicate responses when language changes
+          if (id && createdResponseId) {
+            localStorage.setItem(`survey_response_${id}`, createdResponseId);
+          }
+        }
       }
 
       setLoading(false);
@@ -623,6 +636,10 @@ export default function SurveyFlow() {
             }
 
             const newResponseId = responseId || makeUUID();
+            // Clean up the response ID from localStorage after survey is completed
+            if (id) {
+              localStorage.removeItem(`survey_response_${id}`);
+            }
             navigate(`/survey/${id}/opt-in?lng=${encodeURIComponent(language)}&rid=${encodeURIComponent(newResponseId)}`, {
               state: { lng: language, language, responseId: newResponseId },
             });
@@ -677,6 +694,11 @@ export default function SurveyFlow() {
           console.error('Error updating response:', updateError);
         } else {
           console.log('Survey completed and response saved successfully');
+        }
+
+        // Clean up the response ID from localStorage after survey is completed
+        if (id) {
+          localStorage.removeItem(`survey_response_${id}`);
         }
 
         navigate(`/survey/${id}/opt-in?lng=${encodeURIComponent(language)}&rid=${encodeURIComponent(responseId)}`, {

@@ -32,6 +32,14 @@ const MYMEMORY_EMAIL = ''; // optional: put your email here to increase daily qu
 
 type SupportedLng = 'en' | 'ru' | 'fr' | 'es';
 
+// Translation error class to distinguish API limits from other errors
+class TranslationLimitError extends Error {
+  constructor(message: string, public retryAfter?: number) {
+    super(message);
+    this.name = 'TranslationLimitError';
+  }
+}
+
 async function translateMyMemory(text: string, from: SupportedLng, to: SupportedLng) {
   // Ensure text is a string (handle cases where it might be object or null)
   const safeText = typeof text === 'string' ? text : String(text ?? '');
@@ -45,9 +53,28 @@ async function translateMyMemory(text: string, from: SupportedLng, to: Supported
   });
   if (MYMEMORY_EMAIL) params.set('de', MYMEMORY_EMAIL);
 
-  const res = await fetch(`${baseUrl}?${params.toString()}`);
-  const data = await res.json();
-  return data?.responseData?.translatedText ?? trimmed;
+  try {
+    const res = await fetch(`${baseUrl}?${params.toString()}`);
+    const data = await res.json();
+    
+    // Check for rate limit error from MyMemory
+    if (data?.responseStatus === 429 || data?.error?.code === 'QUOTUM_REACHED' || data?.error?.message?.includes('Quotum exceeded')) {
+      throw new TranslationLimitError(
+        'Translation service has reached its daily limit. Please try again tomorrow.',
+        86400
+      );
+    }
+    
+    // Return translated text or fallback to original
+    return data?.responseData?.translatedText ?? trimmed;
+  } catch (error) {
+    // Re-throw TranslationLimitError as-is, otherwise return original text
+    if (error instanceof TranslationLimitError) {
+      throw error;
+    }
+    console.warn('Translation error (falling back to original):', error);
+    return trimmed;
+  }
 }
 
 async function translateArrayMyMemory(items: string[], from: SupportedLng, to: SupportedLng) {
@@ -351,6 +378,7 @@ export default function SurveyBuilder() {
   const [newSectionDesc, setNewSectionDesc] = useState('');
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
   const [sectionsLoading, setSectionsLoading] = useState(false);
+  const [retryTranslationStatus, setRetryTranslationStatus] = useState<'idle' | 'retrying' | 'success'>('idle');
   const otherInputRef = useRef<HTMLInputElement | null>(null);
   const newQuestionRef = useRef<HTMLDivElement | null>(null);
   const [otherValues, setOtherValues] = useState<Record<string, string>>({});
@@ -1000,10 +1028,99 @@ export default function SurveyBuilder() {
         console.log('Starting background translation updates');
         // Background updates will happen without blocking UI
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving questions:', error);
-      setToast({ message: t.failed_toast, type: 'error' });
+      
+      // Check if this is a translation rate limit error
+      if (error instanceof TranslationLimitError || error?.name === 'TranslationLimitError') {
+        setToast({ 
+          message: '⚠️ ' + (error.message || 'Translation service limit reached. Please try again tomorrow.'), 
+          type: 'error' 
+        });
+      } else if (error?.message?.includes('Quotum exceeded') || error?.message?.includes('limit') || error?.message?.includes('exceeded')) {
+        setToast({ 
+          message: '⚠️ Translation service limit reached. Please try again tomorrow.', 
+          type: 'error' 
+        });
+      } else {
+        setToast({ message: t.failed_toast, type: 'error' });
+      }
       setSaveStatus('unsaved');
+    }
+  };
+
+  // Retry translation for all questions (to fix incomplete translations from when limits were hit)
+  const handleRetryTranslation = async () => {
+    setRetryTranslationStatus('retrying');
+    
+    try {
+      console.log('Starting translation retry for all questions...');
+      
+      // For each question, regenerate and update translations
+      const updatePromises = questions.map(async (question) => {
+        try {
+          // Get base language from payload or detect it
+          const baseLanguage = (question as any).payload?.baseLanguage || detectBaseLanguage(question.text, question.options || []);
+          
+          const payload = await buildQuestionPayloadWithTranslations({
+            baseLanguage: baseLanguage as SupportedLng,
+            text: question.text,
+            options: question.options || [],
+            type: question.type,
+            required: question.required,
+            hasOtherOption: question.hasOtherOption,
+            scaleMin: question.scaleMin,
+            scaleMax: question.scaleMax,
+          });
+
+          // Update the question with the new payload
+          const { error } = await supabase
+            .from('questions')
+            .update({ payload })
+            .eq('id', question.id);
+
+          if (error) {
+            console.error(`Error updating translations for question ${question.id}:`, error);
+            throw error;
+          }
+          
+          console.log(`✓ Updated translations for question ${question.id}`);
+        } catch (error: any) {
+          console.error(`Failed to retry translation for question ${question.id}:`, error);
+          // Don't throw - continue with other questions
+          if (error instanceof TranslationLimitError) {
+            throw error; // Re-throw limit errors to stop the process
+          }
+        }
+      });
+
+      await Promise.all(updatePromises);
+      
+      setToast({ 
+        message: '✓ Translation retry completed successfully!', 
+        type: 'success' 
+      });
+      setRetryTranslationStatus('success');
+      
+      // Reload questions to show updated translations
+      await loadQuestions();
+      
+      setTimeout(() => setRetryTranslationStatus('idle'), 2000);
+    } catch (error: any) {
+      console.error('Error during translation retry:', error);
+      
+      if (error instanceof TranslationLimitError) {
+        setToast({ 
+          message: '⚠️ Translation service limit still reached. Please try again later.', 
+          type: 'error' 
+        });
+      } else {
+        setToast({ 
+          message: 'Error during translation retry. Please try again.', 
+          type: 'error' 
+        });
+      }
+      setRetryTranslationStatus('idle');
     }
   };
 
@@ -1348,48 +1465,68 @@ export default function SurveyBuilder() {
               <p className="text-sm text-gray-500 mt-1">{t.buildCustomize}</p>
             </div>
           </div>
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-              <button 
-                onClick={handlePreview}
-                className="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg font-medium transition-colors"
-              >
-                {t.preview}
-              </button>
-              <button 
-                onClick={handleSave}
-                disabled={saveStatus === 'saving'}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  saveStatus === 'saved'
-                    ? 'bg-green-600 text-white'
-                    : saveStatus === 'saving'
-                    ? 'bg-indigo-400 text-white cursor-wait'
-                    : 'bg-indigo-600 hover:bg-indigo-700 text-white'
-                }`}
-              >
-                {saveStatus === 'saved' ? `✓ ${t.saved}` : saveStatus === 'saving' ? t.saving : t.saveChanges}
-              </button>
-              <div className="text-right">
-                <p className="text-xs text-gray-500">{t.totalQuestions}</p>
-                <p className="text-lg font-semibold text-gray-900">{questions.length}</p>
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <button 
+                  onClick={handlePreview}
+                  className="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg font-medium transition-colors"
+                >
+                  {t.preview}
+                </button>
+                <button 
+                  onClick={handleSave}
+                  disabled={saveStatus === 'saving'}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    saveStatus === 'saved'
+                      ? 'bg-green-600 text-white'
+                      : saveStatus === 'saving'
+                      ? 'bg-indigo-400 text-white cursor-wait'
+                      : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                  }`}
+                >
+                  {saveStatus === 'saved' ? `✓ ${t.saved}` : saveStatus === 'saving' ? t.saving : t.saveChanges}
+                </button>
+                <div className="text-right">
+                  <p className="text-xs text-gray-500">{t.totalQuestions}</p>
+                  <p className="text-lg font-semibold text-gray-900">{questions.length}</p>
+                </div>
               </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-medium text-gray-700">{t.surveyState}</span>
-              <button
-                onClick={toggleSurveyStatus}
-                disabled={loadingSurveyStatus}
-                title={surveyIsActive ? 'Click to disable survey' : 'Click to enable survey'}
-                className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
-                  surveyIsActive ? 'bg-green-600' : 'bg-gray-300'
-                } ${loadingSurveyStatus ? 'opacity-70 cursor-wait' : 'cursor-pointer'}`}
-              >
-                <span
-                  className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
-                    surveyIsActive ? 'translate-x-6' : 'translate-x-1'
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium text-gray-700">{t.surveyState}</span>
+                <button
+                  onClick={toggleSurveyStatus}
+                  disabled={loadingSurveyStatus}
+                  title={surveyIsActive ? 'Click to disable survey' : 'Click to enable survey'}
+                  className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
+                    surveyIsActive ? 'bg-green-600' : 'bg-gray-300'
+                  } ${loadingSurveyStatus ? 'opacity-70 cursor-wait' : 'cursor-pointer'}`}
+                >
+                  <span
+                    className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                      surveyIsActive ? 'translate-x-6' : 'translate-x-1'
                   }`}
                 />
               </button>
+            </div>
+            </div>
+            {/* Retry Translation Button - On its own row */}
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={handleRetryTranslation}
+                disabled={retryTranslationStatus === 'retrying' || questions.length === 0}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap ${
+                  retryTranslationStatus === 'success'
+                    ? 'bg-green-600 text-white'
+                    : retryTranslationStatus === 'retrying'
+                    ? 'bg-amber-400 text-white cursor-wait'
+                    : 'bg-amber-500 hover:bg-amber-600 text-white'
+                }`}
+                title="Retry filling in translations for all questions. Use this if translations were incomplete due to API limits."
+              >
+                {retryTranslationStatus === 'success' ? '✓ Done' : retryTranslationStatus === 'retrying' ? '⟳ Retrying...' : '⟳ Retry Translations'}
+              </button>
+              <span className="text-xs text-gray-500">Fill missing translations</span>
             </div>
           </div>
         </div>
