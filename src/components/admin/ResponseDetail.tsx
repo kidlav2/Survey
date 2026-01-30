@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronLeft, Calendar, Clock, Globe, Mail } from 'lucide-react';
+import { ChevronLeft, Calendar, Clock, Globe, Mail, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import SkeletonSurveyCard from '../common/SkeletonSurveyCard';
 
@@ -29,6 +29,8 @@ export default function ResponseDetail() {
   const [response, setResponse] = useState<ResponseData | null>(null);
   const [questions, setQuestions] = useState<Record<string, Question>>({});
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const isCompleted = (r: ResponseData) => {
     return r.completed === true;
@@ -40,6 +42,27 @@ export default function ResponseDetail() {
     const s = Math.floor(seconds % 60);
     if (m <= 0) return `${s}s`;
     return s ? `${m}m ${s}s` : `${m}m`;
+  };
+
+  const handleDeleteResponse = async () => {
+    if (!id) return;
+    
+    setDeleting(true);
+    try {
+      const { error } = await supabase
+        .from('responses')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      // Navigate back to responses list
+      navigate('/admin/responses', { replace: true });
+    } catch (error) {
+      console.error('Error deleting response:', error);
+      alert('Failed to delete response. Please try again.');
+      setDeleting(false);
+    }
   };
 
   useEffect(() => {
@@ -147,19 +170,56 @@ export default function ResponseDetail() {
     <main className="flex-1">
       {/* Top Bar */}
       <header className="bg-white border-b border-gray-200 px-4 md:px-8 py-4">
-        <div className="flex items-center gap-2">
-          <button 
-            onClick={() => navigate('/admin/responses')}
-            className="p-1 hover:bg-gray-100 rounded transition-colors"
-          >
-            <ChevronLeft className="w-5 h-5 text-gray-600" />
-          </button>
-          <div className="flex-1">
-            <h2 className="text-xl md:text-2xl font-semibold text-gray-900">Response Details</h2>
-            <p className="text-sm text-gray-500 mt-1">Response #{response.id.slice(0, 8)}</p>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => navigate('/admin/responses')}
+              className="p-1 hover:bg-gray-100 rounded transition-colors"
+            >
+              <ChevronLeft className="w-5 h-5 text-gray-600" />
+            </button>
+            <div className="flex-1">
+              <h2 className="text-xl md:text-2xl font-semibold text-gray-900">Response Details</h2>
+              <p className="text-sm text-gray-500 mt-1">Response #{response.id.slice(0, 8)}</p>
+            </div>
           </div>
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            className="p-2 hover:bg-red-50 rounded transition-colors"
+            title="Delete this response"
+          >
+            <Trash2 className="w-5 h-5 text-red-600" />
+          </button>
         </div>
       </header>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-sm w-full p-6 shadow-lg">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete Response?</h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete this response? This action cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteResponse}
+                disabled={deleting}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white rounded-lg transition-colors font-medium"
+              >
+                {deleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {/* Main Content */}
       <div className="p-4 md:p-8">
