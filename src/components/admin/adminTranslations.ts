@@ -50,6 +50,7 @@ export const adminTranslations = {
     editQuestions: 'Edit Questions',
     viewResponses: 'View Responses',
     exportCSV: 'Export CSV',
+    exportData: 'Export Data',
     preview: 'Preview',
     actions: 'Actions',
     
@@ -230,6 +231,7 @@ export const adminTranslations = {
     editQuestions: 'Редактировать вопросы',
     viewResponses: 'Просмотреть ответы',
     exportCSV: 'Экспортировать CSV',
+    exportData: 'Экспорт данных',
     preview: 'Предпросмотр',
     actions: 'Действия',
     
@@ -410,6 +412,7 @@ export const adminTranslations = {
     editQuestions: 'Modifier les questions',
     viewResponses: 'Afficher les réponses',
     exportCSV: 'Exporter en CSV',
+    exportData: 'Exporter les données',
     preview: 'Aperçu',
     actions: 'Actions',
     
@@ -589,6 +592,7 @@ export const adminTranslations = {
     editQuestions: 'Editar preguntas',
     viewResponses: 'Ver respuestas',
     exportCSV: 'Exportar CSV',
+    exportData: 'Exportar datos',
     preview: 'Vista previa',
     actions: 'Acciones',
     

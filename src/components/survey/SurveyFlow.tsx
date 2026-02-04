@@ -1,10 +1,47 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { ChevronRight, ChevronLeft } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import LanguageToggle from './LanguageToggle';
 import { translations } from './translations';
 import SkeletonQuestionFlow from '../common/SkeletonQuestionFlow';
+import Toast from '../common/Toast';
+
+// Translation cache to avoid redundant API calls
+const translationCache: Record<string, string> = {};
+
+// Translate text using MyMemory API (on-the-fly when user changes language)
+async function translateText(text: string, from: string, to: string): Promise<string> {
+  if (!text || from === to) return text;
+  
+  const cacheKey = `${from}|${to}|${text}`;
+  if (translationCache[cacheKey]) {
+    return translationCache[cacheKey];
+  }
+  
+  try {
+    const baseUrl = 'https://api.mymemory.translated.net/get';
+    const params = new URLSearchParams({
+      q: text.trim(),
+      langpair: `${from}|${to}`,
+    });
+    
+    const res = await fetch(`${baseUrl}?${params.toString()}`);
+    const data = await res.json();
+    
+    if (data?.responseStatus === 429) {
+      console.warn('Translation limit reached, using original text');
+      return text;
+    }
+    
+    const translated = data?.responseData?.translatedText || text;
+    translationCache[cacheKey] = translated;
+    return translated;
+  } catch (error) {
+    console.warn('Translation error:', error);
+    return text;
+  }
+}
 
 export default function SurveyFlow() {
   const navigate = useNavigate();
@@ -24,6 +61,9 @@ export default function SurveyFlow() {
   const [loading, setLoading] = useState(true);
   const [responseId, setResponseId] = useState<string | null>(null);
   const [startedAt, setStartedAt] = useState<number>(() => Date.now());
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
+  const [translatedQuestions, setTranslatedQuestions] = useState<Record<string, any>>({});
+  const [isTranslating, setIsTranslating] = useState(false);
 
   const t = translations[language]?.questions || translations.en.questions;
   const tQuestions = t as typeof translations.en.questions;
@@ -33,14 +73,22 @@ export default function SurveyFlow() {
   const getLocalized = useCallback((q: any, lng: Lng) => {
     const p = q?.payload ?? {};
     const base = (p.baseLanguage || p.base_language || 'en') as Lng;
+    
+    // Check if we have on-the-fly translations for this question
+    const translatedQ = translatedQuestions[`${q?.id}_${lng}`];
 
     // text can be: string OR { en: string, ... }
     const textMap = p.text;
-    const text =
+    let text =
       (textMap && typeof textMap === 'object' ? (textMap[lng] || textMap[base]) : null) ||
       (typeof q?.text === 'string' ? q.text : '') ||
       (typeof q?.question_text === 'string' ? q.question_text : '') ||
       '';
+    
+    // Use on-the-fly translation if available and no pre-existing translation for this language
+    if (translatedQ?.text && textMap && typeof textMap === 'object' && !textMap[lng]) {
+      text = translatedQ.text;
+    }
 
     // options can be: string[] OR { en: string[], ... }
     // For yes-no questions, always return empty options so translations are used
@@ -51,15 +99,22 @@ export default function SurveyFlow() {
       if (payloadOptions && typeof payloadOptions === 'object' && !Array.isArray(payloadOptions)) {
         // payload.options is a map like { en: [...], ru: [...], ... }
         // Check explicitly if array exists (not just ||) because empty arrays are falsy in JS
-        options = (Array.isArray(payloadOptions[lng]) && payloadOptions[lng].length > 0 ? payloadOptions[lng] : 
+        let baseOptions = (Array.isArray(payloadOptions[lng]) && payloadOptions[lng].length > 0 ? payloadOptions[lng] : 
                    Array.isArray(payloadOptions[base]) ? payloadOptions[base] : 
                    Array.isArray(q?.options) ? q.options : []);
+        
+        // Use on-the-fly translated options if available
+        if (translatedQ?.options && Array.isArray(translatedQ.options) && !payloadOptions[lng]) {
+          options = translatedQ.options;
+        } else {
+          options = baseOptions;
+        }
       } else if (Array.isArray(payloadOptions)) {
-        // payload.options is a direct array (older format) - treat as base language options
-        options = payloadOptions;
+        // payload.options is a direct array (older format) - use translated if available
+        options = translatedQ?.options || payloadOptions;
       } else if (Array.isArray(q?.options)) {
         // Fall back to q.options (used for backward compatibility)
-        options = q.options;
+        options = translatedQ?.options || q.options;
       }
     } else {
       // For yes-no questions, log why we're not loading options
@@ -78,7 +133,7 @@ export default function SurveyFlow() {
 
     return { text, options, hasOtherOption };
 
-  }, [tQuestions]);
+  }, [tQuestions, translatedQuestions]);
 
   const getLocalizedSection = useCallback((section: any, lng: Lng) => {
     const p = section?.payload || {};
@@ -349,6 +404,80 @@ export default function SurveyFlow() {
     loadSurveyQuestions();
   }, [id, language, loadSurveyQuestions]);
 
+  // On-the-fly translation when language changes and translations are missing
+  useEffect(() => {
+    const translateMissingQuestions = async () => {
+      if (!questions.length || loading) return;
+      
+      const questionsNeedingTranslation = questions.filter(q => {
+        const p = q?.payload ?? {};
+        const textMap = p.text;
+        const base = (p.baseLanguage || p.base_language || 'en') as string;
+        
+        // Check if translation exists for current language
+        if (textMap && typeof textMap === 'object' && textMap[language]) {
+          return false; // Already has translation
+        }
+        // Check if we already translated this question
+        if (translatedQuestions[`${q.id}_${language}`]) {
+          return false; // Already translated on-the-fly
+        }
+        // Need to translate if base language differs from selected
+        return base !== language;
+      });
+      
+      if (questionsNeedingTranslation.length === 0) return;
+      
+      console.log(`🌐 Translating ${questionsNeedingTranslation.length} questions to ${language}...`);
+      setIsTranslating(true);
+      
+      const newTranslations: Record<string, any> = { ...translatedQuestions };
+      
+      for (const q of questionsNeedingTranslation) {
+        try {
+          const p = q?.payload ?? {};
+          const base = (p.baseLanguage || p.base_language || 'en') as string;
+          const textMap = p.text;
+          const baseText = (textMap && typeof textMap === 'object' ? textMap[base] : null) || q.text || '';
+          
+          // Translate question text
+          const translatedText = await translateText(baseText, base, language);
+          
+          // Translate options if any
+          let translatedOptions: string[] = [];
+          const payloadOptions = p.options;
+          if (payloadOptions && typeof payloadOptions === 'object' && !Array.isArray(payloadOptions)) {
+            const baseOptions = payloadOptions[base] || [];
+            if (Array.isArray(baseOptions) && baseOptions.length > 0) {
+              for (const opt of baseOptions) {
+                const translatedOpt = await translateText(opt, base, language);
+                translatedOptions.push(translatedOpt);
+              }
+            }
+          } else if (Array.isArray(q.options)) {
+            for (const opt of q.options) {
+              const translatedOpt = await translateText(opt, base, language);
+              translatedOptions.push(translatedOpt);
+            }
+          }
+          
+          newTranslations[`${q.id}_${language}`] = {
+            text: translatedText,
+            options: translatedOptions.length > 0 ? translatedOptions : undefined
+          };
+        } catch (error) {
+          console.warn(`Failed to translate question ${q.id}:`, error);
+        }
+      }
+      
+      setTranslatedQuestions(newTranslations);
+      setIsTranslating(false);
+      console.log('✅ On-the-fly translation complete');
+    };
+    
+    translateMissingQuestions();
+  }, [questions, language, loading]);
+
   // Reload questions when page becomes visible (user returns to tab)
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -436,6 +565,29 @@ export default function SurveyFlow() {
     } catch (error) {
       console.error('Error in saveProgress:', error);
     }
+  };
+
+  // Calculate completion percentage based on answered questions
+  const calculateCompletionPercentage = (currentAnswers: Record<string, any>): number => {
+    if (questions.length === 0) return 0;
+    
+    // Count only visible (non-branch-only) questions
+    const visibleQs = questions.filter((_, idx) => !isBranchOnly(questions[idx].id, idx));
+    if (visibleQs.length === 0) return 0;
+    
+    // Count how many visible questions have been answered (not null/undefined)
+    const answeredCount = visibleQs.filter(q => {
+      const answer = currentAnswers[q.id];
+      // Check if question has been answered (not null, not undefined, not empty array)
+      return answer !== null && answer !== undefined && (Array.isArray(answer) ? answer.length > 0 : true);
+    }).length;
+    
+    console.log('Completion:', {
+      answeredCount,
+      totalVisible: visibleQs.length,
+      percentage: Math.round((answeredCount / visibleQs.length) * 100)
+    });
+    return answeredCount; // Return count of answered questions instead of percentage
   };
 
   // Check if a question is only used as a branch target (not in main sequential flow)
@@ -621,6 +773,15 @@ export default function SurveyFlow() {
         if (logic.end_survey) {
           console.log('Survey ended due to conditional logic');
           try {
+            // Check minimum completion percentage
+            const answeredCount = calculateCompletionPercentage(answers);
+            const minAnswered = 1; // Minimum 1 question answered
+            
+            if (answeredCount < minAnswered) {
+              console.log('Survey not saved - less than 1 question answered');
+              return;
+            }
+            
             // Update response with final data
             const updateData: any = { answers, duration_seconds: Math.max(0, Math.round((Date.now() - startedAt) / 1000)), completed: true };
             
@@ -677,6 +838,15 @@ export default function SurveyFlow() {
     } else {
       // Final submit: update response status to completed
       try {
+        // Check minimum completion percentage
+        const answeredCount = calculateCompletionPercentage(answers);
+        const minAnswered = 1; // Minimum 1 question answered
+        
+        if (answeredCount < minAnswered) {
+          console.log('Survey not saved - less than 1 question answered');
+          return;
+        }
+
         const finalAnswers = answers;
         const finalDuration = Math.max(0, Math.round((Date.now() - startedAt) / 1000));
         const updateData: any = {
@@ -721,9 +891,34 @@ export default function SurveyFlow() {
     }
   };
 
-  const isAnswered =
-    answers[question?.id] !== undefined &&
-    (Array.isArray(answers[question?.id]) ? answers[question?.id].length > 0 : true);
+  // Check if question is answered, including validation for "Other" option
+  const isAnswered = (() => {
+    const answer = answers[question?.id];
+    
+    // Basic check - answer exists and not empty
+    if (answer === undefined || answer === null) return false;
+    if (Array.isArray(answer) && answer.length === 0) return false;
+    
+    // If answer is "Other" option, check if user entered minimum characters (5)
+    if (question?.type === 'single-choice' || question?.type === 'multiple-choice') {
+      const localized = getLocalized(question, language);
+      const otherOption = localized.options.find((opt: any) => opt?.__isOtherOption);
+      
+      if (otherOption) {
+        const otherText = Array.isArray(answer) ? answer[0] : answer;
+        const displayText = otherOption?.__text || 'Other';
+        
+        // Check if the selected answer is the "Other" option
+        if (otherText === displayText) {
+          const otherValue = answers[`${question.id}_other`] || '';
+          // Require at least 5 characters for "Other" text input
+          return otherValue.trim().length >= 5;
+        }
+      }
+    }
+    
+    return true;
+  })();
 
   const canSkip = !question?.required;
 
@@ -865,19 +1060,24 @@ export default function SurveyFlow() {
                     
                     {/* Text input for "Other" option */}
                     {isSelected && isOtherOption && (
-                      <textarea
-                        value={answers[`${question.id}_other`] || ''}
-                        onChange={(e) => {
-                          setAnswers({
-                            ...answers,
-                            [`${question.id}_other`]: e.target.value
-                          });
-                        }}
-                        placeholder={tQuestions.placeholder ?? 'Please specify...'}
-                        className="w-full mt-3 px-4 py-3 border border-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                        rows={3}
-                        autoFocus
-                      />
+                      <div className="mt-3">
+                        <textarea
+                          value={answers[`${question.id}_other`] || ''}
+                          onChange={(e) => {
+                            setAnswers({
+                              ...answers,
+                              [`${question.id}_other`]: e.target.value
+                            });
+                          }}
+                          placeholder={tQuestions.placeholder ?? 'Please specify...'}
+                          className="w-full px-4 py-3 border border-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          rows={3}
+                          autoFocus
+                        />
+                        <div className={`mt-2 text-sm ${(answers[`${question.id}_other`] || '').length >= 5 ? 'text-green-600' : 'text-gray-600'}`}>
+                          {(answers[`${question.id}_other`] || '').length}/5 {tQuestions.characters_minimum || 'characters minimum'}
+                        </div>
+                      </div>
                     )}
                   </div>
                 );
@@ -1003,6 +1203,16 @@ export default function SurveyFlow() {
           </div>
         </div>
       </div>
+
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          isVisible={true}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 }

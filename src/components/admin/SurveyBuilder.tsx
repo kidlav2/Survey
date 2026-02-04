@@ -93,6 +93,42 @@ function detectBaseLanguage(text: string, options: string[] = []): 'en' | 'ru' {
   return hasCyrillic ? 'ru' : 'en';
 }
 
+// Build payload WITHOUT translations - translations happen on-the-fly when user takes survey
+function buildQuestionPayloadWithoutTranslations(args: {
+  baseLanguage: SupportedLng;
+  text: string;
+  options?: string[];
+  type: Question['type'];
+  required: boolean;
+  hasOtherOption?: boolean;
+  scaleMin?: string;
+  scaleMax?: string;
+}) {
+  const { baseLanguage, text, options = [], type, required, hasOtherOption } = args;
+  const scaleMin = typeof args.scaleMin === 'string' ? args.scaleMin : '';
+  const scaleMax = typeof args.scaleMax === 'string' ? args.scaleMax : '';
+
+  // Auto-detect base language (RU/EN)
+  const resolvedBaseLanguage = (baseLanguage === 'fr' || baseLanguage === 'es')
+    ? baseLanguage
+    : detectBaseLanguage(text, options);
+
+  const payload: any = {
+    baseLanguage: resolvedBaseLanguage,
+    type,
+    required,
+    hasOtherOption: !!hasOtherOption,
+    text: { [resolvedBaseLanguage]: text },
+    options: { [resolvedBaseLanguage]: options },
+    scaleMin: { [resolvedBaseLanguage]: scaleMin },
+    scaleMax: { [resolvedBaseLanguage]: scaleMax },
+    translations: {},
+  };
+
+  return payload;
+}
+
+// Keep old function for manual "Retry Translations" button only
 async function buildQuestionPayloadWithTranslations(args: {
   baseLanguage: SupportedLng;
   text: string;
@@ -706,11 +742,11 @@ export default function SurveyBuilder() {
     window.open(`${window.location.origin}/survey/${id}`, '_blank', 'noopener,noreferrer');
   };
 
-  // Helper function to get translations only if text changed
+  // Helper function to get payload - NO translations on save, translations happen when user takes survey
   const getPayloadForQuestion = async (question: Question, originalQuestion?: any) => {
-    // If it's a new question, build translations
+    // If it's a new question, build payload without translations
     if (question.id.startsWith('temp_')) {
-      return await buildQuestionPayloadWithTranslations({
+      return buildQuestionPayloadWithoutTranslations({
         baseLanguage: language,
         text: question.text,
         options: question.options,
@@ -757,7 +793,7 @@ export default function SurveyBuilder() {
       if (payloadTypeChanged) {
         console.log('🚨 PAYLOAD TYPE MISMATCH - REGENERATING payload for question:', question.id, 
                     'payload.type:', originalQuestion.payload?.type, 'vs question.type:', question.type);
-        return await buildQuestionPayloadWithTranslations({
+        return buildQuestionPayloadWithoutTranslations({
           baseLanguage: language,
           text: question.text,
           options: question.options,
@@ -773,7 +809,7 @@ export default function SurveyBuilder() {
       if (payloadTextChanged) {
         console.log('🚨 PAYLOAD TEXT MISMATCH - REGENERATING payload for question:', question.id, 
                     'payload.text.en:', originalQuestion.payload?.text?.en, 'vs question.text:', question.text);
-        return await buildQuestionPayloadWithTranslations({
+        return buildQuestionPayloadWithoutTranslations({
           baseLanguage: language,
           text: question.text,
           options: question.options,
@@ -795,8 +831,8 @@ export default function SurveyBuilder() {
       }
     }
 
-    // Text or options changed - build new translations
-    return await buildQuestionPayloadWithTranslations({
+    // Text or options changed - build new payload without translations
+    return buildQuestionPayloadWithoutTranslations({
       baseLanguage: language,
       text: question.text,
       options: question.options,
@@ -1505,28 +1541,31 @@ export default function SurveyBuilder() {
                   <span
                     className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
                       surveyIsActive ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
-            </div>
+                    }`}
+                  />
+                </button>
+              </div>
             </div>
             {/* Retry Translation Button - On its own row */}
             <div className="flex items-center gap-3">
               <button 
                 onClick={handleRetryTranslation}
                 disabled={retryTranslationStatus === 'retrying' || questions.length === 0}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap ${
-                  retryTranslationStatus === 'success'
-                    ? 'bg-green-600 text-white'
-                    : retryTranslationStatus === 'retrying'
-                    ? 'bg-amber-400 text-white cursor-wait'
-                    : 'bg-amber-500 hover:bg-amber-600 text-white'
-                }`}
-                title="Retry filling in translations for all questions. Use this if translations were incomplete due to API limits."
+                style={{
+                  backgroundColor: retryTranslationStatus === 'success' 
+                    ? '#16a34a' 
+                    : retryTranslationStatus === 'retrying' 
+                    ? '#facc15' 
+                    : questions.length === 0 
+                    ? '#d1d5db' 
+                    : '#eab308',
+                  color: retryTranslationStatus === 'success' || questions.length === 0 ? '#fff' : '#1f2937'
+                }}
+                className="px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap"
+                title="Fill missing translations. Use this if translations were incomplete due to API limits."
               >
-                {retryTranslationStatus === 'success' ? '✓ Done' : retryTranslationStatus === 'retrying' ? '⟳ Retrying...' : '⟳ Retry Translations'}
+                {retryTranslationStatus === 'success' ? '✓ Done' : retryTranslationStatus === 'retrying' ? 'Retrying...' : 'Retry Translations'}
               </button>
-              <span className="text-xs text-gray-500">Fill missing translations</span>
             </div>
           </div>
         </div>

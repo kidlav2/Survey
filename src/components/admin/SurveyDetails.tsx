@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronLeft, Copy, Edit3, BarChart3, Download, FileJson, Trash2, ExternalLink, CheckCircle, Pencil, QrCode, X } from 'lucide-react';
+import { ChevronLeft, ChevronDown, Copy, Edit3, BarChart3, Download, FileJson, Trash2, ExternalLink, CheckCircle, Pencil, QrCode, X } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { supabase } from '../../lib/supabaseClient';
 import DeleteSurveyModal from './DeleteSurveyModal';
@@ -60,12 +60,27 @@ export default function SurveyDetails() {
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [exportModalType, setExportModalType] = useState<'CSV' | 'JSON' | null>(null);
+  const [showExportDropdown, setShowExportDropdown] = useState(false);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
 
   useEffect(() => {
     loadSurveyDetails();
   }, [id]);
+
+  // Close export dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (showExportDropdown) {
+        const target = e.target as HTMLElement;
+        if (!target.closest('.export-dropdown-container')) {
+          setShowExportDropdown(false);
+        }
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [showExportDropdown]);
 
   const loadSurveyDetails = async () => {
     try {
@@ -261,6 +276,86 @@ export default function SurveyDetails() {
     } catch (error) {
       console.error('Error resetting responses:', error);
       setToast({ message: `Failed to reset responses: ${error instanceof Error ? error.message : 'Unknown error'}`, type: 'error' });
+    }
+  };
+
+  const handleExportQuestions = async () => {
+    try {
+      // Fetch sections
+      const { data: sections, error: sectionsError } = await supabase
+        .from('sections')
+        .select('*')
+        .eq('survey_id', id)
+        .order('order', { ascending: true });
+
+      if (sectionsError) throw sectionsError;
+
+      // Fetch questions
+      const { data: questions, error: questionsError } = await supabase
+        .from('questions')
+        .select('*')
+        .eq('survey_id', id)
+        .order('order', { ascending: true });
+
+      if (questionsError) throw questionsError;
+
+      // Create sections map
+      const sectionsMap = new Map(sections?.map(s => [s.id, s]) || []);
+
+      // Format questions with section info
+      const exportData = questions?.map((q, index) => {
+        const section = q.section_id ? sectionsMap.get(q.section_id) : null;
+        const payload = q.payload || {};
+        
+        return {
+          order: index + 1,
+          section: section ? {
+            name: payload.name?.en || section.name || 'Unnamed Section',
+            description: payload.description?.en || section.description || ''
+          } : null,
+          question: {
+            id: q.id,
+            type: q.type,
+            text: payload.text?.en || q.text,
+            options: payload.options?.en || q.options || [],
+            required: q.required || false,
+            hasOtherOption: q.has_other_option || false,
+            conditionalLogic: q.conditional_logic || null,
+            translations: {
+              ru: payload.text?.ru || null,
+              fr: payload.text?.fr || null,
+              es: payload.text?.es || null,
+              options_ru: payload.options?.ru || null,
+              options_fr: payload.options?.fr || null,
+              options_es: payload.options?.es || null,
+            }
+          }
+        };
+      }) || [];
+
+      const json = JSON.stringify({
+        survey: {
+          id: survey?.id,
+          title: survey?.title,
+          exportedAt: new Date().toISOString()
+        },
+        totalQuestions: exportData.length,
+        totalSections: sections?.length || 0,
+        questions: exportData
+      }, null, 2);
+
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `questions_${survey?.title}_${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      
+      setToast({ message: 'Questions exported successfully', type: 'success' });
+    } catch (error: any) {
+      console.error('Error exporting questions:', error);
+      setToast({ message: 'Failed to export questions', type: 'error' });
     }
   };
 
@@ -556,7 +651,7 @@ export default function SurveyDetails() {
           </div>
           
           <div className="p-4 md:p-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-start">
               <button
                 onClick={() => navigate(`/admin/surveys/${id}/builder`)}
                 className="flex items-center gap-2 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium justify-center"
@@ -573,21 +668,40 @@ export default function SurveyDetails() {
                 {t.viewResponses}
               </button>
 
-              <button
-                onClick={() => setExportModalType('CSV')}
-                className="flex items-center gap-2 px-4 py-3 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium justify-center"
-              >
-                <Download className="w-4 h-4" />
-                {t.exportCSV}
-              </button>
-
-              <button
-                onClick={() => setExportModalType('JSON')}
-                className="flex items-center gap-2 px-4 py-3 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium justify-center"
-              >
-                <FileJson className="w-4 h-4" />
-                {t.exportJSON}
-              </button>
+              <div className="relative export-dropdown-container">
+                <button
+                  onClick={() => setShowExportDropdown(!showExportDropdown)}
+                  className="flex items-center gap-2 px-4 py-3 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium justify-center w-full"
+                >
+                  <Download className="w-4 h-4" />
+                  {t.exportData || 'Export Data'}
+                  <ChevronDown className={`w-4 h-4 transition-transform ${showExportDropdown ? 'rotate-180' : ''}`} />
+                </button>
+                {showExportDropdown && (
+                  <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden min-w-[180px]" style={{ position: 'absolute' }}>
+                    <button
+                      onClick={() => {
+                        setExportModalType('CSV');
+                        setShowExportDropdown(false);
+                      }}
+                      className="flex items-center gap-2 px-4 py-3 hover:bg-gray-50 text-gray-700 w-full text-left transition-colors"
+                    >
+                      <Download className="w-4 h-4" />
+                      {t.exportCSV}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setExportModalType('JSON');
+                        setShowExportDropdown(false);
+                      }}
+                      className="flex items-center gap-2 px-4 py-3 hover:bg-gray-50 text-gray-700 w-full text-left transition-colors border-t border-gray-100"
+                    >
+                      <FileJson className="w-4 h-4" />
+                      {t.exportJSON}
+                    </button>
+                  </div>
+                )}
+              </div>
 
               <button
                 onClick={async () => {
@@ -662,6 +776,15 @@ export default function SurveyDetails() {
               >
                 <ExternalLink className="w-4 h-4" />
                 {t.preview}
+              </button>
+
+              <button
+                onClick={handleExportQuestions}
+                className="flex items-center gap-2 px-4 py-3 border border-indigo-300 hover:bg-indigo-50 text-indigo-700 rounded-lg transition-colors font-medium justify-center"
+                title="Download all questions with sections as JSON"
+              >
+                <Download className="w-4 h-4" />
+                Export Questions
               </button>
 
               <button

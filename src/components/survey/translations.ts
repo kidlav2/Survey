@@ -22,6 +22,8 @@ export const translations = {
       placeholder: 'Enter your answer here...',
       multiNote: 'You can select multiple options',
       other: 'Other (please specify)',
+      minimum_completion_warning: 'Please complete at least 10% of the survey before submitting.',
+      characters_minimum: 'characters minimum',
     },
     questions_list: [
       {
@@ -96,6 +98,8 @@ export const translations = {
       placeholder: 'Введите ваш ответ...',
       multiNote: 'Вы можете выбрать несколько вариантов',
       other: 'Другое (укажите)',
+      minimum_completion_warning: 'Пожалуйста, заполните минимум 10% опроса перед отправкой.',
+      characters_minimum: 'символов минимум',
     },
     questions_list: [
       {
@@ -170,6 +174,8 @@ export const translations = {
       placeholder: 'Entrez votre réponse...',
       multiNote: 'Vous pouvez sélectionner plusieurs options',
       other: 'Autre (veuillez préciser)',
+      minimum_completion_warning: 'Veuillez remplir au moins 10% de l\'enquête avant de soumettre.',
+      characters_minimum: 'caractères minimum',
     },
     questions_list: [
       {
@@ -242,7 +248,11 @@ export const translations = {
       yes: 'Sí',
       no: 'No',
       placeholder: 'Ingrese su respuesta...',
-      multiNote: 'Puede seleccionar varias opciones',      other: 'Otro (por favor especifica)',    },
+      multiNote: 'Puede seleccionar varias opciones',
+      other: 'Otro (por favor especifica)',
+      minimum_completion_warning: 'Por favor, complete al menos el 10% de la encuesta antes de enviar.',
+      characters_minimum: 'caracteres mínimo',
+    },
     questions_list: [
       {
         question: '¿Con qué frecuencia utiliza herramientas digitales para sus tareas diarias?',

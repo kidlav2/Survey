@@ -195,26 +195,28 @@ export default function ResponseDetail() {
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-sm w-full p-6 shadow-lg">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete Response?</h3>
-            <p className="text-gray-600 mb-6">
-              Are you sure you want to delete this response? This action cannot be undone.
-            </p>
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                className="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDeleteResponse}
-                disabled={deleting}
-                className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white rounded-lg transition-colors font-medium"
-              >
-                {deleting ? 'Deleting...' : 'Delete'}
-              </button>
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+          <div className="bg-white rounded-lg shadow-lg" style={{ maxWidth: '380px', width: '100%' }}>
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete Response?</h3>
+              <p className="text-gray-600 mb-6">
+                Are you sure you want to delete this response? This action cannot be undone.
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteResponse}
+                  disabled={deleting}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white rounded-lg transition-colors font-medium"
+                >
+                  {deleting ? 'Deleting...' : 'Delete'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -348,15 +350,18 @@ export default function ResponseDetail() {
                             </div>
                           </div>
                           <div className="ml-9 space-y-3">
-                            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                              <p className="text-sm md:text-base text-gray-900">
-                                {Array.isArray(answer)
-                                  ? answer.join(', ')
-                                  : typeof answer === 'string'
-                                  ? answer
-                                  : JSON.stringify(answer)}
-                              </p>
-                            </div>
+                            {/* Only show main answer if it's not "Other (please specify)" or if there's no _other answer */}
+                            {!hasOtherAnswer && (
+                              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                                <p className="text-sm md:text-base text-gray-900">
+                                  {Array.isArray(answer)
+                                    ? answer.join(', ')
+                                    : typeof answer === 'string'
+                                    ? answer
+                                    : JSON.stringify(answer)}
+                                </p>
+                              </div>
+                            )}
                             {hasOtherAnswer && (
                               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                                 <p className="text-xs md:text-sm font-semibold text-blue-700 mb-2">Other (please specify):</p>
