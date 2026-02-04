@@ -28,7 +28,7 @@ interface Question {
 }
 
 // --- Auto-translation (MyMemory) ---
-const MYMEMORY_EMAIL = ''; // optional: put your email here to increase daily quota (de=)
+const MYMEMORY_EMAIL = 'valdik20032944@gmail.com'; // optional: put your email here to increase daily quota (de=)
 
 type SupportedLng = 'en' | 'ru' | 'fr' | 'es';
 
@@ -423,6 +423,7 @@ export default function SurveyBuilder() {
   const [editingSectionDesc, setEditingSectionDesc] = useState('');
   const [showActivationModal, setShowActivationModal] = useState(false);
   const [originalQuestionIds, setOriginalQuestionIds] = useState<Set<string>>(new Set());
+  const [draggedSectionIndex, setDraggedSectionIndex] = useState<number | null>(null);
 
   const t = translations[language];
   const adminT = adminTranslations[language];
@@ -511,6 +512,9 @@ export default function SurveyBuilder() {
           id: q.id,
           text: q.text,
           type: q.type,
+          has_other_option: q.has_other_option,
+          hasOtherOption: q.hasOtherOption,
+          payload_hasOtherOption: q.payload?.hasOtherOption,
           conditional_logic_raw: q.conditional_logic,
           conditional_logic_parsed: q.conditional_logic 
             ? (typeof q.conditional_logic === 'string' ? JSON.parse(q.conditional_logic) : q.conditional_logic)
@@ -519,12 +523,16 @@ export default function SurveyBuilder() {
         
         const payload = q.payload || {};
         
+        // Extract hasOtherOption from multiple possible sources
+        const hasOtherOption = q.has_other_option || q.hasOtherOption || payload.hasOtherOption || false;
+        
         return {
           ...q,
           order: q.sort_order,
           options: Array.isArray(q.options) ? q.options : (q.options ? [q.options] : []),
           scaleMin: payload.scaleMin || '',
           scaleMax: payload.scaleMax || '',
+          hasOtherOption: hasOtherOption,
           conditional_logic: q.conditional_logic 
             ? (typeof q.conditional_logic === 'string' ? JSON.parse(q.conditional_logic) : q.conditional_logic)
             : undefined
@@ -565,6 +573,36 @@ export default function SurveyBuilder() {
 
   const addQuestion = (afterIndex?: number, sectionId?: string) => {
     console.log('Adding question with sectionId:', sectionId ?? selectedSectionId);
+    
+    const targetSectionId = sectionId ?? selectedSectionId ?? undefined;
+    
+    // If adding to a section, find the position after the last question in that section
+    let insertIndex = afterIndex;
+    if (insertIndex === undefined && targetSectionId) {
+      // Find all questions in this section and get the index of the last one
+      const sectionQuestions = questions.filter(q => q.section_id === targetSectionId);
+      if (sectionQuestions.length > 0) {
+        const lastSectionQuestion = sectionQuestions[sectionQuestions.length - 1];
+        insertIndex = questions.indexOf(lastSectionQuestion);
+      } else {
+        // No questions in section yet - find where this section starts in the order
+        // Insert at the beginning of the questions list for this section
+        const sectionIndex = sections.findIndex(s => s.id === targetSectionId);
+        if (sectionIndex >= 0) {
+          // Find first question of next sections to insert before it
+          let insertBeforeIndex = questions.length;
+          for (let i = sectionIndex + 1; i < sections.length; i++) {
+            const nextSectionFirstQ = questions.findIndex(q => q.section_id === sections[i].id);
+            if (nextSectionFirstQ !== -1) {
+              insertBeforeIndex = nextSectionFirstQ;
+              break;
+            }
+          }
+          insertIndex = insertBeforeIndex - 1;
+        }
+      }
+    }
+    
     const newQuestion: Question = {
       id: makeTempId(),
       type: 'single-choice',
@@ -572,8 +610,8 @@ export default function SurveyBuilder() {
       options: ['Option 1', 'Option 2'],
       required: false,
       hasOtherOption: false,
-      order: afterIndex !== undefined ? afterIndex + 1 : questions.length,
-      section_id: sectionId ?? selectedSectionId ?? undefined,
+      order: insertIndex !== undefined ? insertIndex + 1 : questions.length,
+      section_id: targetSectionId,
       scaleMin: '',
       scaleMax: '',
     };
@@ -581,11 +619,11 @@ export default function SurveyBuilder() {
     console.log('New question created:', newQuestion);
 
     let newQuestions: Question[];
-    if (afterIndex !== undefined) {
+    if (insertIndex !== undefined && insertIndex >= 0) {
       newQuestions = [
-        ...questions.slice(0, afterIndex + 1),
+        ...questions.slice(0, insertIndex + 1),
         newQuestion,
-        ...questions.slice(afterIndex + 1).map((q, i) => ({ ...q, order: q.order + 1 })),
+        ...questions.slice(insertIndex + 1).map((q) => ({ ...q, order: q.order + 1 })),
       ];
     } else {
       newQuestions = [...questions, newQuestion];
@@ -1251,30 +1289,7 @@ export default function SurveyBuilder() {
       setSectionsLoading(true);
       const nextOrder = sections.length;
       
-      // Build payload with translations for section name and description
-      const payload: any = {
-        baseLanguage: detectBaseLanguage(newSectionName, [newSectionDesc]),
-        name: { en: '' },
-        description: { en: '' },
-      };
-
-      const base = detectBaseLanguage(newSectionName, [newSectionDesc]);
-      payload.baseLanguage = base;
-      payload.name[base] = newSectionName.trim();
-      payload.description[base] = newSectionDesc.trim();
-
-      // Translate section name and description to other languages
-      const langs: SupportedLng[] = ['en', 'ru', 'fr', 'es'];
-      const targets = langs.filter((l) => l !== base);
-
-      for (const lng of targets) {
-        const translatedName = await translateMyMemory(newSectionName.trim(), base, lng);
-        const translatedDesc = newSectionDesc.trim() ? await translateMyMemory(newSectionDesc.trim(), base, lng) : '';
-        
-        payload.name[lng] = translatedName;
-        payload.description[lng] = translatedDesc;
-      }
-      
+      // Add section without translations - translations happen on-the-fly when user takes survey
       const { data, error } = await supabase
         .from('survey_sections')
         .insert({
@@ -1282,7 +1297,6 @@ export default function SurveyBuilder() {
           name: newSectionName.trim(),
           description: newSectionDesc.trim(),
           order_index: nextOrder,
-          payload,
         })
         .select();
       
@@ -1387,39 +1401,16 @@ export default function SurveyBuilder() {
     try {
       setSectionsLoading(true);
       
-      // Build payload with translations for section name and description
-      const payload: any = {
-        baseLanguage: detectBaseLanguage(name, [description]),
-        name: { en: '' },
-        description: { en: '' },
-      };
-
-      const base = detectBaseLanguage(name, [description]);
-      payload.baseLanguage = base;
-      payload.name[base] = name;
-      payload.description[base] = description;
-
-      // Translate section name and description to other languages
-      const langs: SupportedLng[] = ['en', 'ru', 'fr', 'es'];
-      const targets = langs.filter((l) => l !== base);
-
-      for (const lng of targets) {
-        const translatedName = await translateMyMemory(name, base, lng);
-        const translatedDesc = description ? await translateMyMemory(description, base, lng) : '';
-        
-        payload.name[lng] = translatedName;
-        payload.description[lng] = translatedDesc;
-      }
-
+      // Update section without translations - translations happen on-the-fly when user takes survey
       const { error } = await supabase
         .from('survey_sections')
-        .update({ name, description, payload })
+        .update({ name, description })
         .eq('id', sectionId);
       
       if (error) throw error;
       
       setSections(sections.map(s => 
-        s.id === sectionId ? { ...s, name, description, payload } : s
+        s.id === sectionId ? { ...s, name, description } : s
       ));
       setEditingSectionId(null);
       setToast({ message: 'Section updated successfully', type: 'success' });
@@ -1429,6 +1420,62 @@ export default function SurveyBuilder() {
     } finally {
       setSectionsLoading(false);
     }
+  };
+
+  // Handle section drag and drop reordering
+  const handleSectionDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedSectionIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', index.toString());
+  };
+
+  const handleSectionDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleSectionDrop = async (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    
+    if (draggedSectionIndex === null || draggedSectionIndex === dropIndex) {
+      setDraggedSectionIndex(null);
+      return;
+    }
+
+    const newSections = [...sections];
+    const [draggedSection] = newSections.splice(draggedSectionIndex, 1);
+    newSections.splice(dropIndex, 0, draggedSection);
+
+    // Update local state immediately
+    setSections(newSections);
+    setDraggedSectionIndex(null);
+
+    // Update order_index in database
+    try {
+      const updatePromises = newSections.map((section, index) =>
+        supabase
+          .from('survey_sections')
+          .update({ order_index: index })
+          .eq('id', section.id)
+      );
+      
+      await Promise.all(updatePromises);
+      console.log('Section order updated successfully');
+    } catch (error) {
+      console.error('Error updating section order:', error);
+      setToast({ message: 'Failed to update section order', type: 'error' });
+      // Reload sections to restore original order
+      const { data: sectionsData } = await supabase
+        .from('survey_sections')
+        .select('*')
+        .eq('survey_id', id)
+        .order('order_index', { ascending: true });
+      if (sectionsData) setSections(sectionsData);
+    }
+  };
+
+  const handleSectionDragEnd = () => {
+    setDraggedSectionIndex(null);
   };
 
   const toggleSurveyStatus = async () => {
@@ -1770,8 +1817,20 @@ export default function SurveyBuilder() {
                   const borderColor = borderColors[sectionIndex % borderColors.length];
                   
                   return (
-                  <div key={section.id} className={`p-4 rounded-lg border ${bgColor} ${borderColor}`}>
+                  <div 
+                    key={section.id} 
+                    className={`p-4 rounded-lg border ${bgColor} ${borderColor} ${draggedSectionIndex === sectionIndex ? 'opacity-50' : ''} transition-opacity`}
+                    draggable
+                    onDragStart={(e) => handleSectionDragStart(e, sectionIndex)}
+                    onDragOver={(e) => handleSectionDragOver(e, sectionIndex)}
+                    onDrop={(e) => handleSectionDrop(e, sectionIndex)}
+                    onDragEnd={handleSectionDragEnd}
+                  >
                     <div className="flex items-start justify-between gap-3 mb-4 pb-3 border-b border-purple-100">
+                      {/* Drag handle */}
+                      <div className="cursor-grab active:cursor-grabbing p-1 text-gray-400 hover:text-gray-600">
+                        <GripVertical className="w-5 h-5" />
+                      </div>
                       <div className="flex-1">
                         {editingSectionId === section.id ? (
                           <div className="space-y-2">
@@ -1891,6 +1950,21 @@ export default function SurveyBuilder() {
                                   <span className="text-gray-500 font-normal">Q{actualIndex + 1}. </span>
                                   {question.text || 'Untitled question'}
                                 </p>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className="text-xs px-2 py-0.5 bg-gray-200 text-gray-600 rounded">
+                                    {question.type}
+                                  </span>
+                                  {question.required && (
+                                    <span className="text-xs px-2 py-0.5 bg-red-100 text-red-600 rounded">
+                                      Required
+                                    </span>
+                                  )}
+                                  {question.hasOtherOption && (
+                                    <span className="text-xs px-2 py-0.5 bg-purple-100 text-purple-600 rounded">
+                                      + Other
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                               <div className="flex items-center gap-2">
                                 <Copy 
@@ -2348,6 +2422,16 @@ export default function SurveyBuilder() {
                       <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded">
                         {question.type === 'single-choice' ? 'Single Choice' : question.type === 'multiple-choice' ? 'Multiple' : question.type}
                       </span>
+                      {question.required && (
+                        <span className="text-xs px-2 py-0.5 bg-red-100 text-red-600 rounded">
+                          Required
+                        </span>
+                      )}
+                      {question.hasOtherOption && (
+                        <span className="text-xs px-2 py-0.5 bg-purple-100 text-purple-600 rounded">
+                          + Other
+                        </span>
+                      )}
                     </div>
                     <p className="text-sm text-gray-700 truncate">{question.text || 'Untitled question'}</p>
                   </div>

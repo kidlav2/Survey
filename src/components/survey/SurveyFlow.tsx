@@ -135,26 +135,42 @@ export default function SurveyFlow() {
 
   }, [tQuestions, translatedQuestions]);
 
+  // State for translated sections
+  const [translatedSections, setTranslatedSections] = useState<Record<string, any>>({});
+
   const getLocalizedSection = useCallback((section: any, lng: Lng) => {
     const p = section?.payload || {};
     const base = (p.baseLanguage || p.base_language || 'en') as Lng;
 
+    // Check for on-the-fly translations
+    const translatedS = translatedSections[`${section?.id}_${lng}`];
+
     // Get section name
     const nameMap = p.name || p.text;
-    const name =
+    let name =
       (nameMap && typeof nameMap === 'object' ? (nameMap[lng] || nameMap[base]) : null) ||
       (typeof section?.name === 'string' ? section.name : '') ||
       '';
+    
+    // Use on-the-fly translation if available
+    if (translatedS?.name) {
+      name = translatedS.name;
+    }
 
     // Get section description
     const descMap = p.description;
-    const description =
+    let description =
       (descMap && typeof descMap === 'object' ? (descMap[lng] || descMap[base]) : null) ||
       (typeof section?.description === 'string' ? section.description : '') ||
       '';
+    
+    // Use on-the-fly translation if available
+    if (translatedS?.description) {
+      description = translatedS.description;
+    }
 
     return { name, description };
-  }, []);
+  }, [translatedSections]);
 
   const makeUUID = () => {
     // Use browser crypto when available
@@ -477,6 +493,65 @@ export default function SurveyFlow() {
     
     translateMissingQuestions();
   }, [questions, language, loading]);
+
+  // On-the-fly translation for sections when language changes
+  useEffect(() => {
+    const translateMissingSections = async () => {
+      if (!sections.length || loading) return;
+      
+      // Detect base language from section name (check for Cyrillic)
+      const detectSectionBaseLang = (name: string) => {
+        return /[А-Яа-яЁё]/.test(name) ? 'ru' : 'en';
+      };
+      
+      const sectionsNeedingTranslation = sections.filter(s => {
+        const p = s?.payload || {};
+        const nameMap = p.name;
+        const base = (p.baseLanguage || detectSectionBaseLang(s.name || '')) as string;
+        
+        // Check if translation exists for current language
+        if (nameMap && typeof nameMap === 'object' && nameMap[language]) {
+          return false;
+        }
+        // Check if we already translated this section
+        if (translatedSections[`${s.id}_${language}`]) {
+          return false;
+        }
+        // Need to translate if base language differs from selected
+        return base !== language;
+      });
+      
+      if (sectionsNeedingTranslation.length === 0) return;
+      
+      console.log(`🌐 Translating ${sectionsNeedingTranslation.length} sections to ${language}...`);
+      
+      const newTranslations: Record<string, any> = { ...translatedSections };
+      
+      for (const s of sectionsNeedingTranslation) {
+        try {
+          const base = detectSectionBaseLang(s.name || '');
+          
+          // Translate section name
+          const translatedName = s.name ? await translateText(s.name, base, language) : '';
+          
+          // Translate section description
+          const translatedDesc = s.description ? await translateText(s.description, base, language) : '';
+          
+          newTranslations[`${s.id}_${language}`] = {
+            name: translatedName,
+            description: translatedDesc
+          };
+        } catch (error) {
+          console.warn(`Failed to translate section ${s.id}:`, error);
+        }
+      }
+      
+      setTranslatedSections(newTranslations);
+      console.log('✅ Section translation complete');
+    };
+    
+    translateMissingSections();
+  }, [sections, language, loading]);
 
   // Reload questions when page becomes visible (user returns to tab)
   useEffect(() => {
