@@ -1,144 +1,146 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { Clock, FileText } from 'lucide-react';
-import LanguageToggle from './LanguageToggle';
 import { translations } from './translations';
 import { supabase } from '../../lib/supabaseClient';
+import SurveyShell from '../chrome/SurveyShell';
+import Button from '../chrome/Button';
+import { isLng, type Lng } from '../../lib/cn';
+import { getStoredLanguage, setStoredLanguage } from '../../lib/surveySession';
 
 export default function SurveyWelcome() {
   const navigate = useNavigate();
   const { id } = useParams();
   const location = useLocation();
-  
+
   const searchLng = new URLSearchParams(location.search).get('lng');
-  const stateLng = (location.state as any)?.lng ?? (location.state as any)?.language;
-  const persistedLng = id ? localStorage.getItem(`survey_lng_${id}`) : null;
-  const initialLanguage = (stateLng || searchLng || persistedLng || 'en') as 'en' | 'ru' | 'fr' | 'es';
-  const [language, setLanguage] = useState<'en' | 'ru' | 'fr' | 'es'>(initialLanguage);
+  const stateLng = (location.state as { lng?: string; language?: string } | null)?.lng
+    ?? (location.state as { language?: string } | null)?.language;
+  const persistedLng = id ? getStoredLanguage(id) : null;
+  const initialLanguage: Lng = isLng(stateLng)
+    ? stateLng
+    : isLng(searchLng)
+      ? searchLng
+      : isLng(persistedLng)
+        ? persistedLng
+        : 'en';
+
+  const [language, setLanguage] = useState<Lng>(initialLanguage);
   const [survey, setSurvey] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [showInfo, setShowInfo] = useState(true);
+  const [unavailable, setUnavailable] = useState(false);
 
   useEffect(() => {
-    checkSurveyStatus();
-  }, [id]);
-
-  const checkSurveyStatus = async () => {
     if (!id) return;
+    let cancelled = false;
 
-    try {
-      const { data, error } = await supabase
-        .from('surveys')
-        .select('id, title, description, estimated_time, status, show_survey_info')
-        .eq('id', id)
-        .single();
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('surveys')
+          .select('id, title, description, estimated_time, status, show_survey_info')
+          .eq('id', id)
+          .single();
 
-      if (error) throw error;
+        if (error) throw error;
+        if (cancelled) return;
 
-      setSurvey(data);
-      setShowInfo(data?.show_survey_info !== false);
+        if (data?.status !== 'active') {
+          navigate(`/survey/${id}/closed`, { replace: true });
+          return;
+        }
 
-      if (data?.status !== 'active') {
-        navigate(`/survey/${id}/closed`, { replace: true });
+        setSurvey(data);
+      } catch {
+        if (!cancelled) setUnavailable(true);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-    } catch (error) {
-      console.error('Error checking survey status:', error);
-      navigate(`/survey/${id}/closed`, { replace: true });
-    } finally {
-      setLoading(false);
-    }
-  };
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id, navigate]);
 
   const t = translations[language]?.welcome || translations.en.welcome;
+  const showInfo = survey?.show_survey_info !== false;
 
-  // Get description in the current language
   const getDescriptionForLanguage = () => {
     if (!survey?.description) return t.description;
-    
     try {
       const parsed = JSON.parse(survey.description);
-      if (typeof parsed === 'object' && parsed !== null) {
-        // Return translation for current language, or fallback to English
-        return parsed[language] || parsed['en'] || t.description;
+      if (parsed && typeof parsed === 'object') {
+        return parsed[language] || parsed.en || t.description;
       }
     } catch {
-      // Not JSON, return as is
       return survey.description;
     }
-    
     return t.description;
   };
 
+  const handleLanguageChange = (lng: Lng) => {
+    setLanguage(lng);
+    if (id) setStoredLanguage(id, lng);
+    navigate(`/survey/${id}/welcome?lng=${encodeURIComponent(lng)}`, {
+      replace: true,
+      state: { lng, language: lng },
+    });
+  };
+
   const handleStart = () => {
+    if (id) setStoredLanguage(id, language);
     navigate(`/survey/${id}/questions?lng=${encodeURIComponent(language)}`, {
       state: { lng: language, language },
     });
   };
 
-  return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
-      {/* Language Toggle */}
-      <div className="fixed top-6 right-6 z-10">
-        <LanguageToggle currentLanguage={language} onLanguageChange={setLanguage} />
-      </div>
+  useEffect(() => {
+    if (unavailable && id) navigate(`/survey/${id}/closed`, { replace: true });
+  }, [unavailable, id, navigate]);
 
-      <div className="max-w-2xl w-full">
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-8 md:p-12">
-          {/* Header */}
-          <div className="mb-8">
-            <div className="flex justify-center mb-4">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-50 rounded-full">
-                <FileText className="w-8 h-8 text-indigo-600" />
-              </div>
-            </div>
-            <h1 className="text-3xl font-semibold text-gray-900 mb-3 text-center">
+  if (unavailable) return null;
+
+  return (
+    <SurveyShell language={language} onLanguageChange={handleLanguageChange}>
+      <article className="sheet px-6 py-10 md:px-12 md:py-14">
+        {loading ? (
+          <div className="space-y-4" aria-busy="true" aria-live="polite">
+            <div className="h-8 w-2/3 bg-canvas" />
+            <div className="h-4 w-full bg-canvas" />
+            <div className="h-4 w-5/6 bg-canvas" />
+          </div>
+        ) : (
+          <>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-ink-subtle">
+              {t.footer}
+            </p>
+            <h1 className="mt-3 font-serif text-4xl font-semibold text-navy md:text-5xl">
               {survey?.title || t.title}
             </h1>
             {showInfo && (
-              <div className="text-gray-600 leading-relaxed text-left space-y-4">
-                {getDescriptionForLanguage().split('\n').map((paragraph: string, index: number) => (
-                  paragraph.trim() ? (
-                    <p key={index}>{paragraph}</p>
-                  ) : null
-                ))}
+              <div className="mt-6 max-w-[65ch] space-y-4 text-base leading-relaxed text-ink-muted">
+                {getDescriptionForLanguage()
+                  .split('\n')
+                  .map((paragraph: string, index: number) =>
+                    paragraph.trim() ? <p key={index}>{paragraph}</p> : null
+                  )}
               </div>
             )}
-          </div>
-
-          {/* Info Box */}
-          {showInfo && (
-            <div className="bg-gray-50 rounded-lg p-6 mb-8 border border-gray-200">
-              <div className="flex items-start gap-4">
-                <Clock className="w-5 h-5 text-gray-600 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-medium text-gray-900 mb-1">{t.estimatedTime}</p>
-                  <p className="text-sm text-gray-600">{survey?.estimated_time || '4'} {t.minutes || 'minutes'}</p>
-                </div>
-              </div>
+            {showInfo && (
+              <p className="mt-8 border-t border-line pt-6 text-sm text-ink-muted">
+                <span className="font-bold text-ink">{t.estimatedTime}: </span>
+                {survey?.estimated_time || '4'} {t.minutes || 'minutes'}
+              </p>
+            )}
+            <p className="mt-4 max-w-[65ch] text-sm leading-relaxed text-ink-muted">{t.privacy}</p>
+            <div className="mt-10">
+              <Button onClick={handleStart} className="w-full sm:w-auto">
+                {t.startButton}
+              </Button>
             </div>
-          )}
-
-          {/* Privacy Note */}
-          <div className="mb-8">
-            <p className="text-sm text-gray-600 leading-relaxed">
-              {t.privacy}
-            </p>
-          </div>
-
-          {/* CTA Button */}
-          <button
-            onClick={handleStart}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-4 px-6 rounded-lg transition-colors"
-          >
-            {t.startButton}
-          </button>
-
-          {/* Footer */}
-          <p className="text-center text-xs text-gray-500 mt-6">
-            {t.footer}
-          </p>
-        </div>
-      </div>
-    </div>
+          </>
+        )}
+      </article>
+    </SurveyShell>
   );
 }

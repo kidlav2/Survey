@@ -1,10 +1,11 @@
 import React, { useState, createContext, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
+import { isLng, type Lng } from '../../lib/cn';
 
 export const AdminLanguageContext = createContext<{
-  language: 'en' | 'ru' | 'fr' | 'es';
-  setLanguage: (lang: 'en' | 'ru' | 'fr' | 'es') => void;
+  language: Lng;
+  setLanguage: (lang: Lng) => void;
 }>({
   language: 'en',
   setLanguage: () => {},
@@ -16,50 +17,57 @@ export default function AdminLayout() {
     const saved = localStorage.getItem('adminSidebarVisible');
     return saved !== null ? saved === 'true' : true;
   });
-  const [language, setLanguage] = useState<'en' | 'ru' | 'fr' | 'es'>('en');
+  const [language, setLanguage] = useState<Lng>(() => {
+    const saved = localStorage.getItem('ui_lng');
+    return isLng(saved) ? saved : 'en';
+  });
 
   useEffect(() => {
     localStorage.setItem('adminSidebarVisible', String(isDesktopSidebarVisible));
   }, [isDesktopSidebarVisible]);
 
+  useEffect(() => {
+    localStorage.setItem('ui_lng', language);
+  }, [language]);
+
   return (
     <AdminLanguageContext.Provider value={{ language, setLanguage }}>
-      <div className="flex min-h-screen bg-gray-50">
-        <Sidebar 
-          isOpen={isSidebarOpen} 
+      <div className="flex min-h-dvh bg-canvas text-ink">
+        <a href="#admin-main" className="skip-link">
+          Skip to content
+        </a>
+        <Sidebar
+          isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
-          onOpen={() => setIsSidebarOpen(true)}
           isDesktopVisible={isDesktopSidebarVisible}
           onDesktopToggle={() => setIsDesktopSidebarVisible(!isDesktopSidebarVisible)}
         />
-        
-        {/* Overlay for mobile */}
+
         {isSidebarOpen && (
           <div
-            className="fixed inset-0 z-20 lg:hidden"
+            className="fixed inset-0 z-20 bg-ink/40 lg:hidden"
             onClick={() => setIsSidebarOpen(false)}
-            style={{ backgroundColor: 'rgba(0, 0, 0, 0.3)' }}
           />
         )}
-        
-        <div className="flex-1 flex flex-col min-w-0 relative z-10">
-          {/* Mobile Header */}
-          <div className="lg:hidden bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
+
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-canvas px-4 py-3 lg:hidden">
             <button
+              type="button"
               onClick={() => setIsSidebarOpen(true)}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              className="min-h-11 min-w-11 text-ink"
+              aria-label="Open menu"
             >
-              <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              <svg className="mx-auto size-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 7h16M4 12h16M4 17h16" />
               </svg>
             </button>
-            <div>
-              <h1 className="text-base font-semibold text-gray-900">Survey Research</h1>
-            </div>
-            <div className="w-8" /> {/* Spacer for centering */}
+            <p className="font-serif text-base font-semibold text-navy">Survey Research</p>
+            <span className="w-11" />
           </div>
-          
-          <Outlet />
+          <div id="admin-main" className="flex-1">
+            <Outlet />
+          </div>
         </div>
       </div>
     </AdminLanguageContext.Provider>

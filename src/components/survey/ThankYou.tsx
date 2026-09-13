@@ -1,123 +1,75 @@
-import React, { useState, useEffect } from "react";
-import { useLocation, useParams } from "react-router-dom";
-import { CheckCircle } from "lucide-react";
-import { supabase } from "../../lib/supabaseClient";
-import LanguageToggle from "./LanguageToggle";
-import { translations } from "./translations";
+import React, { useEffect, useState } from 'react';
+import { useLocation, useParams } from 'react-router-dom';
+import { supabase } from '../../lib/supabaseClient';
+import { translations } from './translations';
+import { isLng, type Lng } from '../../lib/cn';
+import { getStoredLanguage, setStoredLanguage } from '../../lib/surveySession';
+import SurveyShell from '../chrome/SurveyShell';
 
 export default function ThankYou() {
   const { id } = useParams();
   const location = useLocation();
-  const [language, setLanguage] = useState<
-    "en" | "ru" | "fr" | "es"
-  >(location.state?.language || "en");
-  
-  const [thankYouMessage, setThankYouMessage] = useState("");
-  const [loading, setLoading] = useState(true);
+  const searchLng = new URLSearchParams(location.search).get('lng');
+  const persisted = id ? getStoredLanguage(id) : null;
+  const initial: Lng = isLng((location.state as { language?: string } | null)?.language)
+    ? (location.state as { language: Lng }).language
+    : isLng(searchLng)
+      ? searchLng
+      : isLng(persisted)
+        ? persisted
+        : 'en';
 
-  const t =
-    translations[language]?.thankYou ||
-    translations.en.thankYou;
+  const [language, setLanguage] = useState<Lng>(initial);
+  const [thankYouMessage, setThankYouMessage] = useState('');
+
+  const t = translations[language]?.thankYou || translations.en.thankYou;
 
   useEffect(() => {
-    const loadSurveyMessage = async () => {
-      if (!id) {
-        setLoading(false);
-        return;
-      }
-      
+    if (!id) return;
+    let cancelled = false;
+    (async () => {
       try {
-        const { data, error } = await supabase
-          .from("surveys")
-          .select("thank_you_message")
-          .eq("id", id)
+        const { data } = await supabase
+          .from('surveys')
+          .select('thank_you_message')
+          .eq('id', id)
           .single();
-        
-        if (error && error.code !== "42703" && error.code !== "PGRST116") {
-          console.error("Error loading survey:", error);
-        }
-        
-        if (data?.thank_you_message) {
+        if (!cancelled && data?.thank_you_message) {
           setThankYouMessage(data.thank_you_message);
         }
-      } catch (error) {
-        console.error("Error loading survey message:", error);
-      } finally {
-        setLoading(false);
+      } catch {
+        /* default copy is enough */
       }
+    })();
+    return () => {
+      cancelled = true;
     };
-    
-    loadSurveyMessage();
   }, [id]);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
-      {/* Language Toggle */}
-      <div className="fixed top-6 right-6">
-        <LanguageToggle
-          currentLanguage={language}
-          onLanguageChange={setLanguage}
-        />
-      </div>
-
-      <div className="max-w-2xl w-full">
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-8 md:p-12 text-center">
-          {/* Success Icon */}
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-green-50 rounded-full mb-6">
-            <CheckCircle className="w-10 h-10 text-green-600" />
-          </div>
-
-          {/* Thank You Message */}
-          <h1 className="text-3xl font-semibold text-gray-900 mb-4">
-            {t.title}
-          </h1>
-
-          <p className="text-gray-600 leading-relaxed mb-6">
-            {thankYouMessage || t.description}
-          </p>
-
-          {/* Additional Info */}
-          <div className="bg-gray-50 rounded-lg p-6 border border-gray-200 text-left">
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">
-              {t.nextStepsTitle}
-            </h3>
-            <ul className="space-y-2 text-sm text-gray-600">
-              {t.nextSteps.map((step, index) => (
-                <li
-                  key={index}
-                  className="flex items-start gap-2"
-                >
-                  <span className="text-indigo-600 mt-0.5">
-                    •
-                  </span>
-                  <span>{step}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Footer */}
-          <p className="text-sm text-gray-500 mt-8">
-            {language === 'ru' ? (
-              <>
-                Теперь вы можете <strong>закрыть</strong> это окно
-              </>
-            ) : language === 'fr' ? (
-              <>
-                Vous pouvez maintenant <strong>fermer</strong> cette fenêtre
-              </>
-            ) : language === 'es' ? (
-              <>
-                Ahora puede <strong>cerrar</strong> esta ventana
-              </>
-            ) : (
-              <>
-                You may now <strong>close</strong> this window
-              </>
-            )}
-          </p>
-        </div>
-      </div>
-    </div>
+    <SurveyShell
+      language={language}
+      onLanguageChange={(lng) => {
+        setLanguage(lng);
+        if (id) setStoredLanguage(id, lng);
+      }}
+    >
+      <article className="sheet px-6 py-10 md:px-12 md:py-14">
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-ok">Recorded</p>
+        <h1 className="mt-3 font-serif text-4xl font-semibold text-navy">{t.title}</h1>
+        <p className="mt-4 max-w-[65ch] text-base leading-relaxed text-ink-muted">
+          {thankYouMessage || t.description}
+        </p>
+        <section className="mt-10 border-t border-line pt-6">
+          <h2 className="font-serif text-xl font-semibold text-ink">{t.nextStepsTitle}</h2>
+          <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm leading-relaxed text-ink-muted">
+            {t.nextSteps.map((step: string, index: number) => (
+              <li key={index}>{step}</li>
+            ))}
+          </ol>
+        </section>
+        <p className="mt-10 text-sm text-ink-subtle">{t.footer}</p>
+      </article>
+    </SurveyShell>
   );
 }

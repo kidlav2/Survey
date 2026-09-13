@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronLeft, Plus, Trash2, GripVertical, ChevronDown, ChevronUp, FileText, Copy } from 'lucide-react';
-import { supabase } from '../../lib/supabaseClient';
+import { ChevronLeft, Plus, Trash2, GripVertical, ChevronDown, ChevronUp, FileText, Copy, Upload, X } from 'lucide-react';
+import { insertIgnoringUnknownColumns, supabase, updateIgnoringUnknownColumns } from '../../lib/supabaseClient';
 import Toast from '../common/Toast';
 import SkeletonQuestion from '../common/SkeletonQuestion';
 import { AdminLanguageContext } from './AdminLayout';
 import { adminTranslations } from './adminTranslations';
+import ImportFromFile from './ImportFromFile';
 
 
 interface Question {
@@ -422,6 +423,7 @@ export default function SurveyBuilder() {
   const [editingSectionName, setEditingSectionName] = useState('');
   const [editingSectionDesc, setEditingSectionDesc] = useState('');
   const [showActivationModal, setShowActivationModal] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   const [originalQuestionIds, setOriginalQuestionIds] = useState<Set<string>>(new Set());
   const [draggedSectionIndex, setDraggedSectionIndex] = useState<number | null>(null);
 
@@ -1288,21 +1290,14 @@ export default function SurveyBuilder() {
     try {
       setSectionsLoading(true);
       const nextOrder = sections.length;
+      const data = await insertIgnoringUnknownColumns('survey_sections', {
+        survey_id: id,
+        name: newSectionName.trim(),
+        description: newSectionDesc.trim(),
+        order_index: nextOrder,
+      });
       
-      // Add section without translations - translations happen on-the-fly when user takes survey
-      const { data, error } = await supabase
-        .from('survey_sections')
-        .insert({
-          survey_id: id,
-          name: newSectionName.trim(),
-          description: newSectionDesc.trim(),
-          order_index: nextOrder,
-        })
-        .select();
-      
-      if (error) throw error;
-      
-      setSections([...sections, data[0]]);
+      setSections([...sections, data]);
       setNewSectionName('');
       setNewSectionDesc('');
       setToast({ message: 'Section added successfully', type: 'success' });
@@ -1325,45 +1320,14 @@ export default function SurveyBuilder() {
     try {
       setSectionsLoading(true);
       const nextOrder = sections.length;
+      const data = await insertIgnoringUnknownColumns('survey_sections', {
+        survey_id: id,
+        name: name.trim(),
+        description: description.trim(),
+        order_index: nextOrder,
+      });
       
-      // Build payload with translations for section name and description
-      const payload: any = {
-        baseLanguage: detectBaseLanguage(name, [description]),
-        name: { en: '' },
-        description: { en: '' },
-      };
-
-      const base = detectBaseLanguage(name, [description]);
-      payload.baseLanguage = base;
-      payload.name[base] = name.trim();
-      payload.description[base] = description.trim();
-
-      // Translate section name and description to other languages
-      const langs: SupportedLng[] = ['en', 'ru', 'fr', 'es'];
-      const targets = langs.filter((l) => l !== base);
-
-      for (const lng of targets) {
-        const translatedName = await translateMyMemory(name.trim(), base, lng);
-        const translatedDesc = description.trim() ? await translateMyMemory(description.trim(), base, lng) : '';
-        
-        payload.name[lng] = translatedName;
-        payload.description[lng] = translatedDesc;
-      }
-      
-      const { data, error } = await supabase
-        .from('survey_sections')
-        .insert({
-          survey_id: id,
-          name: name.trim(),
-          description: description.trim(),
-          order_index: nextOrder,
-          payload,
-        })
-        .select();
-      
-      if (error) throw error;
-      
-      setSections([...sections, data[0]]);
+      setSections([...sections, data]);
       setToast({ message: 'Section added successfully', type: 'success' });
     } catch (error: any) {
       console.error('Error adding section:', error);
@@ -1401,13 +1365,11 @@ export default function SurveyBuilder() {
     try {
       setSectionsLoading(true);
       
-      // Update section without translations - translations happen on-the-fly when user takes survey
-      const { error } = await supabase
-        .from('survey_sections')
-        .update({ name, description })
-        .eq('id', sectionId);
-      
-      if (error) throw error;
+      await updateIgnoringUnknownColumns(
+        'survey_sections',
+        { name, description },
+        sectionId
+      );
       
       setSections(sections.map(s => 
         s.id === sectionId ? { ...s, name, description } : s
@@ -1556,6 +1518,14 @@ export default function SurveyBuilder() {
                   className="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg font-medium transition-colors"
                 >
                   {t.preview}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsImportOpen(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg font-medium transition-colors"
+                >
+                  <Upload className="w-4 h-4" />
+                  Import file
                 </button>
                 <button 
                   onClick={handleSave}
@@ -2880,6 +2850,30 @@ export default function SurveyBuilder() {
               >
                 {t.activateNow}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isImportOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4">
+          <div className="sheet flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden">
+            <div className="flex items-center justify-between border-b border-line px-6 py-4">
+              <h2 className="font-serif text-2xl font-semibold text-navy">Import questions</h2>
+              <button type="button" onClick={() => setIsImportOpen(false)} className="min-h-10 min-w-10" aria-label="Close">
+                <X className="mx-auto size-5" />
+              </button>
+            </div>
+            <div className="overflow-y-auto px-6 py-6">
+              <ImportFromFile
+                mode="append"
+                surveyId={id}
+                onImported={() => {
+                  setIsImportOpen(false);
+                  setToast({ message: 'Questions imported', type: 'success' });
+                  loadQuestions();
+                }}
+              />
             </div>
           </div>
         </div>

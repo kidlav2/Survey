@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
+import ImportFromFile from './ImportFromFile';
+import Button from '../chrome/Button';
+import Field from '../chrome/Field';
 
 interface CreateSurveyModalProps {
   isOpen: boolean;
@@ -9,64 +12,54 @@ interface CreateSurveyModalProps {
 }
 
 export default function CreateSurveyModal({ isOpen, onClose, onCreate }: CreateSurveyModalProps) {
+  const [tab, setTab] = useState<'blank' | 'ai'>('ai');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [estimatedTime, setEstimatedTime] = useState('4');
+  const [estimatedTime, setEstimatedTime] = useState('6');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
+  const finish = (survey: { id: string; title: string; description: string; status: string }) => {
+    onCreate?.(survey);
+    setTitle('');
+    setDescription('');
+    setEstimatedTime('6');
+    setError(null);
+    onClose();
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!title.trim()) {
       setError('Survey title is required');
       return;
     }
-
     setIsLoading(true);
     setError(null);
-
     try {
-      // Get current user
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError || !user) throw new Error('Not authenticated');
-
-      // Create survey in database
       const { data, error: createError } = await supabase
         .from('surveys')
         .insert([{
           title: title.trim(),
           description: description.trim(),
-          estimated_time: parseInt(estimatedTime) || 4,
+          estimated_time: parseInt(estimatedTime, 10) || 6,
           owner_id: user.id,
           status: 'draft',
         }])
         .select()
         .single();
-
       if (createError) throw createError;
-
-      // Call onCreate callback if provided
-      if (onCreate) {
-        onCreate({
-          id: data.id,
-          title: data.title,
-          description: data.description,
-          status: data.status,
-        });
-      }
-      
-      // Reset form
-      setTitle('');
-      setDescription('');
-      setEstimatedTime('5');
-      setError(null);
-      
-      onClose();
+      finish({
+        id: data.id,
+        title: data.title,
+        description: data.description,
+        status: data.status,
+      });
     } catch (err: any) {
-      console.error('Error creating survey:', err);
       setError(err?.message || 'Failed to create survey');
     } finally {
       setIsLoading(false);
@@ -74,109 +67,88 @@ export default function CreateSurveyModal({ isOpen, onClose, onCreate }: CreateS
   };
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center p-6 z-50" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
-      <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">Create New Survey</h2>
-          <button
-            onClick={onClose}
-            disabled={isLoading}
-            className="p-1 hover:bg-gray-100 rounded transition-colors disabled:opacity-50"
-          >
-            <X className="w-5 h-5 text-gray-600" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4">
+      <div className="sheet flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden">
+        <div className="flex items-center justify-between border-b border-line px-6 py-4">
+          <h2 className="font-serif text-2xl font-semibold text-navy">New survey</h2>
+          <button type="button" onClick={onClose} className="min-h-10 min-w-10" aria-label="Close">
+            <X className="mx-auto size-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
-          {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-sm text-red-700">{error}</p>
-            </div>
-          )}
+        <div className="flex border-b border-line px-6">
+          <button
+            type="button"
+            onClick={() => setTab('ai')}
+            className={`min-h-12 px-3 text-sm font-bold ${tab === 'ai' ? 'border-b-2 border-navy text-navy' : 'text-ink-muted'}`}
+          >
+            From AI file
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab('blank')}
+            className={`min-h-12 px-3 text-sm font-bold ${tab === 'blank' ? 'border-b-2 border-navy text-navy' : 'text-ink-muted'}`}
+          >
+            Blank
+          </button>
+        </div>
 
-          <div>
-            <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
-              Survey Title *
-            </label>
-            <input
-              type="text"
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-              disabled={isLoading}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg 
-                       focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-500"
-              placeholder="e.g., User Experience Research Survey 2026"
+        <div className="overflow-y-auto px-6 py-6">
+          {tab === 'ai' ? (
+            <ImportFromFile
+              mode="create"
+              onImported={(id) => finish({ id, title: 'Imported survey', description: '', status: 'draft' })}
             />
-          </div>
-
-          <div>
-            <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
-              Description (Optional)
-            </label>
-            <textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={3}
-              disabled={isLoading}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg 
-                       focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none disabled:bg-gray-50 disabled:text-gray-500"
-              placeholder="Brief description of the survey purpose and goals"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="estimatedTime" className="block text-sm font-medium text-gray-700 mb-2">
-              Estimated Time to Complete (minutes)
-            </label>
-            <input
-              type="number"
-              id="estimatedTime"
-              value={estimatedTime}
-              onChange={(e) => setEstimatedTime(e.target.value)}
-              min="1"
-              max="120"
-              disabled={isLoading}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg 
-                       focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-500"
-              placeholder="5"
-            />
-          </div>
-
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p className="text-sm text-blue-900">
-              <span className="font-medium">Note:</span> After creating the survey, you can configure 
-              questions, logic, and distribution settings in the survey management panel.
-            </p>
-          </div>
-
-          <div className="flex gap-3 pt-4">
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="flex-1 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {isLoading ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  Creating...
-                </>
-              ) : (
-                'Create Survey'
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {error && (
+                <p role="alert" className="border border-danger bg-danger-soft px-3 py-3 text-sm text-danger">
+                  {error}
+                </p>
               )}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={isLoading}
-              className="flex-1 px-4 py-2.5 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg font-medium transition-colors disabled:opacity-50"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
+              <Field
+                id="title"
+                label="Survey title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                required
+                disabled={isLoading}
+                placeholder="e.g. Library use, spring term"
+              />
+              <div className="space-y-2">
+                <label htmlFor="description" className="block text-sm font-bold text-ink">
+                  Description
+                </label>
+                <textarea
+                  id="description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={3}
+                  disabled={isLoading}
+                  className="w-full border border-line-strong bg-surface px-3 py-3 text-base"
+                />
+              </div>
+              <Field
+                id="estimatedTime"
+                label="Estimated minutes"
+                type="number"
+                min={1}
+                max={120}
+                value={estimatedTime}
+                onChange={(e) => setEstimatedTime(e.target.value)}
+                disabled={isLoading}
+              />
+              <div className="flex gap-3 pt-2">
+                <Button type="submit" disabled={isLoading} className="flex-1">
+                  {isLoading ? 'Creating…' : 'Create empty survey'}
+                </Button>
+                <Button type="button" variant="secondary" onClick={onClose} disabled={isLoading} className="flex-1">
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          )}
+        </div>
       </div>
     </div>
   );

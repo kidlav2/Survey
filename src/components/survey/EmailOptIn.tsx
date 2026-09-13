@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate, useParams, useLocation, useSearchParams } from 'react-router-dom';
-import { Mail, Shield } from 'lucide-react';
-import LanguageToggle from './LanguageToggle';
 import { translations } from './translations';
-import { supabase } from '../../lib/supabaseClient';
+import { updateIgnoringUnknownColumns } from '../../lib/supabaseClient';
+import { isLng, type Lng } from '../../lib/cn';
+import { getStoredLanguage, getStoredResponseId, setStoredLanguage } from '../../lib/surveySession';
+import SurveyShell from '../chrome/SurveyShell';
+import Button from '../chrome/Button';
+import Field from '../chrome/Field';
 
 export default function EmailOptIn() {
   const navigate = useNavigate();
@@ -11,153 +14,120 @@ export default function EmailOptIn() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
 
-  type Lng = 'en' | 'ru' | 'fr' | 'es';
-  const lngFromQuery = searchParams.get('lng') as Lng | null;
+  const lngFromQuery = searchParams.get('lng');
   const ridFromQuery = searchParams.get('rid');
-
-  const persistedLng = id ? (localStorage.getItem(`survey_lng_${id}`) as Lng | null) : null;
-  const initialLng: Lng = (lngFromQuery && ['en', 'ru', 'fr', 'es'].includes(lngFromQuery))
+  const persistedLng = id ? getStoredLanguage(id) : null;
+  const initialLng: Lng = isLng(lngFromQuery)
     ? lngFromQuery
-    : (location.state?.language as Lng) || persistedLng || 'en';
+    : isLng((location.state as { language?: string } | null)?.language)
+      ? ((location.state as { language: Lng }).language)
+      : isLng(persistedLng)
+        ? persistedLng
+        : 'en';
 
   const [language, setLanguage] = useState<Lng>(initialLng);
   const [optIn, setOptIn] = useState(false);
   const [email, setEmail] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  // responseId can arrive via route state OR query param OR localStorage
-  const persistedRid = id ? localStorage.getItem(`survey_rid_${id}`) : null;
-  const responseId = (location.state?.responseId as string | undefined) || ridFromQuery || persistedRid || null;
+  const persistedRid = id ? getStoredResponseId(id) : null;
+  const responseId =
+    (location.state as { responseId?: string } | null)?.responseId || ridFromQuery || persistedRid || null;
 
   const t = translations[language]?.optIn || translations.en.optIn;
 
-  const handleSubmit = async () => {
-    if (id && responseId) {
-      localStorage.setItem(`survey_rid_${id}`, responseId);
-    }
-
-    const isEmailValid = optIn && email && email.includes('@');
-
-    // If opted-in and valid email provided
-    if (isEmailValid) {
-      try {
-        if (responseId) {
-          await supabase
-            .from('responses')
-            .update({ 
-              respondent_email: email,
-              opted_in: true,
-              completed: true,
-            })
-            .eq('id', responseId);
-        }
-      } catch (error) {
-        console.error('Error saving email:', error);
-      }
-    } else if (responseId) {
-      // User didn't opt-in, or unchecked the box, or didn't provide email
-      try {
-        await supabase
-          .from('responses')
-          .update({ 
-            opted_in: false,
-            completed: true,
-          })
-          .eq('id', responseId);
-      } catch (error) {
-        console.error('Error updating response completion:', error);
-      }
-    }
-
-    // Navigate regardless
-    if (id) localStorage.setItem(`survey_lng_${id}`, language);
+  const goThankYou = (lng: Lng) => {
     const rid = responseId ? `&rid=${encodeURIComponent(responseId)}` : '';
-    navigate(`/survey/${id}/thank-you?lng=${encodeURIComponent(language)}${rid}`, { state: { language } });
+    navigate(`/survey/${id}/thank-you?lng=${encodeURIComponent(lng)}${rid}`, { state: { language: lng } });
+  };
+
+  const handleSubmit = async () => {
+    const trimmed = email.trim();
+    if (optIn && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      setEmailError('Enter a valid email address.');
+      return;
+    }
+
+    setSubmitting(true);
+    setEmailError('');
+
+    try {
+      if (responseId) {
+        await updateIgnoringUnknownColumns(
+          'responses',
+          optIn && trimmed
+            ? { respondent_email: trimmed, opted_in: true, completed: true, status: 'completed' }
+            : { opted_in: false, completed: true, status: 'completed' },
+          responseId
+        );
+      }
+    } catch {
+      /* still let the participant finish */
+    }
+
+    if (id) setStoredLanguage(id, language);
+    goThankYou(language);
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
-      {/* Language Toggle */}
-      <div className="fixed top-6 right-6">
-        <LanguageToggle
-          currentLanguage={language}
-          onLanguageChange={(lng) => {
-            setLanguage(lng);
-            if (id) localStorage.setItem(`survey_lng_${id}`, lng);
-            const rid = responseId ? `&rid=${encodeURIComponent(responseId)}` : '';
-            navigate(`/survey/${id}/opt-in?lng=${encodeURIComponent(lng)}${rid}`, {
-              replace: true,
-              state: { ...location.state, language: lng },
-            });
-          }}
-        />
-      </div>
+    <SurveyShell
+      language={language}
+      onLanguageChange={(lng) => {
+        setLanguage(lng);
+        if (id) setStoredLanguage(id, lng);
+        const rid = responseId ? `&rid=${encodeURIComponent(responseId)}` : '';
+        navigate(`/survey/${id}/opt-in?lng=${encodeURIComponent(lng)}${rid}`, {
+          replace: true,
+          state: { ...(location.state as object), language: lng },
+        });
+      }}
+    >
+      <article className="sheet px-6 py-10 md:px-12 md:py-14">
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-ink-subtle">Optional</p>
+        <h1 className="mt-3 font-serif text-4xl font-semibold text-navy">{t.title}</h1>
+        <p className="mt-4 max-w-[60ch] text-base leading-relaxed text-ink-muted">{t.description}</p>
 
-      <div className="max-w-2xl w-full">
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-8 md:p-10">
-          {/* Header */}
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-14 h-14 bg-indigo-50 rounded-full mb-4">
-              <Mail className="w-7 h-7 text-indigo-600" />
-            </div>
-            <h2 className="text-2xl font-semibold text-gray-900 mb-2">{t.title}</h2>
-            <p className="text-gray-600">{t.description}</p>
+        <label className="mt-8 flex cursor-pointer items-start gap-3">
+          <input
+            type="checkbox"
+            checked={optIn}
+            onChange={(e) => setOptIn(e.target.checked)}
+            className="mt-1 size-5 shrink-0 accent-navy"
+          />
+          <span>
+            <span className="block font-bold text-ink">{t.checkbox}</span>
+            <span className="mt-1 block text-sm text-ink-muted">{t.checkboxDetail}</span>
+          </span>
+        </label>
+
+        {optIn && (
+          <div className="mt-6">
+            <Field
+              id="opt-in-email"
+              label={t.emailLabel}
+              type="email"
+              autoComplete="email"
+              inputMode="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder={t.emailPlaceholder}
+              error={emailError}
+            />
           </div>
+        )}
 
-          {/* Opt-in Checkbox */}
-          <div className="mb-6">
-            <label className="flex items-start gap-3 cursor-pointer group">
-              <div className="relative flex items-center justify-center mt-0.5">
-                <input
-                  type="checkbox"
-                  checked={optIn}
-                  onChange={(e) => setOptIn(e.target.checked)}
-                  className="w-5 h-5 border-2 border-gray-300 rounded cursor-pointer checked:bg-indigo-600 checked:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                />
-              </div>
-              <div>
-                <span className="text-gray-900 font-medium">{t.checkbox}</span>
-                <p className="text-sm text-gray-600 mt-1">{t.checkboxDetail}</p>
-              </div>
-            </label>
-          </div>
+        <aside className="mt-8 border border-line bg-canvas px-4 py-4 text-sm leading-relaxed text-ink-muted">
+          <p className="font-bold text-ink">{t.privacyTitle}</p>
+          <p className="mt-1">{t.privacyText}</p>
+        </aside>
 
-          {/* Email Input (conditional) */}
-          {optIn && (
-            <div className="mb-6 animate-fadeIn">
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                {t.emailLabel}
-              </label>
-              <input
-                type="email"
-                id="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder={t.emailPlaceholder}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              />
-            </div>
-          )}
-
-          {/* Trust Note */}
-          <div className="bg-gray-50 rounded-lg p-4 mb-8 border border-gray-200">
-            <div className="flex items-start gap-3">
-              <Shield className="w-5 h-5 text-gray-600 mt-0.5 flex-shrink-0" />
-              <div className="text-sm text-gray-600">
-                <p className="font-medium text-gray-900 mb-1">{t.privacyTitle}</p>
-                <p>{t.privacyText}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Submit Button */}
-          <button
-            onClick={handleSubmit}
-            className="w-full py-4 px-6 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors shadow-sm"
-          >
-            {t.submitButton}
-          </button>
+        <div className="mt-10">
+          <Button onClick={handleSubmit} disabled={submitting} className="w-full sm:w-auto">
+            {submitting ? '…' : t.submitButton}
+          </Button>
         </div>
-      </div>
-    </div>
+      </article>
+    </SurveyShell>
   );
 }

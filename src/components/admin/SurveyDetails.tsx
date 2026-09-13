@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronLeft, ChevronDown, Copy, Edit3, BarChart3, Download, FileJson, Trash2, ExternalLink, CheckCircle, Pencil, QrCode, X } from 'lucide-react';
+import { ChevronLeft, ChevronDown, Copy, Edit3, BarChart3, Download, FileJson, Trash2, ExternalLink, CheckCircle, Pencil, QrCode, X, Inbox } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { supabase } from '../../lib/supabaseClient';
 import DeleteSurveyModal from './DeleteSurveyModal';
@@ -10,6 +10,9 @@ import Toast from '../common/Toast';
 import SkeletonSurveyCard from '../common/SkeletonSurveyCard';
 import { adminTranslations } from './adminTranslations';
 import { AdminLanguageContext } from './AdminLayout';
+import { isResponseCompleted, type QuestionRow, type ResponseRow } from '../../lib/responseFormat';
+import { exportResponsesFile } from '../../lib/surveyExport';
+import { exportSurveyJson } from '../../lib/surveyImport';
 
 interface SurveyData {
   id: string;
@@ -107,26 +110,7 @@ export default function SurveyDetails() {
 
       // Calculate stats (DB-backed)
       const totalResponses = responses?.length || 0;
-
-      const isCompleted = (r: any) => {
-        const a = r?.answers;
-        if (a == null) return false;
-        if (typeof a === 'string') {
-          const s = a.trim();
-          if (!s || s === '{}' || s === 'null') return false;
-          try {
-            const obj = JSON.parse(s);
-            return obj && typeof obj === 'object' && Object.keys(obj).length > 0;
-          } catch {
-            // If it's a non-empty string but not JSON, treat as completed
-            return s.length > 0;
-          }
-        }
-        if (typeof a === 'object') return Object.keys(a).length > 0;
-        return Boolean(a);
-      };
-
-      const completedResponses = responses?.filter((r: any) => isCompleted(r)).length || 0;
+      const completedResponses = responses?.filter((r: any) => isResponseCompleted(r)).length || 0;
       const completionRate = totalResponses > 0 ? Math.round((completedResponses / totalResponses) * 100) : 0;
 
       const hasEmail = (r: any) => {
@@ -361,130 +345,37 @@ export default function SurveyDetails() {
 
   const handleExport = async (type: 'CSV' | 'JSON', exportOptions?: { includeResponses: boolean; includeContacts: boolean; dateRange: string }) => {
     try {
-      // Fetch responses for export
+      const options = exportOptions || { includeResponses: true, includeContacts: false, dateRange: 'all' };
       const { data: responses, error: responsesError } = await supabase
         .from('responses')
         .select('*')
         .eq('survey_id', id);
-
       if (responsesError) throw responsesError;
 
-      // Fetch questions for answers-only export
       const { data: questions, error: questionsError } = await supabase
         .from('questions')
         .select('*')
         .eq('survey_id', id)
         .order('sort_order', { ascending: true });
-
       if (questionsError) throw questionsError;
 
-      // Determine what to export based on options
-      if (exportOptions) {
-        if (!exportOptions.includeResponses && exportOptions.includeContacts) {
-          // Only export contact information (emails from opt-ins)
-          const contactData = (responses || [])
-            .filter(r => r.respondent_email && r.opted_in === true)
-            .map(r => ({ email: r.respondent_email, opted_in_date: r.created_at }));
-
-          if (type === 'CSV') {
-            const csv = [
-              ['Email', 'Opted In Date'],
-              ...contactData.map(c => [c.email, new Date(c.opted_in_date).toLocaleString()])
-            ]
-              .map(row => row.map(cell => `"${cell}"`).join(','))
-              .join('\n');
-
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `contacts_${survey?.title}_${new Date().toISOString().split('T')[0]}.csv`;
-            a.click();
-            window.URL.revokeObjectURL(url);
-          } else if (type === 'JSON') {
-            const json = JSON.stringify(contactData, null, 2);
-            const blob = new Blob([json], { type: 'application/json' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `contacts_${survey?.title}_${new Date().toISOString().split('T')[0]}.json`;
-            a.click();
-            window.URL.revokeObjectURL(url);
-          }
-          return;
-        } else if (!exportOptions.includeResponses) {
-          // Nothing selected, show error
-          setToast({ message: 'Please select at least one export option', type: 'error' });
-          return;
-        }
-      }
-
-      if (type === 'CSV') {
-        const csv = [
-          ['ID', 'Date', 'Email', 'Status', 'Duration', 'Answers'],
-          ...(responses || []).map(r => [
-            r.id,
-            new Date(r.created_at).toLocaleString(),
-            r.respondent_email || r.email || 'Not provided',
-            r.completed ? 'Completed' : 'Not Completed',
-            r.duration_seconds ? `${Math.round(r.duration_seconds / 60)} minutes` : 'N/A',
-            r.answers ? JSON.stringify(r.answers) : ''
-          ])
-        ]
-          .map(row => row.map(cell => `"${cell}"`).join(','))
-          .join('\n');
-
-        const blob = new Blob([csv], { type: 'text/csv' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `responses_${survey?.title}_${new Date().toISOString().split('T')[0]}.csv`;
-        a.click();
-        window.URL.revokeObjectURL(url);
-      } else if (type === 'JSON') {
-        // For answers-only export, include email and structured answers
-        const answersOnly = (responses || []).map(r => {
-          const answersObj: any = {
-            email: r.respondent_email || r.email || 'Not provided'
-          };
-
-          // Add answers mapped to question text
-          if (r.answers && typeof r.answers === 'object') {
-            Object.entries(r.answers).forEach(([questionId, answer]) => {
-              const question = questions?.find((q: any) => q.id === questionId);
-              if (question) {
-                const payload = question.payload || {};
-                const questionText = payload.text && typeof payload.text === 'object' 
-                  ? payload.text.en || question.text 
-                  : question.text;
-                answersObj[questionText || questionId] = answer;
-              } else {
-                answersObj[questionId] = answer;
-              }
-            });
-          }
-
-          return answersObj;
-        });
-
-        const json = JSON.stringify(answersOnly, null, 2);
-        const blob = new Blob([json], { type: 'application/json' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `responses_${survey?.title}_${new Date().toISOString().split('T')[0]}.json`;
-        a.click();
-        window.URL.revokeObjectURL(url);
-      }
-
-      setToast({ 
-        message: `${type} exported successfully`, 
-        type: 'success' 
+      exportResponsesFile({
+        type,
+        responses: (responses || []) as ResponseRow[],
+        questions: (questions || []) as QuestionRow[],
+        surveyTitle: survey?.title,
+        surveyTitles: survey?.id ? { [survey.id]: survey.title } : undefined,
+        includeResponses: options.includeResponses,
+        includeContacts: options.includeContacts,
+        dateRange: options.dateRange,
+        language,
       });
+
+      setToast({ message: `${type} exported successfully`, type: 'success' });
       setExportModalType(null);
     } catch (error) {
       console.error('Error exporting:', error);
-      setToast({ message: 'Failed to export data', type: 'error' });
+      setToast({ message: error instanceof Error ? error.message : 'Failed to export data', type: 'error' });
     }
   };
 
@@ -664,8 +555,16 @@ export default function SurveyDetails() {
                 onClick={() => navigate('/admin/responses')}
                 className="flex items-center gap-2 px-4 py-3 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium justify-center"
               >
-                <BarChart3 className="w-4 h-4" />
+                <Inbox className="w-4 h-4" />
                 {t.viewResponses}
+              </button>
+
+              <button
+                onClick={() => navigate(`/admin/analytics?survey=${id}`)}
+                className="flex items-center gap-2 px-4 py-3 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium justify-center"
+              >
+                <BarChart3 className="w-4 h-4" />
+                {t.analytics}
               </button>
 
               <div className="relative export-dropdown-container">
@@ -706,68 +605,18 @@ export default function SurveyDetails() {
               <button
                 onClick={async () => {
                   try {
-                    // Fetch responses with answers
-                    const { data: responses, error: responsesError } = await supabase
-                      .from('responses')
-                      .select('*')
-                      .eq('survey_id', id);
-
-                    if (responsesError) throw responsesError;
-
-                    // Fetch questions
-                    const { data: questions, error: questionsError } = await supabase
-                      .from('questions')
-                      .select('*')
-                      .eq('survey_id', id)
-                      .order('sort_order', { ascending: true });
-
-                    if (questionsError) throw questionsError;
-
-                    // Create answers-only format (email + answers)
-                    const answersOnly = (responses || []).map(r => {
-                      const answersObj: any = {
-                        email: r.respondent_email || r.email || 'Not provided'
-                      };
-
-                      // Add answers mapped to question text
-                      if (r.answers && typeof r.answers === 'object') {
-                        Object.entries(r.answers).forEach(([questionId, answer]) => {
-                          const question = questions?.find((q: any) => q.id === questionId);
-                          if (question) {
-                            const payload = question.payload || {};
-                            const questionText = payload.text && typeof payload.text === 'object' 
-                              ? payload.text.en || question.text 
-                              : question.text;
-                            answersObj[questionText || questionId] = answer;
-                          } else {
-                            answersObj[questionId] = answer;
-                          }
-                        });
-                      }
-
-                      return answersObj;
-                    });
-
-                    const json = JSON.stringify(answersOnly, null, 2);
-                    const blob = new Blob([json], { type: 'application/json' });
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `answers_only_${survey?.title}_${new Date().toISOString().split('T')[0]}.json`;
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                    
-                    setToast({ message: 'Answers exported successfully', type: 'success' });
-                  } catch (error: any) {
-                    console.error('Error exporting answers:', error);
-                    setToast({ message: 'Failed to export answers', type: 'error' });
+                    await exportSurveyJson(id as string);
+                    setToast({ message: t.surveyFileExported || 'Survey file downloaded', type: 'success' });
+                  } catch (error) {
+                    console.error(error);
+                    setToast({ message: 'Failed to export survey file', type: 'error' });
                   }
                 }}
-                className="flex items-center gap-2 px-4 py-3 border border-green-300 hover:bg-green-50 text-green-700 rounded-lg transition-colors font-medium justify-center"
-                title="Export only respondent emails and their answers (without metadata)"
+                className="flex items-center gap-2 px-4 py-3 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium justify-center"
+                title="Download the survey structure so you can import it again"
               >
                 <FileJson className="w-4 h-4" />
-                Export Answers Only
+                {t.exportSurvey}
               </button>
 
               <button

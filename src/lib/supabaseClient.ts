@@ -9,6 +9,42 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+export function missingSchemaColumn(error: { message?: string } | null | undefined): string | null {
+  const match = String(error?.message || '').match(/Could not find the '([^']+)' column/i);
+  return match?.[1] ?? null;
+}
+
+export async function insertIgnoringUnknownColumns(table: string, row: Record<string, unknown>) {
+  const current: Record<string, unknown> = { ...row };
+  for (let i = 0; i < 8; i++) {
+    const { data, error } = await supabase.from(table).insert(current).select('*').single();
+    if (!error) {
+      if (!data) throw new Error(`No row returned from ${table}`);
+      return data as { id: string } & Record<string, unknown>;
+    }
+    const column = missingSchemaColumn(error);
+    if (!column || !(column in current)) throw error;
+    delete current[column];
+  }
+  throw new Error(`Could not insert into ${table}`);
+}
+
+export async function updateIgnoringUnknownColumns(
+  table: string,
+  row: Record<string, unknown>,
+  id: string
+) {
+  const current: Record<string, unknown> = { ...row };
+  for (let i = 0; i < 8; i++) {
+    const { error } = await supabase.from(table).update(current).eq('id', id);
+    if (!error) return;
+    const column = missingSchemaColumn(error);
+    if (!column || !(column in current)) throw error;
+    delete current[column];
+  }
+  throw new Error(`Could not update ${table}`);
+}
+
 export type SurveyStatus = 'draft' | 'active';
 
 export type Survey = {

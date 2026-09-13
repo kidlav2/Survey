@@ -6,6 +6,7 @@ export const adminTranslations = {
     responses: 'Responses',
     settings: 'Settings',
     contacts: 'Contacts',
+    analytics: 'Analytics',
     adminPortal: 'Admin Portal',
     surveyResearch: 'Survey Research',
     
@@ -152,6 +153,17 @@ export const adminTranslations = {
     notProvided: 'Not provided',
     minutes: 'minutes',
     noResponses: 'No responses yet',
+    skipped: 'Skipped',
+    analyticsIntro: 'Choose a survey to see how people answered: counts, time, languages, and each question.',
+    pickSurvey: 'Choose a survey',
+    noSurveysForAnalytics: 'Create a survey first, then come back here.',
+    noResponsesForAnalytics: 'No responses yet for this survey.',
+    overTime: 'Responses over time',
+    questionBreakdown: 'Answers by question',
+    meanScore: 'Mean',
+    exportSurvey: 'Export survey file',
+    surveyFileExported: 'Survey file downloaded',
+    notSpecified: 'Not specified',
     
     // Common
     loading: 'Loading...',
@@ -187,6 +199,7 @@ export const adminTranslations = {
     responses: 'Ответы',
     settings: 'Настройки',
     contacts: 'Контакты',
+    analytics: 'Аналитика',
     adminPortal: 'Портал администратора',
     surveyResearch: 'Опросные исследования',
     
@@ -304,6 +317,17 @@ export const adminTranslations = {
     notProvided: 'Не предоставлено',
     minutes: 'минут',
     noResponses: 'Ответов еще нет',
+    skipped: 'Пропущен',
+    analyticsIntro: 'Выберите опрос, чтобы увидеть, как отвечали: число ответов, время, языки и каждый вопрос.',
+    pickSurvey: 'Выберите опрос',
+    noSurveysForAnalytics: 'Сначала создайте опрос, потом вернитесь сюда.',
+    noResponsesForAnalytics: 'По этому опросу пока нет ответов.',
+    overTime: 'Ответы по дням',
+    questionBreakdown: 'Ответы по вопросам',
+    meanScore: 'Среднее',
+    exportSurvey: 'Скачать файл опроса',
+    surveyFileExported: 'Файл опроса скачан',
+    notSpecified: 'Не указано',
     
     // Settings
     settingsPage: 'Настройки',
@@ -368,6 +392,7 @@ export const adminTranslations = {
     responses: 'Réponses',
     settings: 'Paramètres',
     contacts: 'Contacts',
+    analytics: 'Analytique',
     adminPortal: 'Portail d\'administration',
     surveyResearch: 'Recherche d\'enquête',
     
@@ -485,6 +510,17 @@ export const adminTranslations = {
     notProvided: 'Non fourni',
     minutes: 'minutes',
     noResponses: 'Aucune réponse pour le moment',
+    skipped: 'Ignorée',
+    analyticsIntro: 'Choisissez une enquête pour voir comment les gens ont répondu : volumes, temps, langues et chaque question.',
+    pickSurvey: 'Choisir une enquête',
+    noSurveysForAnalytics: 'Créez d’abord une enquête, puis revenez ici.',
+    noResponsesForAnalytics: 'Pas encore de réponses pour cette enquête.',
+    overTime: 'Réponses dans le temps',
+    questionBreakdown: 'Réponses par question',
+    meanScore: 'Moyenne',
+    exportSurvey: 'Exporter le fichier d’enquête',
+    surveyFileExported: 'Fichier d’enquête téléchargé',
+    notSpecified: 'Non précisé',
     
     // Settings
     settingsPage: 'Paramètres',
@@ -548,6 +584,7 @@ export const adminTranslations = {
     responses: 'Respuestas',
     settings: 'Configuración',
     contacts: 'Contactos',
+    analytics: 'Analítica',
     adminPortal: 'Portal de administración',
     surveyResearch: 'Investigación de encuestas',
     
@@ -665,6 +702,17 @@ export const adminTranslations = {
     notProvided: 'No proporcionado',
     minutes: 'minutos',
     noResponses: 'Sin respuestas aún',
+    skipped: 'Omitida',
+    analyticsIntro: 'Elija una encuesta para ver cómo respondieron: recuentos, tiempo, idiomas y cada pregunta.',
+    pickSurvey: 'Elija una encuesta',
+    noSurveysForAnalytics: 'Cree primero una encuesta y vuelva aquí.',
+    noResponsesForAnalytics: 'Aún no hay respuestas para esta encuesta.',
+    overTime: 'Respuestas en el tiempo',
+    questionBreakdown: 'Respuestas por pregunta',
+    meanScore: 'Media',
+    exportSurvey: 'Exportar archivo de encuesta',
+    surveyFileExported: 'Archivo de encuesta descargado',
+    notSpecified: 'No indicado',
     
     // Settings
     settingsPage: 'Configuración',

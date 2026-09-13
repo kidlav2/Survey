@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Download, FileJson } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
@@ -7,305 +7,123 @@ import Toast from '../common/Toast';
 import SkeletonDashboard from '../common/SkeletonDashboard';
 import { adminTranslations } from './adminTranslations';
 import { AdminLanguageContext } from './AdminLayout';
-
-interface Response {
-  id: string;
-  created_at: string;
-  respondent_email: string | null;
-  survey_id: string;
-  answers: Record<string, any> | null;
-  // Optional columns if you add them later
-  completed?: boolean | null;
-  duration_seconds?: number | null;
-  opted_in?: boolean | null;
-}
-
-interface ResponseStats {
-  totalResponses: number;
-  today: number;
-  thisWeek: number;
-  completionRate: number;
-}
+import { formatDuration, isResponseCompleted, type QuestionRow, type ResponseRow } from '../../lib/responseFormat';
+import { exportResponsesFile } from '../../lib/surveyExport';
+import Button from '../chrome/Button';
 
 export default function Responses() {
   const navigate = useNavigate();
   const { language } = useContext(AdminLanguageContext);
   const t = adminTranslations[language];
-  const [responses, setResponses] = useState<Response[]>([]);
-  const [stats, setStats] = useState<ResponseStats>({
-    totalResponses: 0,
-    today: 0,
-    thisWeek: 0,
-    completionRate: 0,
-  });
+  const [responses, setResponses] = useState<ResponseRow[]>([]);
+  const [questions, setQuestions] = useState<QuestionRow[]>([]);
+  const [surveys, setSurveys] = useState<{ id: string; title: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [exportModalType, setExportModalType] = useState<'CSV' | 'JSON' | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
   const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
-  const [surveys, setSurveys] = useState<any[]>([]);
-  const [filterSurvey, setFilterSurvey] = useState<string>('all');
+  const [filterSurvey, setFilterSurvey] = useState('all');
 
   useEffect(() => {
-    loadResponses();
-    
-    // Subscribe to real-time updates
-    const channel = supabase
-      .channel('responses-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'responses',
-        },
-        (payload) => {
-          console.log('Response changed:', payload);
-          // Reload responses when any change occurs
-          loadResponses();
-        }
-      )
-      .subscribe((status) => {
-        console.log('Subscription status:', status);
-      });
-
-    // Cleanup subscription on unmount
-    return () => {
-      supabase.removeChannel(channel);
+    void loadResponses();
+    const onFocus = () => {
+      if (!document.hidden) void loadResponses();
     };
+    document.addEventListener('visibilitychange', onFocus);
+    return () => document.removeEventListener('visibilitychange', onFocus);
   }, []);
-
-  // Add this separate effect to debug the responses state
-  useEffect(() => {
-    console.log('Current responses count:', responses.length);
-    console.log('Current stats:', stats);
-  }, [responses]);
 
   const loadResponses = async () => {
     try {
       setLoading(true);
-
-      // Get current user
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError || !user) throw new Error('Not authenticated');
 
-      console.log('Loading responses for user:', user.id);
-
-      // DEBUG: Try to get ALL surveys to see what's happening
-      const { data: allSurveysDebug } = await supabase
-        .from('surveys')
-        .select('id, title, owner_id');
-      
-      console.log('DEBUG - ALL surveys in DB:', allSurveysDebug?.map(s => ({ id: s.id, title: s.title, owner: s.owner_id })));
-
-      // Fetch surveys for current user
-      const { data: surveys, error: surveysError } = await supabase
+      const { data: surveyRows, error: surveysError } = await supabase
         .from('surveys')
         .select('id, title')
         .eq('owner_id', user.id);
-
       if (surveysError) throw surveysError;
-
-      console.log('Found surveys for user:', surveys?.length || 0);
-      console.log('Survey data:', surveys);
-
-      // Store surveys in state for filtering
-      setSurveys(surveys || []);
-
-      const surveyIds = surveys?.map(s => s.id) || [];
-
-      if (surveyIds.length === 0) {
-        console.log('No surveys found');
+      setSurveys(surveyRows || []);
+      const surveyIds = (surveyRows || []).map((survey) => survey.id);
+      if (!surveyIds.length) {
         setResponses([]);
-        setLoading(false);
+        setQuestions([]);
         return;
       }
 
-      // Fetch responses for user's surveys
-      const { data: allResponses, error: responsesError } = await supabase
-        .from('responses')
-        .select('*')
-        .in('survey_id', surveyIds)
-        .order('created_at', { ascending: false });
-
+      const [{ data: allResponses, error: responsesError }, { data: allQuestions, error: questionsError }] = await Promise.all([
+        supabase.from('responses').select('*').in('survey_id', surveyIds).order('created_at', { ascending: false }),
+        supabase.from('questions').select('*').in('survey_id', surveyIds).order('sort_order', { ascending: true }),
+      ]);
       if (responsesError) throw responsesError;
-
-      console.log('Fetched responses:', allResponses?.length || 0);
-      console.log('Response data:', allResponses);
-      console.log('Survey IDs searched:', surveyIds);
-      
-      // Debug: Try fetching all responses to check RLS
-      const { data: debugAllResponses, error: debugError } = await supabase
-        .from('responses')
-        .select('id, survey_id, created_at, answers');
-      
-      console.log('DEBUG - All responses in DB:', debugAllResponses?.length || 0);
-      if (debugAllResponses) {
-        console.log('DEBUG - Full response list:', debugAllResponses);
-        const surveyIdList = debugAllResponses.map(r => r.survey_id);
-        console.log('DEBUG - All survey_ids in DB:', surveyIdList);
-        console.log('DEBUG - Missing survey ids:', surveyIds.filter(id => !surveyIdList.includes(id)));
-      }
-      if (debugError) console.log('DEBUG - Error:', debugError);
-
+      if (questionsError) throw questionsError;
       setResponses(allResponses || []);
-
-      // Calculate stats
-      const totalResponses = allResponses?.length || 0;
-      const completedResponses = allResponses?.filter((r: any) => r.completed === true).length || 0;
-      const completionRate = totalResponses > 0 ? Math.round((completedResponses / totalResponses) * 100) : 0;
-
-      // Count today
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const todayCount = allResponses?.filter(r => 
-        new Date(r.created_at) >= today
-      ).length || 0;
-
-      // Count this week
-      const oneWeekAgo = new Date();
-      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-      const thisWeekCount = allResponses?.filter(r => 
-        new Date(r.created_at) > oneWeekAgo
-      ).length || 0;
-
-      setStats({
-        totalResponses,
-        today: todayCount,
-        thisWeek: thisWeekCount,
-        completionRate,
-      });
-
-      setLoading(false);
+      setQuestions(allQuestions || []);
     } catch (error) {
       console.error('Error loading responses:', error);
       setToast({ message: 'Failed to load responses', type: 'error' });
+    } finally {
       setLoading(false);
     }
   };
 
-  const handleExport = (type: 'CSV' | 'JSON', exportOptions?: { includeResponses: boolean; includeContacts: boolean; dateRange: string }) => {
+  const surveyTitles = useMemo(
+    () => Object.fromEntries(surveys.map((survey) => [survey.id, survey.title])),
+    [surveys]
+  );
+
+  const visible = useMemo(() => {
+    const filtered = responses.filter((row) => filterSurvey === 'all' || row.survey_id === filterSurvey);
+    return sortBy === 'newest' ? filtered : [...filtered].reverse();
+  }, [responses, filterSurvey, sortBy]);
+
+  const stats = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const week = new Date();
+    week.setDate(week.getDate() - 7);
+    const completed = visible.filter(isResponseCompleted).length;
+    return {
+      totalResponses: visible.length,
+      today: visible.filter((row) => new Date(row.created_at) >= today).length,
+      thisWeek: visible.filter((row) => new Date(row.created_at) > week).length,
+      completionRate: visible.length ? Math.round((completed / visible.length) * 100) : 0,
+    };
+  }, [visible]);
+
+  const handleExport = async (
+    type: 'CSV' | 'JSON',
+    exportOptions?: { includeResponses: boolean; includeContacts: boolean; dateRange: string }
+  ) => {
     try {
-      // Apply current filters and sort to exported data
-      let filteredResponses = responses.filter(r => filterSurvey === 'all' || r.survey_id === filterSurvey);
-      let sortedResponses = sortBy === 'newest' ? filteredResponses : [...filteredResponses].reverse();
-
-      // Determine what to export based on options
-      if (exportOptions) {
-        if (!exportOptions.includeResponses && exportOptions.includeContacts) {
-          // Only export contact information (emails from opt-ins)
-          const contactData = sortedResponses
-            .filter(r => r.respondent_email && r.opted_in === true)
-            .map(r => ({ email: r.respondent_email, opted_in_date: r.created_at }));
-
-          if (type === 'CSV') {
-            const csv = [
-              ['Email', 'Opted In Date'],
-              ...contactData.map(c => [c.email, new Date(c.opted_in_date).toLocaleString()])
-            ]
-              .map(row => row.map(cell => `"${cell}"`).join(','))
-              .join('\n');
-
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `contacts_${new Date().toISOString().split('T')[0]}.csv`;
-            a.click();
-            window.URL.revokeObjectURL(url);
-          } else if (type === 'JSON') {
-            const json = JSON.stringify(contactData, null, 2);
-            const blob = new Blob([json], { type: 'application/json' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `contacts_${new Date().toISOString().split('T')[0]}.json`;
-            a.click();
-            window.URL.revokeObjectURL(url);
-          }
-        } else if (!exportOptions.includeResponses) {
-          // Nothing selected, show error
-          setToast({ message: 'Please select at least one export option', type: 'error' });
-          return;
-        } else {
-          // Export survey responses (with or without contacts appended)
-          if (type === 'CSV') {
-            const csv = [
-              [t.id, t.date, t.email, t.status, t.duration, 'Answers'],
-              ...sortedResponses.map(r => [
-                r.id,
-                new Date(r.created_at).toLocaleString(),
-                r.respondent_email || t.notProvided,
-                r.completed ? t.completed : t.inProgress,
-                r.duration_seconds ? `${Math.round(r.duration_seconds / 60)} ${t.minutes}` : 'N/A',
-                r.answers ? JSON.stringify(r.answers) : ''
-              ])
-            ]
-              .map(row => row.map(cell => `"${cell}"`).join(','))
-              .join('\n');
-
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `responses_${new Date().toISOString().split('T')[0]}.csv`;
-            a.click();
-            window.URL.revokeObjectURL(url);
-          } else if (type === 'JSON') {
-            const json = JSON.stringify(sortedResponses, null, 2);
-            const blob = new Blob([json], { type: 'application/json' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `responses_${new Date().toISOString().split('T')[0]}.json`;
-            a.click();
-            window.URL.revokeObjectURL(url);
-          }
-        }
-      }
-
-      setToast({ 
-        message: `${type} ${t.exportedSuccessfully}`, 
-        type: 'success' 
+      const options = exportOptions || { includeResponses: true, includeContacts: false, dateRange: 'all' };
+      const surveyTitle = filterSurvey === 'all' ? 'all-surveys' : surveyTitles[filterSurvey];
+      const scopedQuestions = filterSurvey === 'all' ? questions : questions.filter((q) => q.survey_id === filterSurvey);
+      exportResponsesFile({
+        type,
+        responses: visible,
+        questions: scopedQuestions,
+        surveyTitle,
+        surveyTitles,
+        includeResponses: options.includeResponses,
+        includeContacts: options.includeContacts,
+        dateRange: options.dateRange,
+        language,
       });
+      setToast({ message: t.exportedSuccessfully.replace('{type}', type), type: 'success' });
       setExportModalType(null);
     } catch (error) {
       console.error('Error exporting:', error);
-      setToast({ message: 'Failed to export data', type: 'error' });
+      setToast({ message: error instanceof Error ? error.message : 'Failed to export data', type: 'error' });
     }
   };
-
-  const statConfig = [
-    {
-      label: t.totalResponses,
-      value: stats.totalResponses,
-      color: 'indigo',
-      icon: Download,
-    },
-    {
-      label: t.today,
-      value: stats.today,
-      color: 'green',
-      icon: Download,
-    },
-    {
-      label: t.thisWeek,
-      value: stats.thisWeek,
-      color: 'blue',
-      icon: Download,
-    },
-    {
-      label: t.completionRate,
-      value: `${stats.completionRate}%`,
-      color: 'yellow',
-      icon: Download,
-    },
-  ];
 
   if (loading) {
     return (
       <main className="flex-1">
-        <header className="bg-white border-b border-gray-200 px-4 md:px-8 py-4">
-          <h2 className="text-xl md:text-2xl font-semibold text-gray-900">{t.responsesPage}</h2>
+        <header className="border-b border-line px-4 py-5 md:px-8">
+          <h2 className="font-serif text-2xl font-semibold text-navy">{t.responsesPage}</h2>
         </header>
         <div className="p-4 md:p-8">
           <SkeletonDashboard />
@@ -316,63 +134,52 @@ export default function Responses() {
 
   return (
     <main className="flex-1">
-      {/* Top Bar */}
-      <header className="bg-white border-b border-gray-200 px-4 md:px-8 py-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <header className="border-b border-line px-4 py-5 md:px-8">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h2 className="text-xl md:text-2xl font-semibold text-gray-900">{t.responsesPage}</h2>
-            <p className="text-sm text-gray-500 mt-1">{t.viewAndAnalyze}</p>
+            <h2 className="font-serif text-2xl font-semibold text-navy">{t.responsesPage}</h2>
+            <p className="mt-1 text-sm text-ink-muted">{t.viewAndAnalyze}</p>
           </div>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <button 
-              onClick={() => setExportModalType('CSV')}
-              className="flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium"
-              title="Export all response data including answers"
-            >
-              <Download className="w-4 h-4" />
-              Export CSV
-            </button>
-            <button 
-              onClick={() => setExportModalType('JSON')}
-              className="flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium"
-              title="Export all response data including answers"
-            >
-              <FileJson className="w-4 h-4" />
-              Export JSON
-            </button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={() => setExportModalType('CSV')}>
+              <Download className="size-4" />
+              {t.exportCSV}
+            </Button>
+            <Button variant="secondary" onClick={() => setExportModalType('JSON')}>
+              <FileJson className="size-4" />
+              {t.exportJSON}
+            </Button>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
       <div className="p-4 md:p-8">
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
-          {statConfig.map((stat) => {
-            const Icon = stat.icon;
-            return (
-              <div key={stat.label} className="bg-white rounded-lg border border-gray-200 p-6">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className={`w-10 h-10 rounded-lg bg-${stat.color}-50 flex items-center justify-center`}>
-                    <Icon className={`w-5 h-5 text-${stat.color}-600`} />
-                  </div>
-                  <p className="text-sm text-gray-600">{stat.label}</p>
-                </div>
-                <p className="text-2xl md:text-3xl font-semibold text-gray-900">{stat.value}</p>
-              </div>
-            );
-          })}
+        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            { label: t.totalResponses, value: stats.totalResponses },
+            { label: t.today, value: stats.today },
+            { label: t.thisWeek, value: stats.thisWeek },
+            { label: t.completionRate, value: `${stats.completionRate}%` },
+          ].map((stat) => (
+            <div key={stat.label} className="border border-line bg-surface p-5">
+              <p className="text-sm text-ink-muted">{stat.label}</p>
+              <p className="mt-2 font-serif text-3xl font-semibold text-navy">{stat.value}</p>
+            </div>
+          ))}
         </div>
 
-        {/* Responses Table */}
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <div className="px-4 md:px-6 py-4 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <h3 className="text-base md:text-lg font-semibold text-gray-900">Recent Responses</h3>
-            <div className="flex flex-col sm:flex-row gap-3">
+        <div className="overflow-hidden border border-line bg-surface">
+          <div className="flex flex-col gap-3 border-b border-line px-4 py-4 sm:flex-row sm:items-center sm:justify-between md:px-6">
+            <h3 className="font-serif text-lg font-semibold text-navy">{t.allResponses}</h3>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <label className="sr-only" htmlFor="filter-survey">
+                {t.allSurveys}
+              </label>
               <select
+                id="filter-survey"
                 value={filterSurvey}
                 onChange={(e) => setFilterSurvey(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="min-h-11 border border-line-strong bg-surface px-3 text-sm"
               >
                 <option value="all">{t.allSurveys}</option>
                 {surveys.map((survey) => (
@@ -381,10 +188,14 @@ export default function Responses() {
                   </option>
                 ))}
               </select>
+              <label className="sr-only" htmlFor="sort-responses">
+                {t.sort}
+              </label>
               <select
+                id="sort-responses"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as 'newest' | 'oldest')}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="min-h-11 border border-line-strong bg-surface px-3 text-sm"
               >
                 <option value="newest">{t.newestFirst}</option>
                 <option value="oldest">{t.oldestFirst}</option>
@@ -392,127 +203,68 @@ export default function Responses() {
             </div>
           </div>
 
-          {responses.length === 0 ? (
-            <div className="p-6 text-center text-gray-500">
-              {t.noResponses}
-            </div>
+          {visible.length === 0 ? (
+            <p className="p-6 text-center text-ink-muted">{t.noResponses}</p>
           ) : (
             <>
-              {/* Mobile Card View */}
               <div className="block md:hidden">
-                {(() => {
-                  const filtered = responses.filter(r => filterSurvey === 'all' || r.survey_id === filterSurvey);
-                  const sorted = sortBy === 'newest' ? filtered : [...filtered].reverse();
-                  return sorted.map((response) => {
-                  const isCompleted = response.completed === true;
+                {visible.map((response) => {
+                  const completed = isResponseCompleted(response);
                   return (
-                  <div key={response.id} className="p-4 border-b border-gray-200 last:border-b-0">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-gray-900">Response #{response.id.slice(0, 8)}</span>
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                        isCompleted
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {isCompleted ? 'Completed' : 'In Progress'}
-                      </span>
-                    </div>
-                    <div className="space-y-1 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Date:</span>
-                        <span className="text-gray-900">{new Date(response.created_at).toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Email:</span>
-                        <span className="text-gray-900">{response.respondent_email || 'Not provided'}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Duration:</span>
-                        <span className="text-gray-900">
-                          {response.duration_seconds ? `${Math.round(response.duration_seconds / 60)} minutes` : 'N/A'}
+                    <div key={response.id} className="border-b border-line p-4 last:border-b-0">
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <span className="text-sm font-medium">{surveyTitles[response.survey_id] || response.id.slice(0, 8)}</span>
+                        <span className={`px-2 py-0.5 text-xs font-bold ${completed ? 'bg-ok-soft text-ok' : 'bg-accent-soft text-accent'}`}>
+                          {completed ? t.completed : t.inProgress}
                         </span>
                       </div>
+                      <p className="text-sm text-ink-muted">{new Date(response.created_at).toLocaleString()}</p>
+                      <p className="text-sm">{response.respondent_email || t.notProvided}</p>
+                      <Button variant="secondary" className="mt-3 w-full" onClick={() => navigate(`/admin/responses/${response.id}`)}>
+                        {t.view}
+                      </Button>
                     </div>
-                    <button 
-                      onClick={() => navigate(`/admin/responses/${response.id}`)}
-                      className="mt-3 w-full px-3 py-1.5 text-sm text-indigo-600 border border-indigo-600 hover:bg-indigo-50 rounded transition-colors"
-                    >
-                      {t.view}
-                    </button>
-                  </div>
                   );
-                });
-                })()}
+                })}
               </div>
 
-              {/* Desktop Table View */}
-              <div className="hidden md:block overflow-x-auto">
+              <div className="hidden overflow-x-auto md:block">
                 <table className="w-full">
-                  <thead className="bg-gray-50 border-b border-gray-200">
+                  <thead className="border-b border-line bg-canvas">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {t.id}
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {t.date}
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {t.email}
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {t.status}
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {t.duration}
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {t.edit}
-                      </th>
+                      {[t.surveyTitle, t.date, t.email, t.status, t.duration, t.view].map((heading) => (
+                        <th key={heading} className="px-6 py-3 text-left text-xs font-bold tracking-wide text-ink-muted uppercase">
+                          {heading}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {(() => {
-                      const filtered = responses.filter(r => filterSurvey === 'all' || r.survey_id === filterSurvey);
-                      const sorted = sortBy === 'newest' ? filtered : [...filtered].reverse();
-                      return sorted.map((response) => {
-                      const isCompleted = response.completed === true;
+                  <tbody>
+                    {visible.map((response) => {
+                      const completed = isResponseCompleted(response);
                       return (
-                      <tr key={response.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {response.id.slice(0, 8)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                          {new Date(response.created_at).toLocaleString()}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                          {response.respondent_email || t.notProvided}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              isCompleted
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-yellow-100 text-yellow-800'
-                            }`}
-                          >
-                            {isCompleted ? t.completed : t.inProgress}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                          {response.duration_seconds ? `${Math.round(response.duration_seconds / 60)} ${t.minutes}` : 'N/A'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                          <button 
-                            onClick={() => navigate(`/admin/responses/${response.id}`)}
-                            className="text-indigo-600 hover:text-indigo-900 font-medium"
-                          >
-                            View
-                          </button>
-                        </td>
-                      </tr>
+                        <tr key={response.id} className="border-b border-line last:border-b-0">
+                          <td className="px-6 py-4 text-sm font-medium">{surveyTitles[response.survey_id] || response.id.slice(0, 8)}</td>
+                          <td className="px-6 py-4 text-sm">{new Date(response.created_at).toLocaleString()}</td>
+                          <td className="px-6 py-4 text-sm">{response.respondent_email || t.notProvided}</td>
+                          <td className="px-6 py-4">
+                            <span className={`px-2 py-0.5 text-xs font-bold ${completed ? 'bg-ok-soft text-ok' : 'bg-accent-soft text-accent'}`}>
+                              {completed ? t.completed : t.inProgress}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-sm">{formatDuration(response.duration_seconds)}</td>
+                          <td className="px-6 py-4">
+                            <button
+                              type="button"
+                              onClick={() => navigate(`/admin/responses/${response.id}`)}
+                              className="min-h-11 text-sm font-bold text-navy hover:underline"
+                            >
+                              {t.view}
+                            </button>
+                          </td>
+                        </tr>
                       );
-                    });
-                    })()}
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -521,7 +273,6 @@ export default function Responses() {
         </div>
       </div>
 
-      {/* Export Modals */}
       {exportModalType && (
         <ExportModal
           isOpen={true}
@@ -531,14 +282,8 @@ export default function Responses() {
         />
       )}
 
-      {/* Toast */}
       {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          isVisible={true}
-          onClose={() => setToast(null)}
-        />
+        <Toast message={toast.message} type={toast.type} isVisible={true} onClose={() => setToast(null)} />
       )}
     </main>
   );

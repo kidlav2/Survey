@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import { X, Download } from 'lucide-react';
+import Button from '../chrome/Button';
 
 interface ExportModalProps {
   isOpen: boolean;
   onClose: () => void;
   type: 'CSV' | 'JSON';
-  onExport: (options: { includeResponses: boolean; includeContacts: boolean; dateRange: string }) => void;
+  onExport: (options: { includeResponses: boolean; includeContacts: boolean; dateRange: string }) => void | Promise<void>;
 }
 
 export default function ExportModal({ isOpen, onClose, type, onExport }: ExportModalProps) {
-  const [isExporting, setIsExporting] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [exportOptions, setExportOptions] = useState({
     includeResponses: true,
     includeContacts: false,
@@ -19,115 +20,85 @@ export default function ExportModal({ isOpen, onClose, type, onExport }: ExportM
   if (!isOpen) return null;
 
   const handleExport = async () => {
-    setIsExporting(true);
-    // Simulate export delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setIsExporting(false);
-    onExport(exportOptions);
-    onClose();
+    setBusy(true);
+    try {
+      await onExport(exportOptions);
+      onClose();
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">Export {type}</h3>
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-gray-100 rounded transition-colors"
-            disabled={isExporting}
-          >
-            <X className="w-5 h-5 text-gray-500" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(28, 22, 16, 0.45)' }}>
+      <div role="dialog" aria-modal="true" aria-labelledby="export-title" className="w-full max-w-md border border-line bg-surface">
+        <div className="flex items-center justify-between border-b border-line px-5 py-4">
+          <h3 id="export-title" className="font-serif text-lg font-semibold text-navy">
+            Export {type}
+          </h3>
+          <button type="button" onClick={onClose} className="min-h-11 min-w-11" aria-label="Close" disabled={busy}>
+            <X className="mx-auto size-5" />
           </button>
         </div>
 
-        {/* Body */}
-        <div className="px-6 py-6 space-y-4">
+        <div className="space-y-5 px-5 py-5">
+          <fieldset className="space-y-3">
+            <legend className="mb-2 text-sm font-bold text-ink">Include</legend>
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                checked={exportOptions.includeResponses}
+                onChange={(e) => setExportOptions({ ...exportOptions, includeResponses: e.target.checked })}
+                className="mt-1 size-4 accent-navy"
+                disabled={busy}
+              />
+              <span>
+                <span className="block text-sm font-medium">Survey responses</span>
+                <span className="text-xs text-ink-muted">One column per question, with readable answers</span>
+              </span>
+            </label>
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                checked={exportOptions.includeContacts}
+                onChange={(e) => setExportOptions({ ...exportOptions, includeContacts: e.target.checked })}
+                className="mt-1 size-4 accent-navy"
+                disabled={busy}
+              />
+              <span>
+                <span className="block text-sm font-medium">Contact emails</span>
+                <span className="text-xs text-ink-muted">Only people who opted in</span>
+              </span>
+            </label>
+          </fieldset>
+
           <div>
-            <p className="text-sm text-gray-600 mb-4">Select what to include in your export:</p>
-            
-            <div className="space-y-3">
-              {/* Include Responses */}
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={exportOptions.includeResponses}
-                  onChange={(e) => setExportOptions({ ...exportOptions, includeResponses: e.target.checked })}
-                  className="mt-0.5 w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                  disabled={isExporting}
-                />
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Survey Responses</p>
-                  <p className="text-xs text-gray-500">All survey response data</p>
-                </div>
-              </label>
-
-              {/* Include Contacts */}
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={exportOptions.includeContacts}
-                  onChange={(e) => setExportOptions({ ...exportOptions, includeContacts: e.target.checked })}
-                  className="mt-0.5 w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                  disabled={isExporting}
-                />
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Contact Information</p>
-                  <p className="text-xs text-gray-500">Email addresses from opt-ins</p>
-                </div>
-              </label>
-            </div>
-          </div>
-
-          {/* Date Range */}
-          <div className="pt-4 border-t border-gray-200">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Date Range
+            <label htmlFor="export-range" className="mb-2 block text-sm font-bold text-ink">
+              Date range
             </label>
             <select
+              id="export-range"
               value={exportOptions.dateRange}
               onChange={(e) => setExportOptions({ ...exportOptions, dateRange: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              disabled={isExporting}
+              className="min-h-12 w-full border border-line-strong bg-surface px-3 text-sm"
+              disabled={busy}
             >
-              <option value="all">All Time</option>
+              <option value="all">All time</option>
               <option value="today">Today</option>
-              <option value="week">Last 7 Days</option>
-              <option value="month">Last 30 Days</option>
-              <option value="custom">Custom Range</option>
+              <option value="week">Last 7 days</option>
+              <option value="month">Last 30 days</option>
             </select>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 rounded-b-lg">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 border border-gray-300 hover:bg-white text-gray-700 rounded-lg text-sm font-medium transition-colors"
-            disabled={isExporting}
-          >
+        <div className="flex justify-end gap-3 border-t border-line px-5 py-4">
+          <Button variant="secondary" onClick={onClose} disabled={busy}>
             Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleExport}
-            disabled={isExporting || (!exportOptions.includeResponses && !exportOptions.includeContacts)}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isExporting ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                Exporting...
-              </>
-            ) : (
-              <>
-                <Download className="w-4 h-4" />
-                Download {type}
-              </>
-            )}
-          </button>
+          </Button>
+          <Button onClick={() => void handleExport()} disabled={busy || (!exportOptions.includeResponses && !exportOptions.includeContacts)}>
+            <Download className="size-4" />
+            {busy ? 'Exporting…' : `Download ${type}`}
+          </Button>
         </div>
       </div>
     </div>

@@ -11,6 +11,7 @@ import Surveys from './components/admin/Surveys';
 import SurveyDetails from './components/admin/SurveyDetails';
 import SurveyBuilder from './components/admin/SurveyBuilder';
 import Responses from './components/admin/Responses';
+import Analytics from './components/admin/Analytics';
 import ResponseDetail from './components/admin/ResponseDetail';
 import Contacts from './components/admin/Contacts';
 import Settings from './components/admin/Settings';
@@ -21,7 +22,6 @@ import EmailOptIn from './components/survey/EmailOptIn';
 import ThankYou from './components/survey/ThankYou';
 import SurveyClosed from './components/survey/SurveyClosed';
 import NotFound from './components/common/NotFound';
-import SkeletonDashboard from './components/common/SkeletonDashboard';
 
 export default function App() {
   const [session, setSession] = useState<any>(null);
@@ -46,8 +46,8 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <SkeletonDashboard />
+      <div className="flex min-h-dvh items-center justify-center bg-canvas text-ink-muted">
+        Loading…
       </div>
     );
   }
@@ -70,12 +70,14 @@ export default function App() {
           <Route path="surveys/:id/builder" element={<SurveyBuilder />} />
           <Route path="responses" element={<Responses />} />
           <Route path="responses/:id" element={<ResponseDetail />} />
+          <Route path="analytics" element={<Analytics />} />
           <Route path="contacts" element={<Contacts />} />
           <Route path="settings" element={<Settings />} />
         </Route>
 
         {/* Public Survey Routes */} 
-        <Route path="/survey/:id" element={<LanguageSelection />} />
+        <Route path="/survey/:id" element={<SurveyWelcome />} />
+        <Route path="/survey/:id/language" element={<LanguageSelection />} />
         <Route path="/survey/:id/closed" element={<SurveyClosed />} />
         <Route path="/survey/:id/welcome" element={<SurveyWelcome />} />
         <Route path="/survey/:id/questions" element={<SurveyFlow />} />

@@ -1,28 +1,38 @@
 import React from 'react';
+import { LANGUAGES, type Lng, cn } from '../../lib/cn';
 
 interface LanguageToggleProps {
-  currentLanguage: 'en' | 'ru' | 'fr' | 'es';
-  onLanguageChange: (lang: 'en' | 'ru' | 'fr' | 'es') => void;
+  currentLanguage: Lng;
+  onLanguageChange: (lang: Lng) => void;
 }
 
 export default function LanguageToggle({ currentLanguage, onLanguageChange }: LanguageToggleProps) {
-  const languages: Array<'en' | 'ru' | 'fr' | 'es'> = ['en', 'ru', 'fr', 'es'];
-
   return (
-    <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg p-1">
-      {languages.map((lang) => (
-        <button
-          key={lang}
-          onClick={() => onLanguageChange(lang)}
-          className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
-            currentLanguage === lang
-              ? 'bg-indigo-600 text-white'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
-        >
-          {lang.toUpperCase()}
-        </button>
-      ))}
+    <div
+      role="group"
+      aria-label="Language"
+      className="inline-flex items-center border border-line bg-surface p-0.5"
+    >
+      {LANGUAGES.map((lang) => {
+        const selected = currentLanguage === lang.code;
+        return (
+          <button
+            key={lang.code}
+            type="button"
+            aria-pressed={selected}
+            aria-label={lang.name}
+            onClick={() => onLanguageChange(lang.code)}
+            className={cn(
+              'min-h-10 min-w-10 px-2.5 text-xs font-bold tracking-wide transition-colors duration-150',
+              selected
+                ? 'bg-navy text-surface'
+                : 'text-ink-muted hover:bg-canvas hover:text-ink'
+            )}
+          >
+            {lang.short}
+          </button>
+        );
+      })}
     </div>
   );
 }

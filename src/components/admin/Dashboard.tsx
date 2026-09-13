@@ -40,28 +40,11 @@ export default function Dashboard() {
     loadDashboardData();
 
     // Subscribe to real-time updates on responses
-    const channel = supabase
-      .channel('dashboard-responses')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'responses',
-        },
-        (payload) => {
-          console.log('Response changed, reloading dashboard:', payload);
-          loadDashboardData();
-        }
-      )
-      .subscribe((status) => {
-        console.log('Dashboard subscription status:', status);
-      });
-
-    // Cleanup subscription on unmount
-    return () => {
-      supabase.removeChannel(channel);
+    const onFocus = () => {
+      if (!document.hidden) loadDashboardData();
     };
+    document.addEventListener('visibilitychange', onFocus);
+    return () => document.removeEventListener('visibilitychange', onFocus);
   }, []);
 
   const loadDashboardData = async () => {
@@ -202,7 +185,7 @@ export default function Dashboard() {
     return items
       .filter(i => i.count > 0)
       .map(i => `${i.label}: ${i.count}`)
-      .join(' â€¢ ');
+      .join('  ');
   };
 
   const relativeTime = (iso?: string | null) => {
@@ -287,8 +270,8 @@ export default function Dashboard() {
       <header className="bg-white border-b border-gray-200 px-4 md:px-8 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl md:text-2xl font-semibold text-gray-900">{t.dashboard}</h2>
-            <p className="text-sm text-gray-500 mt-1">{t.internalSurveyResearchProject}</p>
+            <h2 className="font-serif text-2xl font-semibold text-navy">{t.dashboard}</h2>
+            <p className="mt-1 text-sm text-ink-muted">{t.internalSurveyResearchProject}</p>
           </div>
         </div>
       </header>
@@ -298,7 +281,6 @@ export default function Dashboard() {
         {/* Metrics */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
           {metricCards.map((metric) => {
-            const Icon = metric.icon;
             return (
               <button
                 key={metric.label}
@@ -308,13 +290,10 @@ export default function Dashboard() {
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${metricColorClasses[metric.color]?.bg ?? 'bg-gray-50'}`}>
-                    <Icon className={`w-6 h-6 ${metricColorClasses[metric.color]?.text ?? 'text-gray-600'}`} />
-                  </div>
+                  <p className="text-sm text-ink-muted">{metric.label}</p>
                 </div>
                 <div className="mt-4">
-                  <p className="text-sm text-gray-600">{metric.label}</p>
-                  <p className="text-2xl md:text-3xl font-semibold text-gray-900 mt-1">{metric.value}</p>
+                  <p className="font-serif text-3xl font-semibold text-navy">{metric.value}</p>
                 </div>
               </button>
             );
