@@ -124,7 +124,7 @@ A few facts so we can group answers.
 - [optional] Anything else we should know? (text)
 `;
 
-export const AI_SURVEY_PROMPT = `You are helping me build a research survey for a university web app.
+export const AI_SURVEY_PROMPT = `You are helping me build a professional survey.
 
 Write the full survey as ONE JSON file. Do not wrap it in markdown fences. Do not add commentary.
 
