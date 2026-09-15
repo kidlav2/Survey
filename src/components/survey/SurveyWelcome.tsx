@@ -5,7 +5,7 @@ import { supabase } from '../../lib/supabaseClient';
 import SurveyShell from '../chrome/SurveyShell';
 import Button from '../chrome/Button';
 import { isLng, type Lng } from '../../lib/cn';
-import { getStoredLanguage, setStoredLanguage } from '../../lib/surveySession';
+import { getStoredLanguage, hasSurveyDraft, setStoredLanguage } from '../../lib/surveySession';
 
 export default function SurveyWelcome() {
   const navigate = useNavigate();
@@ -64,6 +64,7 @@ export default function SurveyWelcome() {
 
   const t = translations[language]?.welcome || translations.en.welcome;
   const showInfo = survey?.show_survey_info !== false;
+  const canContinue = Boolean(id && hasSurveyDraft(id));
 
   const getDescriptionForLanguage = () => {
     if (!survey?.description) return t.description;
@@ -135,7 +136,7 @@ export default function SurveyWelcome() {
             <p className="mt-4 max-w-[65ch] text-sm leading-relaxed text-ink-muted">{t.privacy}</p>
             <div className="mt-10">
               <Button onClick={handleStart} className="w-full sm:w-auto">
-                {t.startButton}
+                {canContinue ? t.continueButton || t.startButton : t.startButton}
               </Button>
             </div>
           </>

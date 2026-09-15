@@ -39,12 +39,16 @@ export function parseAnswers(raw: unknown): Record<string, unknown> {
   return {};
 }
 
+export function isInternalAnswerKey(key: string) {
+  return key.startsWith('__') || key.endsWith('_other') || key.endsWith('_comment');
+}
+
 export function isResponseCompleted(r: Pick<ResponseRow, 'completed' | 'status' | 'answers'>): boolean {
   if (r.completed === true) return true;
   if (String(r.status || '').toLowerCase() === 'completed') return true;
   if (r.completed === false) return false;
   const answers = parseAnswers(r.answers);
-  return Object.keys(answers).some((key) => !key.endsWith('_other') && answers[key] != null && answers[key] !== '');
+  return Object.keys(answers).some((key) => !isInternalAnswerKey(key) && answers[key] != null && answers[key] !== '');
 }
 
 export function questionType(q: QuestionRow): string {
@@ -129,19 +133,22 @@ export function answerRowsForResponse(questions: QuestionRow[], answersRaw: unkn
   const known = new Set(sorted.map((q) => q.id));
   const rows = sorted.map((q, i) => {
     const other = formatAnswerValue(answers[`${q.id}_other`]);
+    const comment = formatAnswerValue(answers[`${q.id}_comment`]);
     const raw = answers[q.id];
     const skipped = raw === undefined || raw === null || (Array.isArray(raw) && raw.length === 0);
     const main = formatAnswerValue(raw);
+    const parts = skipped ? [] : other ? [`${main}${main ? ' — ' : ''}${other}`] : main ? [main] : [];
+    if (comment) parts.push(`(${comment})`);
     return {
       id: q.id,
       index: i + 1,
       label: questionLabel(q, lng),
       type: questionType(q),
-      answer: skipped ? '' : other ? `${main}${main ? ' — ' : ''}${other}` : main,
-      skipped,
+      answer: parts.join(' '),
+      skipped: skipped && !comment,
     };
   });
-  const extras = Object.keys(answers).filter((key) => !known.has(key) && !key.endsWith('_other'));
+  const extras = Object.keys(answers).filter((key) => !known.has(key) && !isInternalAnswerKey(key));
   extras.forEach((key) => {
     rows.push({
       id: key,

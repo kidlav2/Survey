@@ -6,22 +6,27 @@ import { translations } from './translations';
 import SurveyShell from '../chrome/SurveyShell';
 import Button from '../chrome/Button';
 import { isLng, type Lng } from '../../lib/cn';
+import { isResponseCompleted, parseAnswers } from '../../lib/responseFormat';
 import {
+  clearSurveyDraft,
   getStoredAnswers,
   getStoredLanguage,
   getStoredQuestionIndex,
   getStoredResponseId,
+  questionIndexFromAnswers,
+  resumeUrl,
   setStoredAnswers,
   setStoredLanguage,
   setStoredQuestionIndex,
   setStoredResponseId,
+  withQuestionIndex,
 } from '../../lib/surveySession';
 
 type Answers = Record<string, any>;
 
 export default function SurveyFlow() {
   const navigate = useNavigate();
-  const { id } = useParams();
+  const { id, rid: resumeRid } = useParams();
   const location = useLocation();
 
   const searchLng = new URLSearchParams(location.search).get('lng');
@@ -46,6 +51,9 @@ export default function SurveyFlow() {
   const [startedAt] = useState(() => Date.now());
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [laterOpen, setLaterOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [commentOpen, setCommentOpen] = useState(false);
   const languageRef = useRef(language);
   languageRef.current = language;
 
@@ -110,8 +118,9 @@ export default function SurveyFlow() {
 
   const ensureResponse = useCallback(
     async (surveyId: string, lng: Lng) => {
-      const existing = getStoredResponseId(surveyId);
+      const existing = resumeRid || getStoredResponseId(surveyId);
       if (existing) {
+        setStoredResponseId(surveyId, existing);
         setResponseId(existing);
         return existing;
       }
@@ -131,7 +140,7 @@ export default function SurveyFlow() {
       }
       return createdId;
     },
-    []
+    [resumeRid]
   );
 
   const loadSurveyQuestions = useCallback(async () => {
@@ -178,6 +187,7 @@ export default function SurveyFlow() {
           text: row.text ?? row.question_text ?? '',
           required: payload.required ?? row.required ?? false,
           hasOtherOption: payload.hasOtherOption ?? row.has_other_option ?? row.hasOtherOption ?? false,
+          allowComment: payload.allowComment === true,
           section_id: row.section_id,
           conditional_logic: row.conditional_logic
             ? typeof row.conditional_logic === 'string'
@@ -218,12 +228,55 @@ export default function SurveyFlow() {
   }, [loadSurveyQuestions]);
 
   useEffect(() => {
-    if (!id) return;
-    const storedAnswers = getStoredAnswers(id);
-    const storedIndex = getStoredQuestionIndex(id);
-    if (Object.keys(storedAnswers).length > 0) setAnswers(storedAnswers);
-    if (storedIndex > 0) setCurrentQuestion(storedIndex);
-  }, [id]);
+    if (!id || !responseId) return;
+    let cancelled = false;
+
+    (async () => {
+      let next = getStoredAnswers(id);
+      try {
+        const { data } = await supabase
+          .from('responses')
+          .select('id, survey_id, answers, completed')
+          .eq('id', responseId)
+          .maybeSingle();
+        if (cancelled) return;
+        if (data?.survey_id && data.survey_id !== id) {
+          navigate(`/survey/${id}/closed`, { replace: true });
+          return;
+        }
+        if (data && isResponseCompleted(data)) {
+          clearSurveyDraft(id);
+          navigate(`/survey/${id}/thank-you`, { replace: true });
+          return;
+        }
+        const server = parseAnswers(data?.answers);
+        const local = getStoredAnswers(id);
+        next = { ...server, ...local };
+      } catch {
+        /* local draft is enough */
+      }
+      if (cancelled) return;
+      if (Object.keys(next).length > 0) {
+        setAnswers(next);
+        setStoredAnswers(id, next);
+      }
+      const storedIndex = Math.max(
+        questionIndexFromAnswers(next) ?? 0,
+        getStoredQuestionIndex(id)
+      );
+      if (storedIndex > 0) {
+        setCurrentQuestion(storedIndex);
+        setStoredQuestionIndex(id, storedIndex);
+      }
+      if (resumeRid) {
+        navigate(`/survey/${id}/questions`, { replace: true, state: { lng: languageRef.current, language: languageRef.current } });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id, navigate, responseId, resumeRid]);
 
   useEffect(() => {
     if (!id) return;
@@ -242,10 +295,10 @@ export default function SurveyFlow() {
     };
   }, [id, loadSurveyQuestions]);
 
-  const saveProgress = async (currentAnswers: Answers, completed = false) => {
+  const saveProgress = async (currentAnswers: Answers, completed = false, index = currentQuestion) => {
     if (!responseId) return;
     const row: Record<string, unknown> = {
-      answers: currentAnswers,
+      answers: withQuestionIndex(currentAnswers, index),
       duration_seconds: Math.max(0, Math.round((Date.now() - startedAt) / 1000)),
     };
     if (completed) {
@@ -319,6 +372,7 @@ export default function SurveyFlow() {
 
   const goToOptIn = async (finalAnswers: Answers) => {
     await saveProgress(finalAnswers, true);
+    if (id) clearSurveyDraft(id);
     navigate(`/survey/${id}/opt-in?lng=${encodeURIComponent(language)}&rid=${encodeURIComponent(responseId || '')}`, {
       state: { lng: language, language, responseId },
     });
@@ -335,8 +389,6 @@ export default function SurveyFlow() {
 
     setSaving(true);
     try {
-      await saveProgress(answers);
-
       if (question?.conditional_logic?.length > 0) {
         let answer = answers[question.id];
         if (question.type === 'yes-no') answer = normalizeYesNoAnswer(answer);
@@ -356,6 +408,7 @@ export default function SurveyFlow() {
         if (logic?.next_question_id) {
           const nextQuestionIndex = questions.findIndex((q: any) => q.id === logic.next_question_id);
           if (nextQuestionIndex >= 0) {
+            await saveProgress(answers, false, nextQuestionIndex);
             setCurrentQuestion(nextQuestionIndex);
             if (id) setStoredQuestionIndex(id, nextQuestionIndex);
             return;
@@ -365,6 +418,7 @@ export default function SurveyFlow() {
 
       const nextIdx = nextIndexAfter(currentQuestion);
       if (nextIdx < questions.length) {
+        await saveProgress(answers, false, nextIdx);
         setCurrentQuestion(nextIdx);
         if (id) setStoredQuestionIndex(id, nextIdx);
       } else {
@@ -382,6 +436,31 @@ export default function SurveyFlow() {
       setCurrentQuestion(prevIdx);
       if (id) setStoredQuestionIndex(id, prevIdx);
       setFormError('');
+    }
+  };
+
+  useEffect(() => {
+    setCommentOpen(false);
+  }, [question?.id]);
+
+  const handleContinueLater = async () => {
+    setSaving(true);
+    try {
+      await saveProgress(answers);
+      setCopied(false);
+      setLaterOpen(true);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCopyResume = async () => {
+    if (!id || !responseId) return;
+    try {
+      await navigator.clipboard.writeText(resumeUrl(id, responseId));
+      setCopied(true);
+    } catch {
+      /* the field stays selectable */
     }
   };
 
@@ -412,6 +491,47 @@ export default function SurveyFlow() {
     `w-full min-h-12 text-left px-4 py-3 border transition-colors duration-150 ${
       selected ? 'border-navy bg-accent-soft text-ink' : 'border-line bg-surface text-ink hover:border-line-strong'
     }`;
+
+  const commentKey = `${question.id}_comment`;
+  const commentValue = answers[commentKey] || '';
+  const showComment = Boolean(question.allowComment && question.type !== 'text' && (commentOpen || commentValue));
+  const resumeLink = id && responseId ? resumeUrl(id, responseId) : '';
+
+  if (laterOpen) {
+    return (
+      <SurveyShell
+        language={language}
+        onLanguageChange={(lng) => {
+          setLanguage(lng);
+          if (id) setStoredLanguage(id, lng);
+        }}
+      >
+        <article className="sheet px-6 py-8 md:px-10 md:py-10">
+          <h1 className="font-serif text-3xl font-semibold text-navy">{tQuestions.continueLaterTitle}</h1>
+          <p className="mt-4 max-w-[60ch] text-base leading-relaxed text-ink-muted">
+            {tQuestions.continueLaterBody}
+          </p>
+          <label className="mt-8 block">
+            <span className="sr-only">{tQuestions.continueLater}</span>
+            <input
+              readOnly
+              value={resumeLink}
+              onFocus={(e) => e.currentTarget.select()}
+              className="w-full border border-line-strong bg-surface px-3 py-3 text-sm text-ink"
+            />
+          </label>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            <Button onClick={handleCopyResume} disabled={!resumeLink}>
+              {copied ? tQuestions.copied : tQuestions.copyLink}
+            </Button>
+            <Button variant="secondary" onClick={() => setLaterOpen(false)}>
+              {tQuestions.backToSurvey}
+            </Button>
+          </div>
+        </article>
+      </SurveyShell>
+    );
+  }
 
   return (
     <SurveyShell
@@ -574,6 +694,33 @@ export default function SurveyFlow() {
           <p className="mt-4 text-sm text-ink-subtle">{tQuestions.multiNote}</p>
         )}
 
+        {question.allowComment && question.type !== 'text' && (
+          <div className="mt-8 border-t border-line pt-5">
+            {showComment ? (
+              <label className="block">
+                <span className="text-xs font-bold uppercase tracking-[0.14em] text-ink-subtle">
+                  {tQuestions.commentLabel}
+                </span>
+                <textarea
+                  value={commentValue}
+                  onChange={(e) => commitAnswers({ ...answers, [commentKey]: e.target.value })}
+                  placeholder={tQuestions.commentPlaceholder}
+                  rows={2}
+                  className="mt-2 min-h-20 w-full border border-line bg-surface px-3 py-2 text-sm text-ink"
+                />
+              </label>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setCommentOpen(true)}
+                className="min-h-11 text-left text-sm text-ink-subtle underline decoration-line underline-offset-4 hover:text-ink"
+              >
+                {tQuestions.addComment}
+              </button>
+            )}
+          </div>
+        )}
+
         {formError && (
           <p role="alert" className="mt-6 text-sm text-danger">
             {formError}
@@ -598,6 +745,18 @@ export default function SurveyFlow() {
           </Button>
         </div>
       </div>
+      {responseId && (
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={handleContinueLater}
+            disabled={saving}
+            className="min-h-11 text-xs text-ink-subtle underline decoration-transparent underline-offset-4 hover:text-ink-muted hover:decoration-line"
+          >
+            {tQuestions.continueLater}
+          </button>
+        </div>
+      )}
     </SurveyShell>
   );
 }

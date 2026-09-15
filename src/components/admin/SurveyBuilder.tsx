@@ -16,6 +16,7 @@ interface Question {
   options?: string[];
   required: boolean;
   hasOtherOption?: boolean;
+  allowComment?: boolean;
   order: number;
   section_id?: string;
   scaleMin?: string;  // Description for value 1
@@ -102,10 +103,11 @@ function buildQuestionPayloadWithoutTranslations(args: {
   type: Question['type'];
   required: boolean;
   hasOtherOption?: boolean;
+  allowComment?: boolean;
   scaleMin?: string;
   scaleMax?: string;
 }) {
-  const { baseLanguage, text, options = [], type, required, hasOtherOption } = args;
+  const { baseLanguage, text, options = [], type, required, hasOtherOption, allowComment } = args;
   const scaleMin = typeof args.scaleMin === 'string' ? args.scaleMin : '';
   const scaleMax = typeof args.scaleMax === 'string' ? args.scaleMax : '';
 
@@ -119,6 +121,7 @@ function buildQuestionPayloadWithoutTranslations(args: {
     type,
     required,
     hasOtherOption: !!hasOtherOption,
+    allowComment: !!allowComment,
     text: { [resolvedBaseLanguage]: text },
     options: { [resolvedBaseLanguage]: options },
     scaleMin: { [resolvedBaseLanguage]: scaleMin },
@@ -137,10 +140,11 @@ async function buildQuestionPayloadWithTranslations(args: {
   type: Question['type'];
   required: boolean;
   hasOtherOption?: boolean;
+  allowComment?: boolean;
   scaleMin?: string;
   scaleMax?: string;
 }) {
-const { baseLanguage, text, options = [], type, required, hasOtherOption } = args;
+const { baseLanguage, text, options = [], type, required, hasOtherOption, allowComment } = args;
 // Ensure scaleMin and scaleMax are strings (handle case where they might be objects)
 const scaleMin = typeof args.scaleMin === 'string' ? args.scaleMin : '';
 const scaleMax = typeof args.scaleMax === 'string' ? args.scaleMax : '';
@@ -158,6 +162,7 @@ const resolvedBaseLanguage = (baseLanguage === 'fr' || baseLanguage === 'es')
     type,
     required,
     hasOtherOption: !!hasOtherOption,
+    allowComment: !!allowComment,
     text: { [resolvedBaseLanguage]: text },
     options: { [resolvedBaseLanguage]: options },
     scaleMin: { [resolvedBaseLanguage]: scaleMin },
@@ -193,6 +198,7 @@ const translations = {
     addOption: 'Add Option',
     pasteOption: 'Paste Option',
     addOther: 'Add Other',
+    allowComment: 'Allow a comment',
     other: 'Other (please specify)',
     duplicateQuestion: 'Duplicate Question',
     requiredQuestion: 'Required Question',
@@ -241,6 +247,7 @@ const translations = {
     addOption: 'Добавить вариант',
     pasteOption: 'Вставить вариант',
     addOther: 'Добавить "Другое"',
+    allowComment: 'Можно оставить комментарий',
     other: 'Другое (укажите)',
     duplicateQuestion: 'Дублировать вопрос',
     requiredQuestion: 'Обязательный вопрос',
@@ -289,6 +296,7 @@ const translations = {
     addOption: 'Ajouter une option',
     pasteOption: 'Coller une option',
     addOther: 'Ajouter Autre',
+    allowComment: 'Autoriser un commentaire',
     other: 'Autre (veuillez préciser)',
     duplicateQuestion: 'Dupliquer la question',
     requiredQuestion: 'Question obligatoire',
@@ -337,6 +345,7 @@ const translations = {
     addOption: 'Agregar opción',
     pasteOption: 'Pegar opción',
     addOther: 'Agregar Otro',
+    allowComment: 'Permitir un comentario',
     other: 'Otro (por favor especifique)',
     duplicateQuestion: 'Duplicar pregunta',
     requiredQuestion: 'Pregunta requerida',
@@ -535,6 +544,7 @@ export default function SurveyBuilder() {
           scaleMin: payload.scaleMin || '',
           scaleMax: payload.scaleMax || '',
           hasOtherOption: hasOtherOption,
+          allowComment: payload.allowComment === true,
           conditional_logic: q.conditional_logic 
             ? (typeof q.conditional_logic === 'string' ? JSON.parse(q.conditional_logic) : q.conditional_logic)
             : undefined
@@ -612,6 +622,7 @@ export default function SurveyBuilder() {
       options: ['Option 1', 'Option 2'],
       required: false,
       hasOtherOption: false,
+      allowComment: false,
       order: insertIndex !== undefined ? insertIndex + 1 : questions.length,
       section_id: targetSectionId,
       scaleMin: '',
@@ -793,6 +804,7 @@ export default function SurveyBuilder() {
         type: question.type,
         required: question.required,
         hasOtherOption: question.hasOtherOption,
+        allowComment: question.allowComment,
         scaleMin: question.scaleMin,
         scaleMax: question.scaleMax,
       });
@@ -840,6 +852,7 @@ export default function SurveyBuilder() {
           type: question.type,
           required: question.required,
           hasOtherOption: question.hasOtherOption,
+          allowComment: question.allowComment,
           scaleMin: question.scaleMin,
           scaleMax: question.scaleMax,
         });
@@ -856,6 +869,7 @@ export default function SurveyBuilder() {
           type: question.type,
           required: question.required,
           hasOtherOption: question.hasOtherOption,
+          allowComment: question.allowComment,
           scaleMin: question.scaleMin,
           scaleMax: question.scaleMax,
         });
@@ -863,7 +877,11 @@ export default function SurveyBuilder() {
       
       if (!textChanged && !typeChanged && !optionsChanged && !scaleMinChanged && !scaleMaxChanged && originalQuestion.payload) {
         console.log('✅ Reusing cached payload for question:', question.id);
-        return originalQuestion.payload;
+        return {
+          ...originalQuestion.payload,
+          hasOtherOption: !!question.hasOtherOption,
+          allowComment: !!question.allowComment,
+        };
       }
       
       if (textChanged || typeChanged || optionsChanged) {
@@ -879,6 +897,7 @@ export default function SurveyBuilder() {
       type: question.type,
       required: question.required,
       hasOtherOption: question.hasOtherOption,
+      allowComment: question.allowComment,
       scaleMin: question.scaleMin,
       scaleMax: question.scaleMax,
     });
@@ -1145,6 +1164,7 @@ export default function SurveyBuilder() {
             type: question.type,
             required: question.required,
             hasOtherOption: question.hasOtherOption,
+            allowComment: question.allowComment,
             scaleMin: question.scaleMin,
             scaleMax: question.scaleMax,
           });
@@ -2147,7 +2167,8 @@ export default function SurveyBuilder() {
                                   )}
 
                                   {/* Required Checkbox */}
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex flex-col gap-2">
+                                    <div className="flex items-center gap-2">
                                     <input
                                       type="checkbox"
                                       checked={question.required}
@@ -2158,6 +2179,21 @@ export default function SurveyBuilder() {
                                     <label htmlFor={`required-${question.id}`} className="text-sm font-medium text-gray-700">
                                       {t.requiredQuestion}
                                     </label>
+                                    </div>
+                                    {question.type !== 'text' && (
+                                      <div className="flex items-center gap-2">
+                                        <input
+                                          type="checkbox"
+                                          checked={!!question.allowComment}
+                                          onChange={(e) => updateQuestion(question.id, 'allowComment', e.target.checked)}
+                                          id={`comment-${question.id}`}
+                                          className="w-4 h-4"
+                                        />
+                                        <label htmlFor={`comment-${question.id}`} className="text-sm font-medium text-gray-700">
+                                          {t.allowComment}
+                                        </label>
+                                      </div>
+                                    )}
                                   </div>
 
                                   {/* Conditional Logic */}
@@ -2585,7 +2621,8 @@ export default function SurveyBuilder() {
                       )}
 
                       {/* Required Toggle */}
-                      <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                      <div className="space-y-3 pt-4 border-t border-gray-200">
+                        <div className="flex items-center justify-between">
                         <label className="text-sm font-medium text-gray-700">
                           {t.requiredQuestion}
                         </label>
@@ -2601,6 +2638,28 @@ export default function SurveyBuilder() {
                             }`}
                           />
                         </button>
+                        </div>
+                        {question.type !== 'text' && (
+                          <div className="flex items-center justify-between">
+                            <label className="text-sm font-medium text-gray-700" htmlFor={`comment-toggle-${question.id}`}>
+                              {t.allowComment}
+                            </label>
+                            <button
+                              id={`comment-toggle-${question.id}`}
+                              type="button"
+                              onClick={() => updateQuestion(question.id, 'allowComment', !question.allowComment)}
+                              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                                question.allowComment ? 'bg-indigo-600' : 'bg-gray-200'
+                              }`}
+                            >
+                              <span
+                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                  question.allowComment ? 'translate-x-6' : 'translate-x-1'
+                                }`}
+                              />
+                            </button>
+                          </div>
+                        )}
                       </div>
 
                       {/* Conditional Logic */}

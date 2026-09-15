@@ -81,6 +81,7 @@ export default function App() {
         <Route path="/survey/:id/closed" element={<SurveyClosed />} />
         <Route path="/survey/:id/welcome" element={<SurveyWelcome />} />
         <Route path="/survey/:id/questions" element={<SurveyFlow />} />
+        <Route path="/survey/:id/r/:rid" element={<SurveyFlow />} />
         <Route path="/survey/:id/opt-in" element={<EmailOptIn />} />
         <Route path="/survey/:id/thank-you" element={<ThankYou />} />
         

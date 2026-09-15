@@ -16,7 +16,7 @@ export default function SurveyShell({
   language,
   onLanguageChange,
   children,
-  eyebrow = 'Research survey',
+  eyebrow = 'Survey',
   className,
   showLanguage = true,
 }: SurveyShellProps) {
