@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Download, FileJson } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import ExportModal from './ExportModal';
@@ -7,12 +7,13 @@ import Toast from '../common/Toast';
 import SkeletonDashboard from '../common/SkeletonDashboard';
 import { adminTranslations } from './adminTranslations';
 import { AdminLanguageContext } from './AdminLayout';
-import { formatDuration, isResponseCompleted, type QuestionRow, type ResponseRow } from '../../lib/responseFormat';
+import { formatDuration, isResponseCompleted, isCountableResponse, type QuestionRow, type ResponseRow } from '../../lib/responseFormat';
 import { exportResponsesFile } from '../../lib/surveyExport';
 import Button from '../chrome/Button';
 
 export default function Responses() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { language } = useContext(AdminLanguageContext);
   const t = adminTranslations[language];
   const [responses, setResponses] = useState<ResponseRow[]>([]);
@@ -22,7 +23,7 @@ export default function Responses() {
   const [exportModalType, setExportModalType] = useState<'CSV' | 'JSON' | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
   const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
-  const [filterSurvey, setFilterSurvey] = useState('all');
+  const [filterSurvey, setFilterSurvey] = useState(() => searchParams.get('survey') || 'all');
 
   useEffect(() => {
     void loadResponses();
@@ -32,6 +33,25 @@ export default function Responses() {
     document.addEventListener('visibilitychange', onFocus);
     return () => document.removeEventListener('visibilitychange', onFocus);
   }, []);
+
+  useEffect(() => {
+    const next = searchParams.get('survey') || 'all';
+    setFilterSurvey(next);
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!surveys.length || filterSurvey === 'all') return;
+    if (!surveys.some((survey) => survey.id === filterSurvey)) {
+      setFilterSurvey('all');
+      setSearchParams({});
+    }
+  }, [surveys, filterSurvey, setSearchParams]);
+
+  const selectFilter = (id: string) => {
+    setFilterSurvey(id);
+    if (id === 'all') setSearchParams({});
+    else setSearchParams({ survey: id });
+  };
 
   const loadResponses = async () => {
     try {
@@ -74,7 +94,9 @@ export default function Responses() {
   );
 
   const visible = useMemo(() => {
-    const filtered = responses.filter((row) => filterSurvey === 'all' || row.survey_id === filterSurvey);
+    const filtered = responses.filter(
+      (row) => isCountableResponse(row) && (filterSurvey === 'all' || row.survey_id === filterSurvey)
+    );
     return sortBy === 'newest' ? filtered : [...filtered].reverse();
   }, [responses, filterSurvey, sortBy]);
 
@@ -170,7 +192,9 @@ export default function Responses() {
 
         <div className="overflow-hidden border border-line bg-surface">
           <div className="flex flex-col gap-3 border-b border-line px-4 py-4 sm:flex-row sm:items-center sm:justify-between md:px-6">
-            <h3 className="font-serif text-lg font-semibold text-navy">{t.allResponses}</h3>
+            <h3 className="font-serif text-lg font-semibold text-navy">
+              {filterSurvey === 'all' ? t.allResponses : surveyTitles[filterSurvey] || t.allResponses}
+            </h3>
             <div className="flex flex-col gap-2 sm:flex-row">
               <label className="sr-only" htmlFor="filter-survey">
                 {t.allSurveys}
@@ -178,7 +202,7 @@ export default function Responses() {
               <select
                 id="filter-survey"
                 value={filterSurvey}
-                onChange={(e) => setFilterSurvey(e.target.value)}
+                onChange={(e) => selectFilter(e.target.value)}
                 className="min-h-11 border border-line-strong bg-surface px-3 text-sm"
               >
                 <option value="all">{t.allSurveys}</option>
@@ -220,7 +244,7 @@ export default function Responses() {
                       </div>
                       <p className="text-sm text-ink-muted">{new Date(response.created_at).toLocaleString()}</p>
                       <p className="text-sm">{response.respondent_email || t.notProvided}</p>
-                      <Button variant="secondary" className="mt-3 w-full" onClick={() => navigate(`/admin/responses/${response.id}`)}>
+                      <Button variant="secondary" className="mt-3 w-full" onClick={() => navigate(`/admin/responses/${response.id}${filterSurvey !== 'all' ? `?survey=${encodeURIComponent(filterSurvey)}` : ''}`)}>
                         {t.view}
                       </Button>
                     </div>
@@ -256,7 +280,7 @@ export default function Responses() {
                           <td className="px-6 py-4">
                             <button
                               type="button"
-                              onClick={() => navigate(`/admin/responses/${response.id}`)}
+                              onClick={() => navigate(`/admin/responses/${response.id}${filterSurvey !== 'all' ? `?survey=${encodeURIComponent(filterSurvey)}` : ''}`)}
                               className="min-h-11 text-sm font-bold text-navy hover:underline"
                             >
                               {t.view}

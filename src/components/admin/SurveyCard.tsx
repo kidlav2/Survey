@@ -14,9 +14,11 @@ interface SurveyCardProps {
   };
   onDelete: (id: string) => void;
   onToggleStatus: (id: string, newStatus: 'active' | 'draft') => void;
+  shared?: boolean;
+  canDelete?: boolean;
 }
 
-export default function SurveyCard({ survey, onDelete, onToggleStatus }: SurveyCardProps) {
+export default function SurveyCard({ survey, onDelete, onToggleStatus, shared = false, canDelete = true }: SurveyCardProps) {
   const navigate = useNavigate();
   const [copied, setCopied] = React.useState(false);
   const [isToggling, setIsToggling] = React.useState(false);
@@ -103,6 +105,7 @@ export default function SurveyCard({ survey, onDelete, onToggleStatus }: SurveyC
           <h3 className="text-lg font-semibold text-gray-900 mb-2 truncate" title={title}>{title}</h3>
           <div className="text-sm text-gray-600">
             <span>{responses} responses</span>
+            {shared && <span className="ml-2 text-indigo-700">· Shared with you</span>}
           </div>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
@@ -163,6 +166,7 @@ export default function SurveyCard({ survey, onDelete, onToggleStatus }: SurveyC
       </div>
 
       <div className="flex gap-2">
+        {canDelete && (
         <button
           onClick={handleDelete}
           className="px-3 py-2 border border-red-100 hover:bg-red-50 text-red-600 rounded-lg transition-colors flex-shrink-0"
@@ -170,6 +174,7 @@ export default function SurveyCard({ survey, onDelete, onToggleStatus }: SurveyC
         >
           <Trash2 className="w-4 h-4" />
         </button>
+        )}
         
         <button
           onClick={handleManage}

@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronLeft, ChevronDown, Copy, Edit3, BarChart3, Download, FileJson, Trash2, ExternalLink, CheckCircle, Pencil, QrCode, X, Inbox } from 'lucide-react';
+import { ChevronLeft, ChevronDown, Copy, Edit3, BarChart3, Download, FileJson, Trash2, ExternalLink, CheckCircle, Pencil, QrCode, X, Inbox, UserPlus } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { supabase } from '../../lib/supabaseClient';
 import DeleteSurveyModal from './DeleteSurveyModal';
 import RenameSurveyModal from './RenameSurveyModal';
+import ShareSurveyModal from './ShareSurveyModal';
 import ExportModal from './ExportModal';
 import Toast from '../common/Toast';
 import SkeletonSurveyCard from '../common/SkeletonSurveyCard';
 import { adminTranslations } from './adminTranslations';
 import { AdminLanguageContext } from './AdminLayout';
-import { isResponseCompleted, type QuestionRow, type ResponseRow } from '../../lib/responseFormat';
+import { isResponseCompleted, isCountableResponse, type QuestionRow, type ResponseRow } from '../../lib/responseFormat';
 import { exportResponsesFile } from '../../lib/surveyExport';
 import { exportSurveyJson } from '../../lib/surveyImport';
 
@@ -20,6 +21,7 @@ interface SurveyData {
   created_at: string;
   updated_at?: string;
   languages?: string[];
+  owner_id?: string;
 }
 
 
@@ -61,6 +63,8 @@ export default function SurveyDetails() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
+  const [isShareOpen, setIsShareOpen] = useState(false);
+  const [isOwner, setIsOwner] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const [exportModalType, setExportModalType] = useState<'CSV' | 'JSON' | null>(null);
   const [showExportDropdown, setShowExportDropdown] = useState(false);
@@ -92,12 +96,14 @@ export default function SurveyDetails() {
       // Fetch survey data
       const { data: surveyData, error: surveyError } = await supabase
         .from('surveys')
-        .select('id, title, description, status, created_at, thank_you_message, show_survey_info, estimated_time')
+        .select('id, title, description, status, created_at, thank_you_message, show_survey_info, estimated_time, owner_id')
         .eq('id', id)
         .single();
 
       if (surveyError) throw surveyError;
 
+      const { data: { user } } = await supabase.auth.getUser();
+      setIsOwner(!surveyData?.owner_id || surveyData.owner_id === user?.id);
       setSurvey(surveyData);
 
       // Fetch responses for stats
@@ -109,8 +115,9 @@ export default function SurveyDetails() {
       if (responsesError) throw responsesError;
 
       // Calculate stats (DB-backed)
-      const totalResponses = responses?.length || 0;
-      const completedResponses = responses?.filter((r: any) => isResponseCompleted(r)).length || 0;
+      const counted = (responses || []).filter((r: ResponseRow) => isCountableResponse(r));
+      const totalResponses = counted.length;
+      const completedResponses = counted.filter((r) => isResponseCompleted(r)).length;
       const completionRate = totalResponses > 0 ? Math.round((completedResponses / totalResponses) * 100) : 0;
 
       const hasEmail = (r: any) => {
@@ -118,11 +125,11 @@ export default function SurveyDetails() {
         return e.length > 0;
       };
 
-      const optedInResponses = responses?.filter((r: any) => hasEmail(r)).length || 0;
+      const optedInResponses = counted.filter((r: any) => hasEmail(r)).length;
       const optInRate = totalResponses > 0 ? Math.round((optedInResponses / totalResponses) * 100) : 0;
 
       // Calculate average time (seconds -> minutes)
-      const totalSeconds = responses?.reduce((sum: number, r: any) => sum + (Number(r?.duration_seconds) || 0), 0) || 0;
+      const totalSeconds = counted.reduce((sum: number, r: any) => sum + (Number(r?.duration_seconds) || 0), 0) || 0;
       const avgTime = totalResponses > 0 ? Math.round(totalSeconds / totalResponses / 60) : 0;
 
       setStats({
@@ -361,7 +368,7 @@ export default function SurveyDetails() {
 
       exportResponsesFile({
         type,
-        responses: (responses || []) as ResponseRow[],
+        responses: ((responses || []) as ResponseRow[]).filter(isCountableResponse),
         questions: (questions || []) as QuestionRow[],
         surveyTitle: survey?.title,
         surveyTitles: survey?.id ? { [survey.id]: survey.title } : undefined,
@@ -544,6 +551,14 @@ export default function SurveyDetails() {
           <div className="p-4 md:p-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-start">
               <button
+                onClick={() => setIsShareOpen(true)}
+                className="flex items-center gap-2 px-4 py-3 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium justify-center"
+              >
+                <UserPlus className="w-4 h-4" />
+                {t.shareSurvey}
+              </button>
+
+              <button
                 onClick={() => navigate(`/admin/surveys/${id}/builder`)}
                 className="flex items-center gap-2 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium justify-center"
               >
@@ -552,7 +567,7 @@ export default function SurveyDetails() {
               </button>
 
               <button
-                onClick={() => navigate('/admin/responses')}
+                onClick={() => navigate(id ? `/admin/responses?survey=${encodeURIComponent(id)}` : '/admin/responses')}
                 className="flex items-center gap-2 px-4 py-3 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium justify-center"
               >
                 <Inbox className="w-4 h-4" />
@@ -636,6 +651,7 @@ export default function SurveyDetails() {
                 Export Questions
               </button>
 
+              {isOwner && (
               <button
                 onClick={() => setIsDeleteModalOpen(true)}
                 className="flex items-center gap-2 px-4 py-3 border border-red-300 hover:bg-red-50 text-red-700 rounded-lg transition-colors font-medium justify-center"
@@ -643,17 +659,30 @@ export default function SurveyDetails() {
                 <Trash2 className="w-4 h-4" />
                 {t.deleteSurvey}
               </button>
+              )}
+              {isOwner && (
               <button
                 onClick={handleResetQuestions}
                 className="flex items-center gap-2 px-4 py-3 border border-red-300 hover:bg-red-50 text-red-700 rounded-lg transition-colors font-medium justify-center"
               >
                 <Trash2 className="w-4 h-4" />
                 Clear All Responses
-              </button>            </div>
+              </button>
+              )}
+              {!isOwner && (
+                <p className="sm:col-span-2 lg:col-span-3 text-sm text-gray-500">{t.sharedWithYou}</p>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
+      <ShareSurveyModal
+        isOpen={isShareOpen}
+        surveyId={survey.id}
+        language={language}
+        onClose={() => setIsShareOpen(false)}
+      />
       {/* Delete Modal */}
       <DeleteSurveyModal 
         isOpen={isDeleteModalOpen} 

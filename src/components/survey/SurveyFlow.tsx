@@ -7,6 +7,8 @@ import SurveyShell from '../chrome/SurveyShell';
 import Button from '../chrome/Button';
 import { isLng, type Lng } from '../../lib/cn';
 import { isResponseCompleted, parseAnswers } from '../../lib/responseFormat';
+import { isMatrixComplete, remainingMatrixRows, readLocalizedList } from '../../lib/matrixQuestion';
+import MatrixQuestion from './MatrixQuestion';
 import {
   clearSurveyDraft,
   getStoredAnswers,
@@ -91,11 +93,13 @@ export default function SurveyFlow() {
       }
 
       const hasOtherOption = q?.hasOtherOption || q?.has_other_option || false;
-      if (hasOtherOption && !options.some((opt) => opt && typeof opt === 'object' && opt.__isOtherOption)) {
+      if (hasOtherOption && q?.type !== 'matrix' && !options.some((opt) => opt && typeof opt === 'object' && opt.__isOtherOption)) {
         options = [...options, { __text: tQuestions.other || 'Other (please specify)', __isOtherOption: true }];
       }
 
-      return { text, options, hasOtherOption };
+      const rows = readLocalizedList(p.rows, lng, base);
+
+      return { text, options, rows, hasOtherOption };
     },
     [tQuestions]
   );
@@ -125,20 +129,7 @@ export default function SurveyFlow() {
         return existing;
       }
 
-      const created = await insertIgnoringUnknownColumns('responses', {
-        survey_id: surveyId,
-        answers: {},
-        duration_seconds: 0,
-        language: lng,
-        status: 'in_progress',
-      });
-      const createdId = created?.id || null;
-
-      if (createdId) {
-        setStoredResponseId(surveyId, createdId);
-        setResponseId(createdId);
-      }
-      return createdId;
+      return null;
     },
     [resumeRid]
   );
@@ -228,32 +219,34 @@ export default function SurveyFlow() {
   }, [loadSurveyQuestions]);
 
   useEffect(() => {
-    if (!id || !responseId) return;
+    if (!id) return;
     let cancelled = false;
 
     (async () => {
       let next = getStoredAnswers(id);
-      try {
-        const { data } = await supabase
-          .from('responses')
-          .select('id, survey_id, answers, completed')
-          .eq('id', responseId)
-          .maybeSingle();
-        if (cancelled) return;
-        if (data?.survey_id && data.survey_id !== id) {
-          navigate(`/survey/${id}/closed`, { replace: true });
-          return;
+      if (responseId) {
+        try {
+          const { data } = await supabase
+            .from('responses')
+            .select('id, survey_id, answers, completed')
+            .eq('id', responseId)
+            .maybeSingle();
+          if (cancelled) return;
+          if (data?.survey_id && data.survey_id !== id) {
+            navigate(`/survey/${id}/closed`, { replace: true });
+            return;
+          }
+          if (data && isResponseCompleted(data)) {
+            clearSurveyDraft(id);
+            navigate(`/survey/${id}/thank-you`, { replace: true });
+            return;
+          }
+          const server = parseAnswers(data?.answers);
+          const local = getStoredAnswers(id);
+          next = { ...server, ...local };
+        } catch {
+          /* local draft is enough */
         }
-        if (data && isResponseCompleted(data)) {
-          clearSurveyDraft(id);
-          navigate(`/survey/${id}/thank-you`, { replace: true });
-          return;
-        }
-        const server = parseAnswers(data?.answers);
-        const local = getStoredAnswers(id);
-        next = { ...server, ...local };
-      } catch {
-        /* local draft is enough */
       }
       if (cancelled) return;
       if (Object.keys(next).length > 0) {
@@ -295,17 +288,44 @@ export default function SurveyFlow() {
     };
   }, [id, loadSurveyQuestions]);
 
-  const saveProgress = async (currentAnswers: Answers, completed = false, index = currentQuestion) => {
-    if (!responseId) return;
+  const saveProgress = async (
+    currentAnswers: Answers,
+    completed = false,
+    index = currentQuestion,
+    persist = false
+  ): Promise<string | null> => {
+    if (!id) return responseId;
+    if (!completed && index <= 0 && !persist) return responseId;
+
     const row: Record<string, unknown> = {
       answers: withQuestionIndex(currentAnswers, index),
       duration_seconds: Math.max(0, Math.round((Date.now() - startedAt) / 1000)),
+      language: languageRef.current,
     };
     if (completed) {
       row.completed = true;
       row.status = 'completed';
+    } else {
+      row.completed = false;
+      row.status = 'in_progress';
     }
-    await updateIgnoringUnknownColumns('responses', row, responseId);
+
+    let rid = responseId;
+    if (!rid) {
+      const created = await insertIgnoringUnknownColumns('responses', {
+        survey_id: id,
+        ...row,
+      });
+      rid = created?.id || null;
+      if (rid) {
+        setStoredResponseId(id, rid);
+        setResponseId(rid);
+      }
+      return rid;
+    }
+
+    await updateIgnoringUnknownColumns('responses', row, rid);
+    return rid;
   };
 
   const isBranchOnly = (qId: string, qIdx: number) => {
@@ -327,7 +347,7 @@ export default function SurveyFlow() {
   const question = questions[currentQuestion];
   const localized = question
     ? getLocalized(question, language)
-    : { text: '', options: [] as string[], hasOtherOption: false };
+    : { text: '', options: [] as string[], rows: [] as string[], hasOtherOption: false };
 
   const visibleQuestions = useMemo(
     () => questions.filter((_, idx) => !isBranchOnly(questions[idx].id, idx)),
@@ -370,20 +390,48 @@ export default function SurveyFlow() {
     }
   };
 
+  const handleMatrixAnswer = (rowIndex: number, columnIndex: number) => {
+    if (!question) return;
+    setFormError('');
+    const current = answers[question.id];
+    const map =
+      current && typeof current === 'object' && !Array.isArray(current) ? { ...current } : {};
+    map[String(rowIndex)] = columnIndex;
+    commitAnswers({ ...answers, [question.id]: map });
+  };
+
   const goToOptIn = async (finalAnswers: Answers) => {
-    await saveProgress(finalAnswers, true);
+    const rid = await saveProgress(finalAnswers, true);
     if (id) clearSurveyDraft(id);
-    navigate(`/survey/${id}/opt-in?lng=${encodeURIComponent(language)}&rid=${encodeURIComponent(responseId || '')}`, {
-      state: { lng: language, language, responseId },
+    navigate(`/survey/${id}/opt-in?lng=${encodeURIComponent(language)}&rid=${encodeURIComponent(rid || '')}`, {
+      state: { lng: language, language, responseId: rid },
     });
   };
 
   const handleNext = async () => {
+    const matrixColumns = (localized.options || []).map((option: any) =>
+      typeof option === 'object' ? String(option.__text || '') : String(option)
+    );
+    const matrixIncomplete =
+      question?.type === 'matrix' &&
+      !isMatrixComplete(answers[question.id], localized.rows || [], matrixColumns);
     const unanswered =
-      answers[question?.id] === undefined ||
-      (Array.isArray(answers[question?.id]) && answers[question?.id].length === 0);
+      question?.type === 'matrix'
+        ? matrixIncomplete
+        : answers[question?.id] === undefined ||
+          (Array.isArray(answers[question?.id]) && answers[question?.id].length === 0);
     if (question?.required && unanswered) {
-      setFormError(tQuestions.answerRequired || 'Please answer this question before continuing.');
+      setFormError(
+        question.type === 'matrix'
+          ? tQuestions.matrixRequired || tQuestions.answerRequired || 'Please rate every item before continuing.'
+          : tQuestions.answerRequired || 'Please answer this question before continuing.'
+      );
+      if (question.type === 'matrix') {
+        requestAnimationFrame(() => {
+          const nextRow = document.querySelector<HTMLElement>('[data-matrix-row]:not([data-answered])');
+          nextRow?.querySelector<HTMLInputElement>('input')?.focus();
+        });
+      }
       return;
     }
 
@@ -446,7 +494,7 @@ export default function SurveyFlow() {
   const handleContinueLater = async () => {
     setSaving(true);
     try {
-      await saveProgress(answers);
+      await saveProgress(answers, false, currentQuestion, true);
       setCopied(false);
       setLaterOpen(true);
     } finally {
@@ -464,9 +512,14 @@ export default function SurveyFlow() {
     }
   };
 
+  const matrixColumns = (localized.options || []).map((option: any) =>
+    typeof option === 'object' ? String(option.__text || '') : String(option)
+  );
   const isAnswered =
-    answers[question?.id] !== undefined &&
-    (Array.isArray(answers[question?.id]) ? answers[question.id].length > 0 : true);
+    question?.type === 'matrix'
+      ? isMatrixComplete(answers[question.id], localized.rows || [], matrixColumns)
+      : answers[question?.id] !== undefined &&
+        (Array.isArray(answers[question?.id]) ? answers[question.id].length > 0 : true);
   const canSkip = !question?.required;
 
   const handleSkip = () => {
@@ -581,7 +634,7 @@ export default function SurveyFlow() {
           )}
         </div>
 
-        <h1 className="font-serif text-3xl font-semibold text-navy md:text-4xl">{localized.text}</h1>
+        <h1 className="text-balance font-serif text-3xl font-semibold leading-tight text-navy md:text-4xl">{localized.text}</h1>
 
         {(question.type === 'multiple-choice' || question.type === 'single-choice') && (
           <fieldset className="mt-8 space-y-2">
@@ -688,6 +741,22 @@ export default function SurveyFlow() {
               )
             )}
           </div>
+        )}
+
+        {question.type === 'matrix' && (
+          <MatrixQuestion
+            questionId={question.id}
+            stem={localized.text}
+            rows={localized.rows || []}
+            columns={matrixColumns}
+            value={answers[question.id]}
+            remainingLabel={(tQuestions.matrixRemaining || '{n} left to rate').replace(
+              '{n}',
+              String(remainingMatrixRows(answers[question.id], localized.rows || [], matrixColumns))
+            )}
+            allRatedLabel={tQuestions.matrixAllRated || 'Every item is rated'}
+            onSelect={handleMatrixAnswer}
+          />
         )}
 
         {question.type === 'multiple-choice' && (

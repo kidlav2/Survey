@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import { supabase } from './lib/supabaseClient';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './components/auth/Login';
@@ -11,7 +11,6 @@ import Surveys from './components/admin/Surveys';
 import SurveyDetails from './components/admin/SurveyDetails';
 import SurveyBuilder from './components/admin/SurveyBuilder';
 import Responses from './components/admin/Responses';
-import Analytics from './components/admin/Analytics';
 import ResponseDetail from './components/admin/ResponseDetail';
 import Contacts from './components/admin/Contacts';
 import Settings from './components/admin/Settings';
@@ -22,6 +21,9 @@ import EmailOptIn from './components/survey/EmailOptIn';
 import ThankYou from './components/survey/ThankYou';
 import SurveyClosed from './components/survey/SurveyClosed';
 import NotFound from './components/common/NotFound';
+import MatrixPreview from './components/survey/MatrixPreview';
+
+const Analytics = React.lazy(() => import('./components/admin/Analytics'));
 
 export default function App() {
   const [session, setSession] = useState<any>(null);
@@ -70,7 +72,14 @@ export default function App() {
           <Route path="surveys/:id/builder" element={<SurveyBuilder />} />
           <Route path="responses" element={<Responses />} />
           <Route path="responses/:id" element={<ResponseDetail />} />
-          <Route path="analytics" element={<Analytics />} />
+          <Route
+            path="analytics"
+            element={
+              <Suspense fallback={<p className="p-8 text-ink-muted">Loading…</p>}>
+                <Analytics />
+              </Suspense>
+            }
+          />
           <Route path="contacts" element={<Contacts />} />
           <Route path="settings" element={<Settings />} />
         </Route>
@@ -84,6 +93,7 @@ export default function App() {
         <Route path="/survey/:id/r/:rid" element={<SurveyFlow />} />
         <Route path="/survey/:id/opt-in" element={<EmailOptIn />} />
         <Route path="/survey/:id/thank-you" element={<ThankYou />} />
+        <Route path="/demo/matrix" element={<MatrixPreview />} />
         
         {/* Default Route */}
         <Route path="/" element={<Navigate to={session ? "/admin/dashboard" : "/login"} replace />} />

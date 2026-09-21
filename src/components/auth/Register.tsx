@@ -50,12 +50,11 @@ export default function Register() {
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/confirm`,
           data: { full_name: name },
         },
       });
       if (error) throw error;
-      navigate('/login', { state: { email, needsConfirmation: true } });
+      navigate('/admin/dashboard');
     } catch (err: any) {
       setErrorMsg(err?.message ?? t.registrationFailed);
     } finally {
@@ -148,7 +147,7 @@ export default function Register() {
           </Link>
         </p>
       </article>
-      <p className="mt-6 text-center text-xs text-ink-subtle">{t.forResearchAdminOnly}</p>
+      <p className="mt-6 text-center text-xs text-ink-subtle">{t.previousAccountHint}</p>
     </AuthShell>
   );
 }

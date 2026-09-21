@@ -9,6 +9,7 @@ import Toast from '../common/Toast';
 import SkeletonDashboard from '../common/SkeletonDashboard';
 import { adminTranslations } from './adminTranslations';
 import { AdminLanguageContext } from './AdminLayout';
+import { isCountableResponse, type ResponseRow } from '../../lib/responseFormat';
 
 interface Survey {
   id: string;
@@ -18,6 +19,7 @@ interface Survey {
   created_at: string;
   updated_at?: string;
   responses_count: number;
+  owner_id?: string;
 }
 
 export default function Surveys() {
@@ -38,6 +40,7 @@ export default function Surveys() {
   });
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [sortButtonRef, setSortButtonRef] = useState<HTMLButtonElement | null>(null);
+  const [userId, setUserId] = useState<string>('');
 
   useEffect(() => {
     loadSurveys();
@@ -54,6 +57,7 @@ export default function Surveys() {
       // Get current user
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError || !user) throw new Error('Not authenticated');
+      setUserId(user.id);
 
       // Fetch surveys for current user
       const { data, error } = await supabase
@@ -64,22 +68,27 @@ export default function Surveys() {
 
       if (error) throw error;
 
-      // Get responses count for each survey
-      const surveysWithCounts = await Promise.all(
-        (data || []).map(async (survey) => {
-          const { count, error: countError } = await supabase
+      const surveyRows = data || [];
+      const { data: responseRows, error: responsesError } = surveyRows.length
+        ? await supabase
             .from('responses')
-            .select('*', { count: 'exact', head: true })
-            .eq('survey_id', survey.id);
+            .select('survey_id, answers, completed, status')
+            .in('survey_id', surveyRows.map((survey) => survey.id))
+        : { data: [], error: null };
+      if (responsesError) throw responsesError;
 
-          return {
-            ...survey,
-            responses_count: countError ? 0 : (count || 0),
-          };
-        })
+      const counts = new Map<string, number>();
+      for (const row of (responseRows || []) as ResponseRow[]) {
+        if (!isCountableResponse(row)) continue;
+        counts.set(row.survey_id, (counts.get(row.survey_id) || 0) + 1);
+      }
+
+      setSurveys(
+        surveyRows.map((survey) => ({
+          ...survey,
+          responses_count: counts.get(survey.id) || 0,
+        }))
       );
-
-      setSurveys(surveysWithCounts);
       setErrorMsg(null);
     } catch (error) {
       console.error('Error loading surveys:', error);
@@ -354,6 +363,8 @@ export default function Surveys() {
                   setIsDeleteModalOpen(true);
                 }}
                 onToggleStatus={handleToggleStatus}
+                shared={Boolean(userId && survey.owner_id && survey.owner_id !== userId)}
+                canDelete={!userId || !survey.owner_id || survey.owner_id === userId}
               />
             ))}
           </div>

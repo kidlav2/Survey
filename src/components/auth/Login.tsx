@@ -193,7 +193,7 @@ export default function Login() {
           </>
         )}
       </article>
-      <p className="mt-6 text-center text-xs text-ink-subtle">{t.forResearchAdminOnly}</p>
+      <p className="mt-6 text-center text-xs text-ink-subtle">{t.previousAccountHint}</p>
     </AuthShell>
   );
 }

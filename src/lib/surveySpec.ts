@@ -1,4 +1,4 @@
-export type QuestionType = 'single-choice' | 'multiple-choice' | 'scale' | 'text' | 'yes-no';
+export type QuestionType = 'single-choice' | 'multiple-choice' | 'scale' | 'text' | 'yes-no' | 'matrix';
 export type SupportedLng = 'en' | 'ru' | 'fr' | 'es';
 
 export type Localized = string | Partial<Record<SupportedLng, string>>;
@@ -10,6 +10,7 @@ export type SurveyQuestionSpec = {
   required?: boolean;
   hasOtherOption?: boolean;
   options?: LocalizedList;
+  rows?: LocalizedList;
   scaleMin?: Localized;
   scaleMax?: Localized;
 };
@@ -78,6 +79,17 @@ export const EXAMPLE_SURVEY_JSON = `{
           "required": true
         },
         {
+          "text": "How difficult is each of the following for you right now?",
+          "type": "matrix",
+          "required": true,
+          "options": ["Not difficult", "Somewhat", "Very difficult", "Not applicable"],
+          "rows": [
+            "Finding a quiet place to work",
+            "Getting help from staff",
+            "Accessing online resources"
+          ]
+        },
+        {
           "text": "Anything else we should know?",
           "type": "text",
           "required": false
@@ -121,6 +133,11 @@ A few facts so we can group answers.
   min: Very hard
   max: Very easy
 - [required] Would you recommend the library to a friend? (yes-no)
+- [required] How difficult is each of the following for you right now? (matrix)
+  scale: Not difficult | Somewhat | Very difficult | Not applicable
+  - Finding a quiet place to work
+  - Getting help from staff
+  - Accessing online resources
 - [optional] Anything else we should know? (text)
 `;
 
@@ -131,10 +148,11 @@ Write the full survey as ONE JSON file. Do not wrap it in markdown fences. Do no
 Rules:
 - Put related questions into sections.
 - Mark each question required: true or required: false. Use required only when the answer is essential.
-- Use exactly these types: "single-choice", "multiple-choice", "scale", "text", "yes-no".
+- Use exactly these types: "single-choice", "multiple-choice", "scale", "text", "yes-no", "matrix".
 - single-choice and multiple-choice MUST have an "options" array of short answers.
 - Set hasOtherOption: true only when "Other, please specify" is useful.
 - For scale questions, add scaleMin (meaning of 1) and scaleMax (meaning of 5).
+- Use type "matrix" when one stem rates several items on the same scale. matrix MUST have "options" (2–7 short column labels) and "rows" (the items to rate). Include a "Not applicable" column when some items may not apply.
 - Keep wording plain, one idea per question, no leading numbers like "1.".
 - Write the survey in the source language I specify. Set "baseLanguage" to en, ru, fr, or es.
 - Set "translate": true so the app can fill the other three languages after upload.
@@ -290,6 +308,7 @@ function normalizeType(value?: string): QuestionType {
   if (['text', 'open', 'open-ended', 'textarea', 'long-text'].includes(raw)) return 'text';
   if (['scale', 'likert', 'rating', '1-5'].includes(raw)) return 'scale';
   if (['yes-no', 'yesno', 'boolean', 'yn'].includes(raw)) return 'yes-no';
+  if (['matrix', 'grid', 'likert-grid', 'rating-grid', 'likert-matrix'].includes(raw)) return 'matrix';
   return 'single-choice';
 }
 
@@ -376,7 +395,8 @@ function normalizeQuestion(input: any): SurveyQuestionSpec {
     type: normalizeType(input?.type),
     required: required === false || required === 'optional' ? false : Boolean(required ?? true),
     hasOtherOption: Boolean(input?.hasOtherOption ?? input?.has_other_option),
-    options: input?.options || input?.choices || [],
+    options: input?.options || input?.choices || input?.columns || [],
+    rows: input?.rows || input?.items || input?.statements || [],
     scaleMin: input?.scaleMin || input?.scale_min || input?.minLabel,
     scaleMax: input?.scaleMax || input?.scale_max || input?.maxLabel,
   };
@@ -415,6 +435,14 @@ function parseMarkdownSurvey(source: string): SurveySpec {
     if ((type === 'single-choice' || type === 'multiple-choice') && !optionCount(currentQuestion.options)) {
       currentQuestion.options = ['Option 1', 'Option 2'];
     }
+    if (type === 'matrix') {
+      if (!optionCount(currentQuestion.options)) {
+        currentQuestion.options = ['Not difficult', 'Somewhat', 'Very difficult', 'Not applicable'];
+      }
+      if (!optionCount(currentQuestion.rows)) {
+        currentQuestion.rows = ['Item 1', 'Item 2'];
+      }
+    }
     questionBucket().push(currentQuestion);
     currentQuestion = null;
   };
@@ -449,7 +477,7 @@ function parseMarkdownSurvey(source: string): SurveySpec {
     }
 
     const questionMatch = trimmed.match(
-      /^[-*]\s+\[(required|optional|req|opt)\]\s+(.+?)(?:\s*\((single-choice|multiple-choice|single|multiple|multi|text|scale|yes-no|yesno)\))?\s*$/i
+      /^[-*]\s+\[(required|optional|req|opt)\]\s+(.+?)(?:\s*\((single-choice|multiple-choice|single|multiple|multi|text|scale|yes-no|yesno|matrix|grid|likert-grid|rating-grid)\))?\s*$/i
     );
     if (questionMatch) {
       commitQuestion();
@@ -469,6 +497,7 @@ function parseMarkdownSurvey(source: string): SurveySpec {
       const optionText = optionMatch[1].trim();
       const min = optionText.match(/^min:\s*(.+)/i);
       const max = optionText.match(/^max:\s*(.+)/i);
+      const columns = optionText.match(/^(scale|columns|labels):\s*(.+)/i);
       if (min) {
         currentQuestion.scaleMin = min[1].trim();
         currentQuestion.type = currentQuestion.type || 'scale';
@@ -477,6 +506,17 @@ function parseMarkdownSurvey(source: string): SurveySpec {
       if (max) {
         currentQuestion.scaleMax = max[1].trim();
         currentQuestion.type = currentQuestion.type || 'scale';
+        continue;
+      }
+      if (columns) {
+        currentQuestion.options = columns[2].split(/\s*\|\s*/).map((part) => part.trim()).filter(Boolean);
+        currentQuestion.type = 'matrix';
+        continue;
+      }
+      if (normalizeType(currentQuestion.type) === 'matrix') {
+        const rows = Array.isArray(currentQuestion.rows) ? currentQuestion.rows : [];
+        rows.push(optionText);
+        currentQuestion.rows = rows;
         continue;
       }
       const list = Array.isArray(currentQuestion.options) ? currentQuestion.options : [];

@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ChevronLeft, Calendar, Clock, Globe, Mail, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import SkeletonSurveyCard from '../common/SkeletonSurveyCard';
@@ -18,6 +18,7 @@ import {
 export default function ResponseDetail() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const { language } = useContext(AdminLanguageContext);
   const t = adminTranslations[language];
   const [response, setResponse] = useState<(ResponseRow & { surveyTitle: string }) | null>(null);
@@ -25,6 +26,8 @@ export default function ResponseDetail() {
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const surveyFilter = searchParams.get('survey');
+  const listPath = surveyFilter ? `/admin/responses?survey=${encodeURIComponent(surveyFilter)}` : '/admin/responses';
 
   const handleDeleteResponse = async () => {
     if (!id) return;
@@ -32,7 +35,7 @@ export default function ResponseDetail() {
     try {
       const { error } = await supabase.from('responses').delete().eq('id', id);
       if (error) throw error;
-      navigate('/admin/responses', { replace: true });
+      navigate(listPath, { replace: true });
     } catch (error) {
       console.error('Error deleting response:', error);
       setDeleting(false);
@@ -96,7 +99,7 @@ export default function ResponseDetail() {
       <main className="flex-1 p-8">
         <div className="border border-line bg-surface px-6 py-10 text-center">
           <p className="text-ink-muted">Response not found</p>
-          <Button className="mt-4" onClick={() => navigate('/admin/responses')}>
+          <Button className="mt-4" onClick={() => navigate(listPath)}>
             {t.backToResponses}
           </Button>
         </div>
@@ -116,7 +119,7 @@ export default function ResponseDetail() {
           <div className="flex items-start gap-3">
             <button
               type="button"
-              onClick={() => navigate('/admin/responses')}
+              onClick={() => navigate(listPath)}
               className="mt-1 min-h-11 min-w-11 text-ink-muted hover:text-ink"
               aria-label={t.backToResponses}
             >
@@ -220,7 +223,7 @@ export default function ResponseDetail() {
           </div>
         </section>
 
-        <Button variant="secondary" onClick={() => navigate('/admin/responses')}>
+        <Button variant="secondary" onClick={() => navigate(listPath)}>
           {t.backToResponses}
         </Button>
       </div>

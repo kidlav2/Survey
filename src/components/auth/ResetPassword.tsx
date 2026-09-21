@@ -14,9 +14,7 @@ export default function ResetPassword() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  // Check if we have a valid token
-  const token = searchParams.get('access_token');
-  const type = searchParams.get('type');
+  const token = searchParams.get('token') || searchParams.get('access_token');
   const errorParam = searchParams.get('error');
   const errorDescription = searchParams.get('error_description');
 
@@ -44,10 +42,17 @@ export default function ResetPassword() {
     setLoading(true);
 
     try {
-      // Update password using the session from the link
-      const { error } = await supabase.auth.updateUser({
-        password: password,
-      });
+      const { error } = token
+        ? await fetch('/api/auth/update', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ token, password }),
+          }).then(async (res) => {
+            const json = await res.json().catch(() => ({}));
+            return { error: json.error || (!res.ok ? { message: 'Reset failed' } : null) };
+          })
+        : await supabase.auth.updateUser({ password });
 
       if (error) {
         setError(error.message);

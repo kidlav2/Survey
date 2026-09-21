@@ -82,6 +82,7 @@ async function questionPayload(question: SurveyQuestionSpec, base: SupportedLng,
   const type = (question.type as QuestionType) || 'single-choice';
   const text = await fillLangMap(question.text, base, translate);
   const options = await fillOptionsMap(question.options, base, translate);
+  const rows = await fillOptionsMap(question.rows, base, translate);
   const scaleMin = await fillLangMap(question.scaleMin, base, translate);
   const scaleMax = await fillLangMap(question.scaleMax, base, translate);
   return {
@@ -91,10 +92,11 @@ async function questionPayload(question: SurveyQuestionSpec, base: SupportedLng,
     hasOtherOption: Boolean(question.hasOtherOption),
     text,
     options,
+    rows,
     scaleMin,
     scaleMax,
     translations: Object.fromEntries(
-      LANGS.filter((lng) => lng !== base).map((lng) => [lng, { text: text[lng], options: options[lng] }])
+      LANGS.filter((lng) => lng !== base).map((lng) => [lng, { text: text[lng], options: options[lng], rows: rows[lng] }])
     ),
   };
 }
@@ -251,6 +253,7 @@ function questionFromRow(row: any): SurveyQuestionSpec {
     required: payload.required ?? row.required ?? true,
     hasOtherOption: payload.hasOtherOption ?? row.has_other_option ?? false,
     options: payload.options || row.options || [],
+    rows: payload.rows || [],
     scaleMin: payload.scaleMin,
     scaleMax: payload.scaleMax,
   };

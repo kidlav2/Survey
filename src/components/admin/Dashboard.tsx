@@ -8,6 +8,7 @@ import Toast from '../common/Toast';
 import SkeletonDashboard from '../common/SkeletonDashboard';
 import { adminTranslations } from './adminTranslations';
 import { AdminLanguageContext } from './AdminLayout';
+import { isCountableResponse, type ResponseRow } from '../../lib/responseFormat';
 
 interface DashboardMetrics {
   totalResponses: number;
@@ -68,22 +69,24 @@ export default function Dashboard() {
         // Get total stats from ALL surveys
         const { data: allResponses, error: allResponsesError } = await supabase
           .from('responses')
-          .select('respondent_email, opted_in, created_at, language, survey_id')
+          .select('respondent_email, opted_in, created_at, language, survey_id, answers, completed, status')
           .in('survey_id', surveys.map(s => s.id));
 
         if (allResponsesError) throw allResponsesError;
 
-        const totalResponsesCount = allResponses?.length || 0;
-        const totalEmailsCount = allResponses?.filter((r: any) => r.opted_in && r.respondent_email && r.respondent_email.trim() !== '').length || 0;
-        const lastResponseAt = allResponses && allResponses.length > 0 
-          ? allResponses.reduce((latest: any, current: any) => {
+        const countedResponses = ((allResponses || []) as ResponseRow[]).filter(isCountableResponse);
+
+        const totalResponsesCount = countedResponses.length;
+        const totalEmailsCount = countedResponses.filter((r: any) => r.opted_in && r.respondent_email && r.respondent_email.trim() !== '').length;
+        const lastResponseAt = countedResponses.length > 0
+          ? countedResponses.reduce((latest: any, current: any) => {
               const latestDate = new Date(latest.created_at).getTime();
               const currentDate = new Date(current.created_at).getTime();
               return currentDate > latestDate ? current : latest;
             }).created_at
           : null;
-        const lastEmailAt = allResponses
-          ?.filter((r: any) => r.opted_in && r.respondent_email && r.respondent_email.trim() !== '')
+        const lastEmailAt = countedResponses
+          .filter((r: any) => r.opted_in && r.respondent_email && r.respondent_email.trim() !== '')
           .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]?.created_at || null;
 
         // Find survey with most recent activity (last response)
@@ -91,7 +94,7 @@ export default function Dashboard() {
         let latestResponseTime = new Date(0);
         
         for (const survey of surveys) {
-          const surveyResponses = allResponses?.filter((r: any) => r.survey_id === survey.id) || [];
+          const surveyResponses = countedResponses.filter((r: any) => r.survey_id === survey.id);
           if (surveyResponses.length > 0) {
             const latestResponse = surveyResponses.reduce((latest: any, current: any) => {
               const latestDate = new Date(latest.created_at).getTime();
@@ -107,13 +110,11 @@ export default function Dashboard() {
         }
 
         const survey = surveyWithLatestActivity;
-        const surveyResponseCount = allResponses?.filter((r: any) => r.survey_id === survey.id).length || 0;
-        
-        console.log('All surveys stats:', { totalResponses: totalResponsesCount, totalEmails: totalEmailsCount });
+        const surveyResponseCount = countedResponses.filter((r: any) => r.survey_id === survey.id).length;
         
         // Get language breakdown ONLY for the active survey
         const counts: Record<string, number> = {};
-        (allResponses || [])
+        countedResponses
           .filter((r: any) => r.survey_id === survey.id)
           .forEach((r: any) => {
             const code = (r?.language ?? null) as string | null;

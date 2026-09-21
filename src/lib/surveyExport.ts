@@ -3,6 +3,7 @@ import {
   filterByDateRange,
   formatDuration,
   isResponseCompleted,
+  isCountableResponse,
   questionLabel,
   type QuestionRow,
   type ResponseRow,
@@ -37,7 +38,7 @@ export function exportResponsesFile(args: {
   dateRange: string;
   language?: string;
 }) {
-  const filtered = filterByDateRange(args.responses, args.dateRange);
+  const filtered = filterByDateRange(args.responses.filter(isCountableResponse), args.dateRange);
   const stamp = new Date().toISOString().slice(0, 10);
   const slug = fileSlug(args.surveyTitle);
   const lng = args.language || 'en';

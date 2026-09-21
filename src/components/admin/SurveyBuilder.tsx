@@ -2,18 +2,22 @@ import React, { useState, useEffect, useRef, useContext } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, Plus, Trash2, GripVertical, ChevronDown, ChevronUp, FileText, Copy, Upload, X } from 'lucide-react';
 import { insertIgnoringUnknownColumns, supabase, updateIgnoringUnknownColumns } from '../../lib/supabaseClient';
+import { presenceColor, presenceLabel, useSurveyPresence, type PresencePeer } from '../../lib/useSurveyPresence';
 import Toast from '../common/Toast';
 import SkeletonQuestion from '../common/SkeletonQuestion';
 import { AdminLanguageContext } from './AdminLayout';
 import { adminTranslations } from './adminTranslations';
 import ImportFromFile from './ImportFromFile';
+import MatrixEditor from './MatrixEditor';
+import { defaultMatrixColumns, defaultMatrixRows, readLocalizedList } from '../../lib/matrixQuestion';
 
 
 interface Question {
   id: string;
-  type: 'single-choice' | 'multiple-choice' | 'scale' | 'text' | 'yes-no';
+  type: 'single-choice' | 'multiple-choice' | 'scale' | 'text' | 'yes-no' | 'matrix';
   text: string;
   options?: string[];
+  rows?: string[];
   required: boolean;
   hasOtherOption?: boolean;
   allowComment?: boolean;
@@ -100,6 +104,7 @@ function buildQuestionPayloadWithoutTranslations(args: {
   baseLanguage: SupportedLng;
   text: string;
   options?: string[];
+  rows?: string[];
   type: Question['type'];
   required: boolean;
   hasOtherOption?: boolean;
@@ -107,7 +112,7 @@ function buildQuestionPayloadWithoutTranslations(args: {
   scaleMin?: string;
   scaleMax?: string;
 }) {
-  const { baseLanguage, text, options = [], type, required, hasOtherOption, allowComment } = args;
+  const { baseLanguage, text, options = [], rows = [], type, required, hasOtherOption, allowComment } = args;
   const scaleMin = typeof args.scaleMin === 'string' ? args.scaleMin : '';
   const scaleMax = typeof args.scaleMax === 'string' ? args.scaleMax : '';
 
@@ -124,6 +129,7 @@ function buildQuestionPayloadWithoutTranslations(args: {
     allowComment: !!allowComment,
     text: { [resolvedBaseLanguage]: text },
     options: { [resolvedBaseLanguage]: options },
+    rows: { [resolvedBaseLanguage]: rows },
     scaleMin: { [resolvedBaseLanguage]: scaleMin },
     scaleMax: { [resolvedBaseLanguage]: scaleMax },
     translations: {},
@@ -137,6 +143,7 @@ async function buildQuestionPayloadWithTranslations(args: {
   baseLanguage: SupportedLng;
   text: string;
   options?: string[];
+  rows?: string[];
   type: Question['type'];
   required: boolean;
   hasOtherOption?: boolean;
@@ -144,7 +151,7 @@ async function buildQuestionPayloadWithTranslations(args: {
   scaleMin?: string;
   scaleMax?: string;
 }) {
-const { baseLanguage, text, options = [], type, required, hasOtherOption, allowComment } = args;
+const { baseLanguage, text, options = [], rows = [], type, required, hasOtherOption, allowComment } = args;
 // Ensure scaleMin and scaleMax are strings (handle case where they might be objects)
 const scaleMin = typeof args.scaleMin === 'string' ? args.scaleMin : '';
 const scaleMax = typeof args.scaleMax === 'string' ? args.scaleMax : '';
@@ -165,6 +172,7 @@ const resolvedBaseLanguage = (baseLanguage === 'fr' || baseLanguage === 'es')
     allowComment: !!allowComment,
     text: { [resolvedBaseLanguage]: text },
     options: { [resolvedBaseLanguage]: options },
+    rows: { [resolvedBaseLanguage]: rows },
     scaleMin: { [resolvedBaseLanguage]: scaleMin },
     scaleMax: { [resolvedBaseLanguage]: scaleMax },
     translations: {},
@@ -172,8 +180,11 @@ const resolvedBaseLanguage = (baseLanguage === 'fr' || baseLanguage === 'es')
 
   for (const lng of targets) {
     const translatedText = await translateMyMemory(text, resolvedBaseLanguage, lng);
-    const translatedOptions = type === 'single-choice' || type === 'multiple-choice'
+    const translatedOptions = type === 'single-choice' || type === 'multiple-choice' || type === 'matrix'
       ? await translateArrayMyMemory(options, resolvedBaseLanguage, lng)
+      : [];
+    const translatedRows = type === 'matrix'
+      ? await translateArrayMyMemory(rows, resolvedBaseLanguage, lng)
       : [];
     
     const translatedScaleMin = scaleMin
@@ -185,9 +196,10 @@ const resolvedBaseLanguage = (baseLanguage === 'fr' || baseLanguage === 'es')
 
     payload.text[lng] = translatedText;
     payload.options[lng] = translatedOptions;
+    payload.rows[lng] = translatedRows;
     payload.scaleMin[lng] = translatedScaleMin;
     payload.scaleMax[lng] = translatedScaleMax;
-    payload.translations[lng] = { text: translatedText, options: translatedOptions };
+    payload.translations[lng] = { text: translatedText, options: translatedOptions, rows: translatedRows };
   }
 
   return payload;
@@ -205,6 +217,15 @@ const translations = {
     questionText: 'Question Text',
     questionType: 'Question Type',
     options: 'Options',
+    typeMatrix: 'Matrix (rate each item)',
+    matrixColumns: 'Scale labels',
+    matrixRows: 'Items to rate',
+    matrixColumnsHint: 'The same choices appear next to every item. Keep them short.',
+    matrixRowsHint: 'Each line is rated on the scale above. Add “Not applicable” as a label if some items may not apply.',
+    addRow: 'Add item',
+    addColumn: 'Add label',
+    matrixRowPlaceholder: 'e.g. Finding funding',
+    matrixColumnPlaceholder: 'e.g. Very difficult',
     addBelow: 'Add Below',
     delete: 'Delete',
     preview: 'Preview Survey',
@@ -254,6 +275,15 @@ const translations = {
     questionText: 'Текст вопроса',
     questionType: 'Тип вопроса',
     options: 'Варианты ответов',
+    typeMatrix: 'Матрица (оценить каждый пункт)',
+    matrixColumns: 'Подписи шкалы',
+    matrixRows: 'Пункты для оценки',
+    matrixColumnsHint: 'Одинаковые варианты стоят у каждого пункта. Делайте их короткими.',
+    matrixRowsHint: 'Каждая строка оценивается по шкале выше. Добавьте «Не применимо», если какой-то пункт может не подходить.',
+    addRow: 'Добавить пункт',
+    addColumn: 'Добавить подпись',
+    matrixRowPlaceholder: 'напр. Найти финансирование',
+    matrixColumnPlaceholder: 'напр. Очень сложно',
     addBelow: 'Добавить ниже',
     delete: 'Удалить',
     preview: 'Предпросмотр',
@@ -303,6 +333,15 @@ const translations = {
     questionText: 'Texte de la question',
     questionType: 'Type de question',
     options: 'Options',
+    typeMatrix: 'Matrice (noter chaque élément)',
+    matrixColumns: 'Libellés de l’échelle',
+    matrixRows: 'Éléments à noter',
+    matrixColumnsHint: 'Les mêmes choix s’affichent pour chaque élément. Gardez-les courts.',
+    matrixRowsHint: 'Chaque ligne est notée sur l’échelle ci-dessus. Ajoutez « Sans objet » si un élément peut ne pas s’appliquer.',
+    addRow: 'Ajouter un élément',
+    addColumn: 'Ajouter un libellé',
+    matrixRowPlaceholder: 'ex. Trouver un financement',
+    matrixColumnPlaceholder: 'ex. Très difficile',
     addBelow: 'Ajouter ci-dessous',
     delete: 'Supprimer',
     preview: 'Aperçu du sondage',
@@ -352,6 +391,15 @@ const translations = {
     questionText: 'Texto de la pregunta',
     questionType: 'Tipo de pregunta',
     options: 'Opciones',
+    typeMatrix: 'Matriz (valorar cada ítem)',
+    matrixColumns: 'Etiquetas de la escala',
+    matrixRows: 'Ítems a valorar',
+    matrixColumnsHint: 'Las mismas opciones aparecen junto a cada ítem. Manténgalas cortas.',
+    matrixRowsHint: 'Cada línea se valora con la escala de arriba. Añada «No aplica» si algún ítem puede no corresponder.',
+    addRow: 'Añadir ítem',
+    addColumn: 'Añadir etiqueta',
+    matrixRowPlaceholder: 'p. ej. Encontrar financiación',
+    matrixColumnPlaceholder: 'p. ej. Muy difícil',
     addBelow: 'Agregar abajo',
     delete: 'Eliminar',
     preview: 'Vista previa de la encuesta',
@@ -392,6 +440,23 @@ const translations = {
   },
 };
 
+function fillPresence(template: string, vars: Record<string, string | number>) {
+  return template.replace(/\{(\w+)\}/g, (_, key) => String(vars[key] ?? ''));
+}
+
+function peerLine(peer: PresencePeer, questions: Question[], labels: (typeof adminTranslations)['en']) {
+  const name = presenceLabel(peer);
+  if (peer.save_status === 'saving') return `${name} · ${labels.isSaving}`;
+  if (peer.question_id) {
+    const index = questions.findIndex((question) => question.id === peer.question_id);
+    return `${name} · ${fillPresence(labels.editingQuestion, { n: index >= 0 ? index + 1 : '?' })}`;
+  }
+  if (peer.area === 'info') return `${name} · ${labels.editingSurveyInfo}`;
+  if (peer.area === 'sections') return `${name} · ${labels.editingSections}`;
+  if (peer.save_status === 'unsaved') return `${name} · ${labels.hasUnsaved}`;
+  return name;
+}
+
 export default function SurveyBuilder() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -399,6 +464,9 @@ export default function SurveyBuilder() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [expandedQuestion, setExpandedQuestion] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved' | 'idle'>('idle');
+  const [saveEpoch, setSaveEpoch] = useState(0);
+  const saveStatusRef = useRef(saveStatus);
+  saveStatusRef.current = saveStatus;
   const [loading, setLoading] = useState(true);
   const [descriptionLanguage, setDescriptionLanguage] = useState<'en' | 'ru' | 'fr' | 'es'>('en');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -438,6 +506,29 @@ export default function SurveyBuilder() {
 
   const t = translations[language];
   const adminT = adminTranslations[language];
+  const presenceArea = surveyInfoExpanded ? 'info' : sectionsExpanded ? 'sections' : expandedQuestion ? 'question' : 'builder';
+  const peers = useSurveyPresence({
+    surveyId: id,
+    questionId: expandedQuestion,
+    area: presenceArea,
+    saveStatus,
+    saveEpoch,
+    enabled: !loading,
+    onRemoteSave: (peer) => {
+      if (saveStatusRef.current === 'unsaved' || saveStatusRef.current === 'saving') {
+        setToast({
+          message: fillPresence(adminT.savedWhileYouEdit, { name: presenceLabel(peer) }),
+          type: 'success',
+        });
+        return;
+      }
+      void loadQuestions({ quiet: true });
+      setToast({
+        message: fillPresence(adminT.savedJustNow, { name: presenceLabel(peer) }),
+        type: 'success',
+      });
+    },
+  });
 
   useEffect(() => {
     loadQuestions();
@@ -451,9 +542,10 @@ export default function SurveyBuilder() {
   }, [expandedQuestion, questions.map(q => q.hasOtherOption).join()]);
 
 
-  const loadQuestions = async () => {
+  const loadQuestions = async (opts?: { quiet?: boolean }) => {
+    const quiet = Boolean(opts?.quiet);
     try {
-      setLoading(true);
+      if (!quiet) setLoading(true);
 
       // Try to fetch survey status and info
       try {
@@ -543,6 +635,7 @@ export default function SurveyBuilder() {
           options: Array.isArray(q.options) ? q.options : (q.options ? [q.options] : []),
           scaleMin: payload.scaleMin || '',
           scaleMax: payload.scaleMax || '',
+          rows: readLocalizedList(payload.rows, language, payload.baseLanguage),
           hasOtherOption: hasOtherOption,
           allowComment: payload.allowComment === true,
           conditional_logic: q.conditional_logic 
@@ -550,6 +643,11 @@ export default function SurveyBuilder() {
             : undefined
         };
       });
+
+      if (quiet && (saveStatusRef.current === 'unsaved' || saveStatusRef.current === 'saving')) {
+        setLoading(false);
+        return;
+      }
 
       setQuestions(parsedQuestions);
       // Track original question IDs for deletion detection
@@ -568,7 +666,7 @@ export default function SurveyBuilder() {
       
       setSections(sectionsData || []);
       
-      setSaveStatus('saved');
+      if (!quiet) setSaveStatus('saved');
       setLoading(false);
     } catch (error) {
       console.error('Error loading questions:', error);
@@ -764,16 +862,18 @@ export default function SurveyBuilder() {
           console.log('Question type changed from', q.type, 'to', value);
           
           if (value === 'yes-no') {
-            // When changing to yes-no type, set options to Yes/No
             updatedQ.options = [t.yes, t.no];
           } else if (value === 'scale') {
-            // When changing to scale type, clear options
             updatedQ.options = [];
           } else if (value === 'text') {
-            // When changing to text type, clear options
             updatedQ.options = [];
+          } else if (value === 'matrix') {
+            updatedQ.options = defaultMatrixColumns(language);
+            updatedQ.rows = updatedQ.rows?.some((row) => String(row || '').trim())
+              ? updatedQ.rows
+              : defaultMatrixRows(language);
+            updatedQ.hasOtherOption = false;
           } else {
-            // For single-choice and multiple-choice, keep existing options or set defaults
             if (!updatedQ.options || updatedQ.options.length === 0) {
               updatedQ.options = ['Option 1', 'Option 2'];
             }
@@ -801,6 +901,7 @@ export default function SurveyBuilder() {
         baseLanguage: language,
         text: question.text,
         options: question.options,
+        rows: question.rows,
         type: question.type,
         required: question.required,
         hasOtherOption: question.hasOtherOption,
@@ -815,6 +916,7 @@ export default function SurveyBuilder() {
       const textChanged = question.text !== originalQuestion.text;
       const typeChanged = question.type !== originalQuestion.type;
       const optionsChanged = JSON.stringify(question.options) !== JSON.stringify(originalQuestion.options);
+      const rowsChanged = JSON.stringify(question.rows || []) !== JSON.stringify(originalQuestion.rows || []);
       const scaleMinChanged = question.scaleMin !== originalQuestion.scaleMin;
       const scaleMaxChanged = question.scaleMax !== originalQuestion.scaleMax;
       
@@ -849,6 +951,7 @@ export default function SurveyBuilder() {
           baseLanguage: language,
           text: question.text,
           options: question.options,
+          rows: question.rows,
           type: question.type,
           required: question.required,
           hasOtherOption: question.hasOtherOption,
@@ -866,6 +969,7 @@ export default function SurveyBuilder() {
           baseLanguage: language,
           text: question.text,
           options: question.options,
+          rows: question.rows,
           type: question.type,
           required: question.required,
           hasOtherOption: question.hasOtherOption,
@@ -875,7 +979,7 @@ export default function SurveyBuilder() {
         });
       }
       
-      if (!textChanged && !typeChanged && !optionsChanged && !scaleMinChanged && !scaleMaxChanged && originalQuestion.payload) {
+      if (!textChanged && !typeChanged && !optionsChanged && !rowsChanged && !scaleMinChanged && !scaleMaxChanged && originalQuestion.payload) {
         console.log('✅ Reusing cached payload for question:', question.id);
         return {
           ...originalQuestion.payload,
@@ -894,6 +998,7 @@ export default function SurveyBuilder() {
       baseLanguage: language,
       text: question.text,
       options: question.options,
+      rows: question.rows,
       type: question.type,
       required: question.required,
       hasOtherOption: question.hasOtherOption,
@@ -1108,6 +1213,7 @@ export default function SurveyBuilder() {
 
       setQuestions(updatedQuestions);
       setSaveStatus('saved');
+      setSaveEpoch((value) => value + 1);
       setToast({ message: t.saved_toast, type: 'success' });
       
       // Show activation modal if survey is not active
@@ -1161,6 +1267,7 @@ export default function SurveyBuilder() {
             baseLanguage: baseLanguage as SupportedLng,
             text: question.text,
             options: question.options || [],
+            rows: question.rows || [],
             type: question.type,
             required: question.required,
             hasOtherOption: question.hasOtherOption,
@@ -1528,6 +1635,19 @@ export default function SurveyBuilder() {
             <div className="flex-1">
               <h2 className="text-xl md:text-2xl font-semibold text-gray-900">{t.surveyBuilder}</h2>
               <p className="text-sm text-gray-500 mt-1">{t.buildCustomize}</p>
+              {peers.length > 0 && (
+                <ul className="mt-3 flex flex-wrap gap-2">
+                  {peers.map((peer) => (
+                    <li
+                      key={peer.user_id}
+                      className="inline-flex items-center gap-2 border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs text-gray-800"
+                    >
+                      <span className="size-2.5 shrink-0" style={{ background: presenceColor(peer.user_id) }} />
+                      {peerLine(peer, questions, adminT)}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
           <div className="flex flex-col gap-3">
@@ -1902,6 +2022,7 @@ export default function SurveyBuilder() {
                       ) : (
                         questions.filter(q => q.section_id === section.id).map((question, sectionQuestionIndex) => {
                           const actualIndex = questions.indexOf(question);
+                          const here = peers.filter((peer) => peer.question_id === question.id);
                           return (
                             <div 
                               key={question.id} 
@@ -1922,7 +2043,8 @@ export default function SurveyBuilder() {
                                 setDraggedIndex(null);
                               }}
                               onDragEnd={handleDragEnd}
-                              className={`bg-gray-50 rounded-lg border border-gray-200 overflow-hidden transition-opacity cursor-grab active:cursor-grabbing ${draggedIndex === actualIndex ? 'opacity-50' : ''}`}
+                              className={`bg-gray-50 rounded-lg border overflow-hidden transition-opacity cursor-grab active:cursor-grabbing ${draggedIndex === actualIndex ? 'opacity-50' : ''} ${here.length ? 'border-indigo-400' : 'border-gray-200'}`}
+                              style={here[0] ? { boxShadow: `inset 4px 0 0 ${presenceColor(here[0].user_id)}` } : undefined}
                             >
                             {/* Question Header */}
                             <div
@@ -1954,6 +2076,11 @@ export default function SurveyBuilder() {
                                       + Other
                                     </span>
                                   )}
+                                  {here.map((peer) => (
+                                    <span key={peer.user_id} className="text-xs font-medium" style={{ color: presenceColor(peer.user_id) }}>
+                                      {presenceLabel(peer)} · {peer.save_status === 'saving' ? adminT.isSaving : adminT.alsoHere}
+                                    </span>
+                                  ))}
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
@@ -2019,8 +2146,26 @@ export default function SurveyBuilder() {
                                       <option value="scale">Scale (1-5)</option>
                                       <option value="text">Text Input</option>
                                       <option value="yes-no">Yes/No</option>
+                                      <option value="matrix">{t.typeMatrix}</option>
                                     </select>
                                   </div>
+
+                                  {question.type === 'matrix' && (
+                                    <MatrixEditor
+                                      rows={question.rows || []}
+                                      columns={question.options || []}
+                                      columnsLabel={t.matrixColumns}
+                                      rowsLabel={t.matrixRows}
+                                      columnsHint={t.matrixColumnsHint}
+                                      rowsHint={t.matrixRowsHint}
+                                      addColumn={t.addColumn}
+                                      addRow={t.addRow}
+                                      columnPlaceholder={t.matrixColumnPlaceholder}
+                                      rowPlaceholder={t.matrixRowPlaceholder}
+                                      onColumnsChange={(next) => updateQuestion(question.id, 'options', next)}
+                                      onRowsChange={(next) => updateQuestion(question.id, 'rows', next)}
+                                    />
+                                  )}
 
                                   {/* Options */}
                                   {(question.type === 'single-choice' || question.type === 'multiple-choice' || question.type === 'yes-no') && (
@@ -2403,6 +2548,7 @@ export default function SurveyBuilder() {
           ) : (
           questions.filter(q => !q.section_id).map((question, index) => {
             const actualIndex = questions.findIndex(q => q.id === question.id);
+            const here = peers.filter((peer) => peer.question_id === question.id);
             return (
             <div 
               key={question.id}
@@ -2415,7 +2561,10 @@ export default function SurveyBuilder() {
               className={`transition-opacity cursor-grab active:cursor-grabbing ${draggedIndex === actualIndex ? 'opacity-50' : ''}`}
             >
               {/* Question Card */}
-              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+              <div
+                className={`bg-white rounded-lg border overflow-hidden ${here.length ? 'border-indigo-400' : 'border-gray-200'}`}
+                style={here[0] ? { boxShadow: `inset 4px 0 0 ${presenceColor(here[0].user_id)}` } : undefined}
+              >
                 {/* Question Header */}
                 <div
                   onClick={() => toggleQuestion(question.id)}
@@ -2438,6 +2587,11 @@ export default function SurveyBuilder() {
                           + Other
                         </span>
                       )}
+                      {here.map((peer) => (
+                        <span key={peer.user_id} className="text-xs font-medium" style={{ color: presenceColor(peer.user_id) }}>
+                          {presenceLabel(peer)} · {peer.save_status === 'saving' ? adminT.isSaving : adminT.alsoHere}
+                        </span>
+                      ))}
                     </div>
                     <p className="text-sm text-gray-700 truncate">{question.text || 'Untitled question'}</p>
                   </div>
@@ -2509,8 +2663,26 @@ export default function SurveyBuilder() {
                           <option value="scale">Scale (1-5)</option>
                           <option value="text">Text Input</option>
                           <option value="yes-no">Yes/No</option>
+                          <option value="matrix">{t.typeMatrix}</option>
                         </select>
                       </div>
+
+                      {question.type === 'matrix' && (
+                        <MatrixEditor
+                          rows={question.rows || []}
+                          columns={question.options || []}
+                          columnsLabel={t.matrixColumns}
+                          rowsLabel={t.matrixRows}
+                          columnsHint={t.matrixColumnsHint}
+                          rowsHint={t.matrixRowsHint}
+                          addColumn={t.addColumn}
+                          addRow={t.addRow}
+                          columnPlaceholder={t.matrixColumnPlaceholder}
+                          rowPlaceholder={t.matrixRowPlaceholder}
+                          onColumnsChange={(next) => updateQuestion(question.id, 'options', next)}
+                          onRowsChange={(next) => updateQuestion(question.id, 'rows', next)}
+                        />
+                      )}
 
                       {/* Options (for single-choice, multiple-choice, and yes-no) */}
                       {(question.type === 'single-choice' || question.type === 'multiple-choice' || question.type === 'yes-no') && (

@@ -1,3 +1,5 @@
+import { formatMatrixAnswer, readLocalizedList } from './matrixQuestion';
+
 export type QuestionRow = {
   id: string;
   survey_id?: string;
@@ -51,6 +53,20 @@ export function isResponseCompleted(r: Pick<ResponseRow, 'completed' | 'status' 
   return Object.keys(answers).some((key) => !isInternalAnswerKey(key) && answers[key] != null && answers[key] !== '');
 }
 
+export function isCountableResponse(r: Pick<ResponseRow, 'completed' | 'status' | 'answers'>): boolean {
+  if (isResponseCompleted(r)) return true;
+  const answers = parseAnswers(r.answers);
+  const index = Number(answers.__i);
+  if (Number.isFinite(index) && index > 0) return true;
+  if (!Number.isFinite(index)) {
+    const real = Object.keys(answers).filter(
+      (key) => !isInternalAnswerKey(key) && answers[key] != null && answers[key] !== ''
+    );
+    return real.length > 1;
+  }
+  return false;
+}
+
 export function questionType(q: QuestionRow): string {
   return String(q.type || q.payload?.type || 'single-choice');
 }
@@ -70,6 +86,11 @@ export function formatAnswerValue(value: unknown): string {
   if (Array.isArray(value)) return value.map(formatAnswerValue).filter(Boolean).join(', ');
   if (typeof value === 'object') return Object.values(value as object).map(formatAnswerValue).filter(Boolean).join(', ');
   return String(value);
+}
+
+export function questionRows(q: QuestionRow, lng = 'en'): string[] {
+  const payload = q.payload || {};
+  return readLocalizedList(payload.rows, lng, payload.baseLanguage);
 }
 
 function optionLists(q: QuestionRow): string[][] {
@@ -135,15 +156,24 @@ export function answerRowsForResponse(questions: QuestionRow[], answersRaw: unkn
     const other = formatAnswerValue(answers[`${q.id}_other`]);
     const comment = formatAnswerValue(answers[`${q.id}_comment`]);
     const raw = answers[q.id];
-    const skipped = raw === undefined || raw === null || (Array.isArray(raw) && raw.length === 0);
-    const main = formatAnswerValue(raw);
+    const type = questionType(q);
+    const skipped =
+      raw === undefined ||
+      raw === null ||
+      (Array.isArray(raw) && raw.length === 0) ||
+      (type === 'matrix' &&
+        (!raw || typeof raw !== 'object' || Array.isArray(raw) || !Object.keys(raw as object).length));
+    const main =
+      type === 'matrix'
+        ? formatMatrixAnswer(raw, questionRows(q, lng), questionOptions(q, lng), optionLists(q))
+        : formatAnswerValue(raw);
     const parts = skipped ? [] : other ? [`${main}${main ? ' — ' : ''}${other}`] : main ? [main] : [];
     if (comment) parts.push(`(${comment})`);
     return {
       id: q.id,
       index: i + 1,
       label: questionLabel(q, lng),
-      type: questionType(q),
+      type,
       answer: parts.join(' '),
       skipped: skipped && !comment,
     };
