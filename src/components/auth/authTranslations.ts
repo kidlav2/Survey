@@ -15,6 +15,8 @@ export const authTranslations = {
     emailNotRegistered: 'This email is not registered. Please create an account.',
     createNewAccount: 'Create a new account',
     register: 'Register',
+    showPassword: 'Show password',
+    hidePassword: 'Hide password',
     forResearchAdminOnly: 'For research administration use only',
     previousAccountHint: 'If you used this site before and cannot sign in, write to the person who sent you this link.',
     accountCreatedSuccessfully: 'Account created successfully!',
@@ -46,6 +48,7 @@ export const authTranslations = {
     alreadyHaveAccount: 'Already have an account?',
     signInRegister: 'Sign in',
     registrationFailed: 'Registration failed',
+    passwordMinLength: 'Password must be at least 8 characters.',
   },
   ru: {
     // Login Page
@@ -63,6 +66,8 @@ export const authTranslations = {
     emailNotRegistered: 'Эта почта не зарегистрирована. Пожалуйста, создайте аккаунт.',
     createNewAccount: 'Создать новый аккаунт',
     register: 'Зарегистрироваться',
+    showPassword: 'Показать пароль',
+    hidePassword: 'Скрыть пароль',
     forResearchAdminOnly: 'Только для администраторов исследований',
     previousAccountHint: 'Если вы пользовались сайтом раньше и не получается войти — напишите тому, кто прислал вам эту ссылку.',
     accountCreatedSuccessfully: 'Аккаунт создан успешно!',
@@ -94,6 +99,7 @@ export const authTranslations = {
     alreadyHaveAccount: 'Уже есть аккаунт?',
     signInRegister: 'Войти',
     registrationFailed: 'Регистрация не удалась',
+    passwordMinLength: 'Пароль должен содержать не менее 8 символов.',
   },
   fr: {
     // Login Page
@@ -111,6 +117,8 @@ export const authTranslations = {
     emailNotRegistered: "Cet e-mail n'est pas enregistré. Veuillez créer un compte.",
     createNewAccount: "S'inscrire pour créer un compte",
     register: "S'inscrire",
+    showPassword: 'Afficher le mot de passe',
+    hidePassword: 'Masquer le mot de passe',
     forResearchAdminOnly: 'Pour usage administratif de recherche uniquement',
     previousAccountHint: 'Si vous utilisiez déjà ce site et n’arrivez plus à vous connecter, écrivez à la personne qui vous a envoyé ce lien.',
     accountCreatedSuccessfully: 'Compte créé avec succès!',
@@ -142,6 +150,7 @@ export const authTranslations = {
     alreadyHaveAccount: 'Vous avez déjà un compte?',
     signInRegister: 'Se connecter',
     registrationFailed: "L'enregistrement a échoué",
+    passwordMinLength: 'Le mot de passe doit contenir au moins 8 caractères.',
   },
   es: {
     // Login Page
@@ -159,6 +168,8 @@ export const authTranslations = {
     emailNotRegistered: 'Este correo electrónico no está registrado. Por favor, cree una cuenta.',
     createNewAccount: 'Crear una nueva cuenta',
     register: 'Registrarse',
+    showPassword: 'Mostrar contraseña',
+    hidePassword: 'Ocultar contraseña',
     forResearchAdminOnly: 'Solo para uso administrativo de investigación',
     previousAccountHint: 'Si usabas este sitio antes y no puedes entrar, escribe a quien te envió este enlace.',
     accountCreatedSuccessfully: '¡Cuenta creada exitosamente!',
@@ -190,5 +201,6 @@ export const authTranslations = {
     alreadyHaveAccount: '¿Ya tienes una cuenta?',
     signInRegister: 'Iniciar sesión',
     registrationFailed: 'El registro falló',
+    passwordMinLength: 'La contraseña debe tener al menos 8 caracteres.',
   },
 };

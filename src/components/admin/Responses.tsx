@@ -82,7 +82,7 @@ export default function Responses() {
       setQuestions(allQuestions || []);
     } catch (error) {
       console.error('Error loading responses:', error);
-      setToast({ message: 'Failed to load responses', type: 'error' });
+      setToast({ message: t.failedToLoadResponses, type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -137,7 +137,7 @@ export default function Responses() {
       setExportModalType(null);
     } catch (error) {
       console.error('Error exporting:', error);
-      setToast({ message: error instanceof Error ? error.message : 'Failed to export data', type: 'error' });
+      setToast({ message: error instanceof Error ? error.message : t.failedToExportData, type: 'error' });
     }
   };
 

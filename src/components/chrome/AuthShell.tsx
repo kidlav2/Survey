@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { LANGUAGES, type Lng, cn } from '../../lib/cn';
+import { applyDocumentLanguage, CHROME_UI } from '../../lib/languages';
 
 interface AuthShellProps {
   language: Lng;
@@ -8,15 +9,21 @@ interface AuthShellProps {
 }
 
 export default function AuthShell({ language, onLanguageChange, children }: AuthShellProps) {
+  const chrome = CHROME_UI[language];
+
+  useEffect(() => {
+    applyDocumentLanguage(language);
+  }, [language]);
+
   return (
     <div className="min-h-dvh bg-canvas text-ink">
       <a href="#auth-main" className="skip-link">
-        Skip to content
+        {chrome.skipToContent}
       </a>
       <header className="border-b border-line">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-4 md:px-8">
-          <p className="font-serif text-xl font-semibold text-navy">Survey Research</p>
-          <div role="group" aria-label="Language" className="flex gap-1">
+          <p className="font-serif text-xl font-semibold text-navy">{chrome.brand}</p>
+          <div role="group" aria-label={chrome.language} className="flex gap-1">
             {LANGUAGES.map((lang) => (
               <button
                 key={lang.code}

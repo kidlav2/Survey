@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useContext, useState } from 'react';
 import { X, Download } from 'lucide-react';
 import Button from '../chrome/Button';
+import { AdminLanguageContext } from './AdminLayout';
+import { adminTranslations } from './adminTranslations';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -10,6 +12,8 @@ interface ExportModalProps {
 }
 
 export default function ExportModal({ isOpen, onClose, type, onExport }: ExportModalProps) {
+  const { language } = useContext(AdminLanguageContext);
+  const t = adminTranslations[language];
   const [busy, setBusy] = useState(false);
   const [exportOptions, setExportOptions] = useState({
     includeResponses: true,
@@ -34,16 +38,16 @@ export default function ExportModal({ isOpen, onClose, type, onExport }: ExportM
       <div role="dialog" aria-modal="true" aria-labelledby="export-title" className="w-full max-w-md border border-line bg-surface">
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
           <h3 id="export-title" className="font-serif text-lg font-semibold text-navy">
-            Export {type}
+            {t.exportTitle.replace('{type}', type)}
           </h3>
-          <button type="button" onClick={onClose} className="min-h-11 min-w-11" aria-label="Close" disabled={busy}>
+          <button type="button" onClick={onClose} className="min-h-11 min-w-11" aria-label={t.close} disabled={busy}>
             <X className="mx-auto size-5" />
           </button>
         </div>
 
         <div className="space-y-5 px-5 py-5">
           <fieldset className="space-y-3">
-            <legend className="mb-2 text-sm font-bold text-ink">Include</legend>
+            <legend className="mb-2 text-sm font-bold text-ink">{t.exportInclude}</legend>
             <label className="flex cursor-pointer items-start gap-3">
               <input
                 type="checkbox"
@@ -53,8 +57,8 @@ export default function ExportModal({ isOpen, onClose, type, onExport }: ExportM
                 disabled={busy}
               />
               <span>
-                <span className="block text-sm font-medium">Survey responses</span>
-                <span className="text-xs text-ink-muted">One column per question, with readable answers</span>
+                <span className="block text-sm font-medium">{t.exportResponses}</span>
+                <span className="text-xs text-ink-muted">{t.exportResponsesHint}</span>
               </span>
             </label>
             <label className="flex cursor-pointer items-start gap-3">
@@ -66,15 +70,15 @@ export default function ExportModal({ isOpen, onClose, type, onExport }: ExportM
                 disabled={busy}
               />
               <span>
-                <span className="block text-sm font-medium">Contact emails</span>
-                <span className="text-xs text-ink-muted">Only people who opted in</span>
+                <span className="block text-sm font-medium">{t.exportContactEmails}</span>
+                <span className="text-xs text-ink-muted">{t.exportContactsHint}</span>
               </span>
             </label>
           </fieldset>
 
           <div>
             <label htmlFor="export-range" className="mb-2 block text-sm font-bold text-ink">
-              Date range
+              {t.exportDateRange}
             </label>
             <select
               id="export-range"
@@ -83,21 +87,21 @@ export default function ExportModal({ isOpen, onClose, type, onExport }: ExportM
               className="min-h-12 w-full border border-line-strong bg-surface px-3 text-sm"
               disabled={busy}
             >
-              <option value="all">All time</option>
-              <option value="today">Today</option>
-              <option value="week">Last 7 days</option>
-              <option value="month">Last 30 days</option>
+              <option value="all">{t.exportAllTime}</option>
+              <option value="today">{t.today}</option>
+              <option value="week">{t.exportLast7Days}</option>
+              <option value="month">{t.exportLast30Days}</option>
             </select>
           </div>
         </div>
 
         <div className="flex justify-end gap-3 border-t border-line px-5 py-4">
           <Button variant="secondary" onClick={onClose} disabled={busy}>
-            Cancel
+            {t.cancel}
           </Button>
           <Button onClick={() => void handleExport()} disabled={busy || (!exportOptions.includeResponses && !exportOptions.includeContacts)}>
             <Download className="size-4" />
-            {busy ? 'Exporting…' : `Download ${type}`}
+            {busy ? t.exporting : t.downloadType.replace('{type}', type)}
           </Button>
         </div>
       </div>

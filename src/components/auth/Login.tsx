@@ -6,17 +6,15 @@ import { authTranslations } from './authTranslations';
 import AuthShell from '../chrome/AuthShell';
 import Button from '../chrome/Button';
 import Field from '../chrome/Field';
-import { isLng, type Lng } from '../../lib/cn';
+import { type Lng } from '../../lib/cn';
+import { preferredUiLanguage } from '../../lib/languages';
 
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [language, setLanguage] = useState<Lng>(() => {
-    const stored = localStorage.getItem('ui_lng');
-    return isLng(stored) ? stored : 'en';
-  });
+  const [language, setLanguage] = useState<Lng>(() => preferredUiLanguage());
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -165,7 +163,7 @@ export default function Login() {
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
                     className="min-h-12 min-w-12 text-ink-muted hover:text-ink"
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    aria-label={showPassword ? t.hidePassword : t.showPassword}
                   >
                     {showPassword ? <EyeOff className="mx-auto size-5" /> : <Eye className="mx-auto size-5" />}
                   </button>

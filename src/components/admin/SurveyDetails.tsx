@@ -14,6 +14,8 @@ import { AdminLanguageContext } from './AdminLayout';
 import { isResponseCompleted, isCountableResponse, type QuestionRow, type ResponseRow } from '../../lib/responseFormat';
 import { exportResponsesFile } from '../../lib/surveyExport';
 import { exportSurveyJson } from '../../lib/surveyImport';
+import { previewSurveyUrl } from '../../lib/surveyPreview';
+import InactiveSurveyCopyModal from './InactiveSurveyCopyModal';
 
 interface SurveyData {
   id: string;
@@ -22,6 +24,7 @@ interface SurveyData {
   updated_at?: string;
   languages?: string[];
   owner_id?: string;
+  status?: 'active' | 'draft' | string;
 }
 
 
@@ -34,16 +37,16 @@ interface SurveyStats {
 
 function formatDateTime(value?: string | null, fallbackValue?: string | null) {
   const v = value ?? fallbackValue;
-  if (!v) return 'N/A';
+  if (!v) return '—';
   const d = new Date(v);
-  return Number.isNaN(d.getTime()) ? 'N/A' : d.toLocaleString();
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString();
 }
 
 function formatDate(value?: string | null, fallbackValue?: string | null) {
   const v = value ?? fallbackValue;
-  if (!v) return 'N/A';
+  if (!v) return '—';
   const d = new Date(v);
-  return Number.isNaN(d.getTime()) ? 'N/A' : d.toLocaleDateString();
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString();
 }
 
 
@@ -70,6 +73,7 @@ export default function SurveyDetails() {
   const [showExportDropdown, setShowExportDropdown] = useState(false);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
+  const [copyWarningOpen, setCopyWarningOpen] = useState(false);
 
   useEffect(() => {
     loadSurveyDetails();
@@ -142,17 +146,36 @@ export default function SurveyDetails() {
       setLoading(false);
     } catch (error) {
       console.error('Error loading survey details:', error);
-      setToast({ message: 'Failed to load survey details', type: 'error' });
+      setToast({ message: t.failedToLoadDetails, type: 'error' });
       setLoading(false);
     }
   };
 
   const surveyLink = `${window.location.origin}/survey/${id}`;
+  const surveyIsActive = survey?.status === 'active';
 
-  const copyToClipboard = () => {
+  const copyLink = () => {
     navigator.clipboard.writeText(surveyLink);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const copyToClipboard = () => {
+    if (!surveyIsActive) {
+      setCopyWarningOpen(true);
+      return;
+    }
+    copyLink();
+  };
+
+  const enableAndCopy = async () => {
+    if (!id) return;
+    const { error } = await supabase.from('surveys').update({ status: 'active' }).eq('id', id);
+    if (!error) {
+      setSurvey((current) => (current ? { ...current, status: 'active' } : current));
+    }
+    copyLink();
+    setCopyWarningOpen(false);
   };
 
   const downloadQRCode = () => {
@@ -195,7 +218,7 @@ export default function SurveyDetails() {
       if (error) throw error;
 
       setIsDeleteModalOpen(false);
-      setToast({ message: 'Survey deleted successfully', type: 'success' });
+      setToast({ message: t.surveyDeleted, type: 'success' });
 
       // Navigate back after a brief delay
       setTimeout(() => {
@@ -203,7 +226,7 @@ export default function SurveyDetails() {
       }, 1000);
     } catch (error) {
       console.error('Error deleting survey:', error);
-      setToast({ message: 'Failed to delete survey', type: 'error' });
+      setToast({ message: t.failedToDeleteSurvey, type: 'error' });
     } finally {
       setIsDeleting(false);
     }
@@ -219,16 +242,16 @@ export default function SurveyDetails() {
       if (error) throw error;
 
       setSurvey(survey ? { ...survey, title: newTitle } : null);
-      setToast({ message: 'Survey renamed successfully', type: 'success' });
+      setToast({ message: t.surveyRenamed, type: 'success' });
     } catch (error) {
       console.error('Error renaming survey:', error);
-      setToast({ message: 'Failed to rename survey', type: 'error' });
+      setToast({ message: t.failedToRenameSurvey, type: 'error' });
     }
   };
 
   const handleResetQuestions = async () => {
     const confirmReset = window.confirm(
-      `Are you sure you want to reset all responses for "${survey?.title}"?\n\nThis will delete all responses but keep the questions.`
+      t.resetResponsesConfirm.replace('{title}', survey?.title || '')
     );
     
     if (!confirmReset) return;
@@ -259,14 +282,14 @@ export default function SurveyDetails() {
       }
 
       if (data && data.length > 0) {
-        setToast({ message: `Deleted ${data.length} responses`, type: 'success' });
+        setToast({ message: t.deletedResponsesCount.replace('{n}', String(data.length)), type: 'success' });
         setTimeout(() => loadSurveyDetails(), 500);
       } else {
-        setToast({ message: 'No responses to delete', type: 'error' });
+        setToast({ message: t.noResponsesToDelete, type: 'error' });
       }
     } catch (error) {
       console.error('Error resetting responses:', error);
-      setToast({ message: `Failed to reset responses: ${error instanceof Error ? error.message : 'Unknown error'}`, type: 'error' });
+      setToast({ message: t.failedToResetResponses, type: 'error' });
     }
   };
 
@@ -343,10 +366,10 @@ export default function SurveyDetails() {
       a.click();
       window.URL.revokeObjectURL(url);
       
-      setToast({ message: 'Questions exported successfully', type: 'success' });
+      setToast({ message: t.questionsExported, type: 'success' });
     } catch (error: any) {
       console.error('Error exporting questions:', error);
-      setToast({ message: 'Failed to export questions', type: 'error' });
+      setToast({ message: t.failedToExportQuestions, type: 'error' });
     }
   };
 
@@ -382,7 +405,7 @@ export default function SurveyDetails() {
       setExportModalType(null);
     } catch (error) {
       console.error('Error exporting:', error);
-      setToast({ message: error instanceof Error ? error.message : 'Failed to export data', type: 'error' });
+      setToast({ message: error instanceof Error ? error.message : t.failedToExportData, type: 'error' });
     }
   };
 
@@ -437,9 +460,17 @@ export default function SurveyDetails() {
               <ChevronLeft className="w-5 h-5 text-gray-600" />
             </button>
             <div className="flex-1">
-              <h2 className="text-xl md:text-2xl font-semibold text-gray-900">{t.responseDetails || 'Survey Details'}</h2>
+              <h2 className="text-xl md:text-2xl font-semibold text-gray-900">{t.responseDetails || t.surveys}</h2>
               <p className="text-sm text-gray-500 mt-1">{survey.title}</p>
             </div>
+            <span
+              className={`inline-flex items-center px-2.5 py-1 text-xs font-medium ${
+                surveyIsActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+              }`}
+            >
+              <span className={`mr-2 size-2 rounded-full ${surveyIsActive ? 'bg-green-600' : 'bg-red-600'}`} />
+              {surveyIsActive ? t.statusOn : t.statusOff}
+            </span>
           </div>
         </div>
       </header>
@@ -521,6 +552,9 @@ export default function SurveyDetails() {
                   </button>
                 </div>
               </div>
+              {!surveyIsActive && (
+                <p className="mt-3 text-sm leading-relaxed text-amber-800">{t.surveyOffPageHint}</p>
+              )}
             </div>
 
             {/* Metadata Grid */}
@@ -621,10 +655,10 @@ export default function SurveyDetails() {
                 onClick={async () => {
                   try {
                     await exportSurveyJson(id as string);
-                    setToast({ message: t.surveyFileExported || 'Survey file downloaded', type: 'success' });
+                    setToast({ message: t.surveyFileExported, type: 'success' });
                   } catch (error) {
                     console.error(error);
-                    setToast({ message: 'Failed to export survey file', type: 'error' });
+                    setToast({ message: t.failedToExportSurvey, type: 'error' });
                   }
                 }}
                 className="flex items-center gap-2 px-4 py-3 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium justify-center"
@@ -635,7 +669,7 @@ export default function SurveyDetails() {
               </button>
 
               <button
-                onClick={() => window.open(surveyLink, '_blank', 'noopener,noreferrer')}
+                onClick={() => window.open(previewSurveyUrl(id as string), '_blank', 'noopener,noreferrer')}
                 className="flex items-center gap-2 px-4 py-3 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium justify-center"
               >
                 <ExternalLink className="w-4 h-4" />
@@ -648,7 +682,7 @@ export default function SurveyDetails() {
                 title="Download all questions with sections as JSON"
               >
                 <Download className="w-4 h-4" />
-                Export Questions
+                {t.exportQuestions}
               </button>
 
               {isOwner && (
@@ -666,7 +700,7 @@ export default function SurveyDetails() {
                 className="flex items-center gap-2 px-4 py-3 border border-red-300 hover:bg-red-50 text-red-700 rounded-lg transition-colors font-medium justify-center"
               >
                 <Trash2 className="w-4 h-4" />
-                Clear All Responses
+                {t.clearAllResponses}
               </button>
               )}
               {!isOwner && (
@@ -712,7 +746,7 @@ export default function SurveyDetails() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-white">
-              <h3 className="text-base font-bold text-gray-900">QR Code sharing</h3>
+              <h3 className="text-base font-bold text-gray-900">{t.qrSharing}</h3>
               <button 
                 onClick={() => setIsQRModalOpen(false)}
                 className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-all"
@@ -734,7 +768,7 @@ export default function SurveyDetails() {
               
               <div className="text-center w-full">
                 <p className="text-sm font-bold text-gray-900 mb-1 truncate px-2">{survey.title}</p>
-                <p className="text-xs text-gray-500">Scan code to open survey</p>
+                <p className="text-xs text-gray-500">{t.openPreview}</p>
               </div>
             </div>
 
@@ -744,7 +778,7 @@ export default function SurveyDetails() {
                 className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-bold text-sm shadow-sm"
               >
                 <Download className="w-4 h-4" />
-                Download PNG
+                {t.downloadPng}
               </button>
               <button
                 onClick={() => setIsQRModalOpen(false)}
@@ -775,6 +809,18 @@ export default function SurveyDetails() {
           onClose={() => setToast(null)}
         />
       )}
+      <InactiveSurveyCopyModal
+        open={copyWarningOpen}
+        language={language}
+        onCancel={() => setCopyWarningOpen(false)}
+        onCopyAnyway={() => {
+          copyLink();
+          setCopyWarningOpen(false);
+        }}
+        onCopyAndEnable={() => {
+          void enableAndCopy();
+        }}
+      />
     </main>
   );
 }

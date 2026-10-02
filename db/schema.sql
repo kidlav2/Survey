@@ -42,7 +42,8 @@ CREATE TABLE IF NOT EXISTS survey_sections (
   name text,
   description text,
   order_index integer,
-  created_at timestamptz NOT NULL DEFAULT now()
+  created_at timestamptz NOT NULL DEFAULT now(),
+  payload jsonb
 );
 
 CREATE TABLE IF NOT EXISTS questions (
@@ -74,6 +75,7 @@ CREATE TABLE IF NOT EXISTS responses (
 );
 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS organization text;
+ALTER TABLE survey_sections ADD COLUMN IF NOT EXISTS payload jsonb;
 
 CREATE TABLE IF NOT EXISTS survey_shares (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

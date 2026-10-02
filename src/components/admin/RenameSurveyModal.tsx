@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { X } from 'lucide-react';
+import { AdminLanguageContext } from './AdminLayout';
+import { adminTranslations } from './adminTranslations';
 
 interface RenameSurveyModalProps {
   isOpen: boolean;
@@ -9,6 +11,8 @@ interface RenameSurveyModalProps {
 }
 
 export default function RenameSurveyModal({ isOpen, onClose, currentTitle, onSave }: RenameSurveyModalProps) {
+  const { language } = useContext(AdminLanguageContext);
+  const t = adminTranslations[language];
   const [title, setTitle] = useState(currentTitle);
 
   useEffect(() => {
@@ -30,7 +34,7 @@ export default function RenameSurveyModal({ isOpen, onClose, currentTitle, onSav
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">Rename Survey</h3>
+          <h3 className="text-lg font-semibold text-gray-900">{t.renamesurvey}</h3>
           <button
             onClick={onClose}
             className="p-1 hover:bg-gray-100 rounded transition-colors"
@@ -44,7 +48,7 @@ export default function RenameSurveyModal({ isOpen, onClose, currentTitle, onSav
           <div className="px-6 py-6">
             <div>
               <label htmlFor="survey-title" className="block text-sm font-medium text-gray-700 mb-2">
-                Survey Title
+                {t.surveyTitle}
               </label>
               <input
                 id="survey-title"
@@ -53,7 +57,7 @@ export default function RenameSurveyModal({ isOpen, onClose, currentTitle, onSav
                 onChange={(e) => setTitle(e.target.value)}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg 
                          focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                placeholder="Enter new survey title"
+                placeholder={t.surveyTitle}
                 autoFocus
               />
             </div>
@@ -66,14 +70,14 @@ export default function RenameSurveyModal({ isOpen, onClose, currentTitle, onSav
               onClick={onClose}
               className="px-4 py-2 border border-gray-300 hover:bg-white text-gray-700 rounded-lg text-sm font-medium transition-colors"
             >
-              Cancel
+              {t.cancel}
             </button>
             <button
               type="submit"
               disabled={!title.trim()}
               className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Save Changes
+              {t.save}
             </button>
           </div>
         </form>

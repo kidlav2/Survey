@@ -1,10 +1,11 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useMemo, useState } from 'react';
 import { Copy, Check, Download, Upload } from 'lucide-react';
 import { AdminLanguageContext } from './AdminLayout';
 import Button from '../chrome/Button';
 import { supabase } from '../../lib/supabaseClient';
-import { AI_SURVEY_PROMPT, EXAMPLE_SURVEY_MD, parseSurveyFile } from '../../lib/surveySpec';
+import { EXAMPLE_SURVEY_MD, buildAiSurveyPrompt, parseSurveyFile } from '../../lib/surveySpec';
 import { downloadExampleJson, downloadTextFile, importSurveySpec } from '../../lib/surveyImport';
+import { CONTENT_LANGUAGES, languageLabel, preferredUiLanguage } from '../../lib/languages';
 
 const copy: Record<string, Record<'en' | 'ru' | 'fr' | 'es', string>> = {
   heading: {
@@ -14,10 +15,34 @@ const copy: Record<string, Record<'en' | 'ru' | 'fr' | 'es', string>> = {
     es: 'Armar un borrador con IA',
   },
   intro: {
-    en: 'Describe the survey to ChatGPT, Claude, or any other model. Download the file it gives you, then upload it here. The app splits sections, marks required questions, and can translate EN / RU / FR / ES.',
-    ru: 'Опишите опрос ChatGPT, Claude или другой модели. Скачайте файл, который она выдаст, и загрузите сюда. Приложение само разложит секции, отметит обязательные вопросы и может перевести EN / RU / FR / ES.',
-    fr: 'Décrivez l’enquête à ChatGPT, Claude ou un autre modèle. Téléchargez le fichier, puis importez-le ici. L’application sépare les sections, marque les questions obligatoires et peut traduire EN / RU / FR / ES.',
-    es: 'Describa la encuesta a ChatGPT, Claude u otro modelo. Descargue el archivo y súbalo aquí. La app separa secciones, marca lo obligatorio y puede traducir EN / RU / FR / ES.',
+    en: 'Describe the survey to ChatGPT, Claude, or any other model. Download the file it gives you, then upload it here. The app splits sections and marks required questions. Extra languages are optional.',
+    ru: 'Опишите опрос ChatGPT, Claude или другой модели. Скачайте файл, который она выдаст, и загрузите сюда. Приложение само разложит секции и отметит обязательные вопросы. Другие языки — по желанию.',
+    fr: 'Décrivez l’enquête à ChatGPT, Claude ou un autre modèle. Téléchargez le fichier, puis importez-le ici. L’application sépare les sections et marque les questions obligatoires. Les langues supplémentaires sont facultatives.',
+    es: 'Describa la encuesta a ChatGPT, Claude u otro modelo. Descargue el archivo y súbalo aquí. La app separa secciones y marca lo obligatorio. Los idiomas extra son opcionales.',
+  },
+  surveyLanguage: {
+    en: 'What language will this survey be in?',
+    ru: 'На каком языке будет опрос?',
+    fr: 'Dans quelle langue sera l’enquête ?',
+    es: '¿En qué idioma será la encuesta?',
+  },
+  surveyLanguageHelp: {
+    en: 'The prompt will ask the model to write only this language, so you do not have to translate it later.',
+    ru: 'Промпт попросит модель писать только на этом языке — лишний перевод не понадобится.',
+    fr: 'Le prompt demandera au modèle d’écrire seulement cette langue, sans traduction inutile.',
+    es: 'El prompt pedirá al modelo escribir solo este idioma, sin traducir de más.',
+  },
+  extraLanguages: {
+    en: 'Also translate to (optional)',
+    ru: 'Дополнительно перевести на (необязательно)',
+    fr: 'Traduire aussi vers (facultatif)',
+    es: 'Traducir también a (opcional)',
+  },
+  extraLanguagesHelp: {
+    en: 'Leave these empty if the survey is for one language only. The app will add the ones you tick after upload.',
+    ru: 'Оставьте пустым, если опрос только на одном языке. Отмеченные языки приложение добавит после загрузки.',
+    fr: 'Laissez vide si l’enquête n’est que pour une langue. L’application ajoutera celles que vous cochez après l’import.',
+    es: 'Déjelas vacías si la encuesta es de un solo idioma. La app añadirá las marcadas después de subir el archivo.',
   },
   step1: {
     en: '1. Copy this prompt',
@@ -85,12 +110,6 @@ const copy: Record<string, Record<'en' | 'ru' | 'fr' | 'es', string>> = {
     fr: 'Ou collez la réponse de l’IA (JSON ou Markdown)',
     es: 'O pegue la respuesta de la IA (JSON o Markdown)',
   },
-  translate: {
-    en: 'Translate missing languages (EN, RU, FR, ES)',
-    ru: 'Перевести недостающие языки (EN, RU, FR, ES)',
-    fr: 'Traduire les langues manquantes (EN, RU, FR, ES)',
-    es: 'Traducir idiomas que falten (EN, RU, FR, ES)',
-  },
   importAction: {
     en: 'Create survey from file',
     ru: 'Создать опрос из файла',
@@ -122,14 +141,26 @@ export default function ImportFromFile({ mode, surveyId, onImported }: Props) {
   const t = (key: keyof typeof copy) => copy[key][language] || copy[key].en;
   const [draft, setDraft] = useState('');
   const [filename, setFilename] = useState('paste.txt');
-  const [translate, setTranslate] = useState(true);
+  const [sourceLanguage, setSourceLanguage] = useState(() => preferredUiLanguage());
+  const [extras, setExtras] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
   const [progress, setProgress] = useState('');
   const [busy, setBusy] = useState(false);
 
+  const prompt = useMemo(
+    () => buildAiSurveyPrompt({ sourceLanguage, extraLanguages: extras }),
+    [sourceLanguage, extras]
+  );
+
+  const toggleExtra = (code: string) => {
+    setExtras((current) =>
+      current.includes(code) ? current.filter((item) => item !== code) : [...current, code]
+    );
+  };
+
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(AI_SURVEY_PROMPT);
+    await navigator.clipboard.writeText(prompt);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -152,7 +183,7 @@ export default function ImportFromFile({ mode, surveyId, onImported }: Props) {
         spec,
         ownerId: data.user.id,
         surveyId: mode === 'append' ? surveyId : undefined,
-        translate,
+        languages: extras,
         onProgress: setProgress,
       });
       onImported(result.surveyId);
@@ -172,10 +203,57 @@ export default function ImportFromFile({ mode, surveyId, onImported }: Props) {
       </div>
 
       <section>
+        <label htmlFor="survey-source-language" className="block text-sm font-bold text-ink">
+          {t('surveyLanguage')}
+        </label>
+        <p className="mt-1 text-sm text-ink-muted">{t('surveyLanguageHelp')}</p>
+        <select
+          id="survey-source-language"
+          value={sourceLanguage}
+          onChange={(e) => {
+            const next = e.target.value;
+            setSourceLanguage(next);
+            setExtras((current) => current.filter((code) => code !== next));
+          }}
+          className="mt-3 min-h-12 w-full max-w-sm border border-line-strong bg-surface px-3 text-sm"
+        >
+          {CONTENT_LANGUAGES.map((lang) => (
+            <option key={lang.code} value={lang.code}>
+              {lang.name}
+            </option>
+          ))}
+        </select>
+
+        <p className="mt-6 text-sm font-bold text-ink">{t('extraLanguages')}</p>
+        <p className="mt-1 text-sm text-ink-muted">{t('extraLanguagesHelp')}</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {CONTENT_LANGUAGES.filter((lang) => lang.code !== sourceLanguage).map((lang) => {
+            const checked = extras.includes(lang.code);
+            return (
+              <label
+                key={lang.code}
+                className={`inline-flex min-h-11 cursor-pointer items-center gap-2 border px-3 text-sm ${
+                  checked ? 'border-navy bg-accent-soft font-semibold text-ink' : 'border-line bg-surface text-ink-muted'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => toggleExtra(lang.code)}
+                  className="size-4 accent-navy"
+                />
+                {lang.name}
+              </label>
+            );
+          })}
+        </div>
+      </section>
+
+      <section>
         <h4 className="text-sm font-bold text-ink">{t('step1')}</h4>
         <p className="mt-1 text-sm text-ink-muted">{t('step1help')}</p>
         <pre className="mt-3 max-h-48 overflow-auto border border-line bg-canvas px-3 py-3 text-xs leading-relaxed whitespace-pre-wrap text-ink">
-          {AI_SURVEY_PROMPT.trim()}
+          {prompt.trim()}
         </pre>
         <Button variant="secondary" className="mt-3" onClick={handleCopy}>
           {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
@@ -224,15 +302,11 @@ export default function ImportFromFile({ mode, surveyId, onImported }: Props) {
           rows={8}
           className="mt-2 w-full border border-line-strong bg-surface px-3 py-3 font-mono text-sm"
         />
-        <label className="mt-4 flex cursor-pointer items-start gap-3 text-sm">
-          <input
-            type="checkbox"
-            checked={translate}
-            onChange={(e) => setTranslate(e.target.checked)}
-            className="mt-0.5 size-4 accent-navy"
-          />
-          <span>{t('translate')}</span>
-        </label>
+        {extras.length > 0 && (
+          <p className="mt-4 text-sm text-ink-muted">
+            {t('extraLanguages')}: {extras.map(languageLabel).join(', ')}
+          </p>
+        )}
       </section>
 
       {error && (

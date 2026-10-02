@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useContext, useState } from 'react';
 import { X } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import ImportFromFile from './ImportFromFile';
 import Button from '../chrome/Button';
 import Field from '../chrome/Field';
+import { AdminLanguageContext } from './AdminLayout';
+import { adminTranslations } from './adminTranslations';
 
 interface CreateSurveyModalProps {
   isOpen: boolean;
@@ -12,6 +14,8 @@ interface CreateSurveyModalProps {
 }
 
 export default function CreateSurveyModal({ isOpen, onClose, onCreate }: CreateSurveyModalProps) {
+  const { language } = useContext(AdminLanguageContext);
+  const t = adminTranslations[language];
   const [tab, setTab] = useState<'blank' | 'ai'>('ai');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -33,14 +37,14 @@ export default function CreateSurveyModal({ isOpen, onClose, onCreate }: CreateS
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) {
-      setError('Survey title is required');
+      setError(t.titleRequired);
       return;
     }
     setIsLoading(true);
     setError(null);
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) throw new Error('Not authenticated');
+      if (userError || !user) throw new Error(t.notAuthenticated);
       const { data, error: createError } = await supabase
         .from('surveys')
         .insert([{
@@ -60,7 +64,7 @@ export default function CreateSurveyModal({ isOpen, onClose, onCreate }: CreateS
         status: data.status,
       });
     } catch (err: any) {
-      setError(err?.message || 'Failed to create survey');
+      setError(err?.message || t.failedToCreate);
     } finally {
       setIsLoading(false);
     }
@@ -70,8 +74,8 @@ export default function CreateSurveyModal({ isOpen, onClose, onCreate }: CreateS
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4">
       <div className="sheet flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden">
         <div className="flex items-center justify-between border-b border-line px-6 py-4">
-          <h2 className="font-serif text-2xl font-semibold text-navy">New survey</h2>
-          <button type="button" onClick={onClose} className="min-h-10 min-w-10" aria-label="Close">
+          <h2 className="font-serif text-2xl font-semibold text-navy">{t.newSurvey}</h2>
+          <button type="button" onClick={onClose} className="min-h-10 min-w-10" aria-label={t.close}>
             <X className="mx-auto size-5" />
           </button>
         </div>
@@ -82,14 +86,14 @@ export default function CreateSurveyModal({ isOpen, onClose, onCreate }: CreateS
             onClick={() => setTab('ai')}
             className={`min-h-12 px-3 text-sm font-bold ${tab === 'ai' ? 'border-b-2 border-navy text-navy' : 'text-ink-muted'}`}
           >
-            From AI file
+            {t.fromAiFile}
           </button>
           <button
             type="button"
             onClick={() => setTab('blank')}
             className={`min-h-12 px-3 text-sm font-bold ${tab === 'blank' ? 'border-b-2 border-navy text-navy' : 'text-ink-muted'}`}
           >
-            Blank
+            {t.blankSurvey}
           </button>
         </div>
 
@@ -97,7 +101,7 @@ export default function CreateSurveyModal({ isOpen, onClose, onCreate }: CreateS
           {tab === 'ai' ? (
             <ImportFromFile
               mode="create"
-              onImported={(id) => finish({ id, title: 'Imported survey', description: '', status: 'draft' })}
+              onImported={(id) => finish({ id, title: t.importedSurvey, description: '', status: 'draft' })}
             />
           ) : (
             <form onSubmit={handleSubmit} className="space-y-5">
@@ -108,16 +112,16 @@ export default function CreateSurveyModal({ isOpen, onClose, onCreate }: CreateS
               )}
               <Field
                 id="title"
-                label="Survey title"
+                label={t.surveyTitleLabel}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 required
                 disabled={isLoading}
-                placeholder="e.g. Library use, spring term"
+                placeholder={t.titlePlaceholder}
               />
               <div className="space-y-2">
                 <label htmlFor="description" className="block text-sm font-bold text-ink">
-                  Description
+                  {t.description}
                 </label>
                 <textarea
                   id="description"
@@ -130,7 +134,7 @@ export default function CreateSurveyModal({ isOpen, onClose, onCreate }: CreateS
               </div>
               <Field
                 id="estimatedTime"
-                label="Estimated minutes"
+                label={t.estimatedMinutes}
                 type="number"
                 min={1}
                 max={120}
@@ -140,10 +144,10 @@ export default function CreateSurveyModal({ isOpen, onClose, onCreate }: CreateS
               />
               <div className="flex gap-3 pt-2">
                 <Button type="submit" disabled={isLoading} className="flex-1">
-                  {isLoading ? 'Creating…' : 'Create empty survey'}
+                  {isLoading ? t.creating : t.createEmptySurvey}
                 </Button>
                 <Button type="button" variant="secondary" onClick={onClose} disabled={isLoading} className="flex-1">
-                  Cancel
+                  {t.cancel}
                 </Button>
               </div>
             </form>

@@ -11,6 +11,8 @@ export const translations = {
       footer: 'Confidential survey',
       minutes: 'minutes',
       language: 'Language',
+      previewBanner: 'This is a preview. Respondents cannot take the survey until you turn it on.',
+      previewLabel: 'Preview',
     },
     questions: {
       of: 'of',
@@ -80,12 +82,15 @@ export const translations = {
       checkboxDetail: 'Receive occasional invitations to related surveys',
       emailLabel: 'Email Address',
       emailPlaceholder: 'your.email@example.com',
+      emailInvalid: 'Enter a valid email address.',
       privacyTitle: 'Your Privacy Matters',
       privacyText: 'Your email will only be used to contact you about this survey and will never be shared with third parties. You can unsubscribe at any time.',
       submitButton: 'Submit Survey',
+      optionalLabel: 'Optional',
     },
     thankYou: {
       title: 'Thank You for Your Participation',
+      recorded: 'Recorded',
       description: 'Your responses have been recorded. Thank you — this will help us improve the work this survey supports.',
       nextStepsTitle: 'What Happens Next?',
       nextSteps: [
@@ -108,6 +113,8 @@ export const translations = {
       footer: 'Конфиденциальный опрос',
       minutes: 'минут',
       language: 'Язык',
+      previewBanner: 'Это предпросмотр. Респонденты не смогут пройти опрос, пока вы его не включите.',
+      previewLabel: 'Предпросмотр',
     },
     questions: {
       of: 'из',
@@ -176,13 +183,16 @@ export const translations = {
       checkbox: 'Я хотел бы участвовать в будущих опросах',
       checkboxDetail: 'Получать приглашения на связанные опросы',
       emailLabel: 'Адрес электронной почты',
-      emailPlaceholder: 'your.email@example.com',
+      emailPlaceholder: 'name@example.com',
+      emailInvalid: 'Введите корректный адрес электронной почты.',
       privacyTitle: 'Ваша конфиденциальность важна',
       privacyText: 'Электронная почта будет использоваться только для связи по этому опросу и не будет передана третьим лицам. Вы можете отписаться в любое время.',
       submitButton: 'Отправить опрос',
+      optionalLabel: 'Необязательно',
     },
     thankYou: {
       title: 'Спасибо за ваше участие',
+      recorded: 'Записано',
       description: 'Ваши ответы записаны. Спасибо — это поможет улучшить то, ради чего проводится опрос.',
       nextStepsTitle: 'Что будет дальше?',
       nextSteps: [
@@ -205,6 +215,8 @@ export const translations = {
       footer: 'Enquête confidentielle',
       minutes: 'minutes',
       language: 'Langue',
+      previewBanner: 'Ceci est un aperçu. Les personnes ne pourront pas répondre tant que vous n’aurez pas activé l’enquête.',
+      previewLabel: 'Aperçu',
     },
     questions: {
       of: 'sur',
@@ -274,12 +286,15 @@ export const translations = {
       checkboxDetail: 'Recevoir des invitations occasionnelles à des enquêtes connexes',
       emailLabel: 'Adresse e-mail',
       emailPlaceholder: 'votre.email@example.com',
+      emailInvalid: 'Saisissez une adresse e-mail valide.',
       privacyTitle: 'Votre confidentialité compte',
       privacyText: 'Votre e-mail sera uniquement utilisé pour vous contacter au sujet de cette enquête et ne sera jamais partagé avec des tiers. Vous pouvez vous désabonner à tout moment.',
       submitButton: 'Soumettre l\'enquête',
+      optionalLabel: 'Facultatif',
     },
     thankYou: {
       title: 'Merci pour votre participation',
+      recorded: 'Enregistré',
       description: 'Vos réponses ont été enregistrées. Merci — cela nous aidera à améliorer le travail que cette enquête soutient.',
       nextStepsTitle: 'Quelle est la suite?',
       nextSteps: [
@@ -302,6 +317,8 @@ export const translations = {
       footer: 'Encuesta confidencial',
       minutes: 'minutos',
       language: 'Idioma',
+      previewBanner: 'Esto es una vista previa. Nadie podrá responder hasta que active la encuesta.',
+      previewLabel: 'Vista previa',
     },
     questions: {
       of: 'de',
@@ -371,12 +388,15 @@ export const translations = {
       checkboxDetail: 'Recibir invitaciones ocasionales a encuestas relacionadas',
       emailLabel: 'Dirección de correo electrónico',
       emailPlaceholder: 'su.email@ejemplo.com',
+      emailInvalid: 'Introduzca un correo electrónico válido.',
       privacyTitle: 'Su privacidad importa',
       privacyText: 'Su correo electrónico solo se utilizará para contactarle sobre esta encuesta y nunca se compartirá con terceros. Puede darse de baja en cualquier momento.',
       submitButton: 'Enviar encuesta',
+      optionalLabel: 'Opcional',
     },
     thankYou: {
       title: 'Gracias por su participación',
+      recorded: 'Registrado',
       description: 'Sus respuestas se han registrado. Gracias — esto nos ayudará a mejorar el trabajo que esta encuesta respalda.',
       nextStepsTitle: '¿Qué sigue?',
       nextSteps: [

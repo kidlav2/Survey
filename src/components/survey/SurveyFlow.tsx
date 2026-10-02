@@ -5,10 +5,11 @@ import { insertIgnoringUnknownColumns, updateIgnoringUnknownColumns, supabase } 
 import { translations } from './translations';
 import SurveyShell from '../chrome/SurveyShell';
 import Button from '../chrome/Button';
-import { isLng, type Lng } from '../../lib/cn';
+import { chromeLng, initialSurveyLanguage, languagesFromMaps, toggleLanguagesForSurvey } from '../../lib/languages';
 import { isResponseCompleted, parseAnswers } from '../../lib/responseFormat';
 import { isMatrixComplete, remainingMatrixRows, readLocalizedList } from '../../lib/matrixQuestion';
 import MatrixQuestion from './MatrixQuestion';
+import { canPreviewInactiveSurvey, isPreviewRequest, withPreviewParam } from '../../lib/surveyPreview';
 import {
   clearSurveyDraft,
   getStoredAnswers,
@@ -35,15 +36,9 @@ export default function SurveyFlow() {
   const stateLng = (location.state as { lng?: string; language?: string } | null)?.lng
     ?? (location.state as { language?: string } | null)?.language;
   const persistedLng = id ? getStoredLanguage(id) : null;
-  const resolvedLng: Lng = isLng(stateLng)
-    ? stateLng
-    : isLng(searchLng)
-      ? searchLng
-      : isLng(persistedLng)
-        ? persistedLng
-        : 'en';
+  const resolvedLng = initialSurveyLanguage(stateLng || searchLng, persistedLng);
 
-  const [language, setLanguage] = useState<Lng>(resolvedLng);
+  const [language, setLanguage] = useState(resolvedLng);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<Answers>({});
   const [questions, setQuestions] = useState<any[]>([]);
@@ -56,16 +51,35 @@ export default function SurveyFlow() {
   const [laterOpen, setLaterOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [commentOpen, setCommentOpen] = useState(false);
+  const [previewMode, setPreviewMode] = useState(
+    isPreviewRequest(location.search) || Boolean((location.state as { preview?: boolean } | null)?.preview)
+  );
   const languageRef = useRef(language);
   languageRef.current = language;
 
-  const t = translations[language]?.questions || translations.en.questions;
+  const t = translations[chromeLng(language)]?.questions || translations.en.questions;
   const tQuestions = t as typeof translations.en.questions;
+  const contentLanguages = useMemo(() => {
+    const maps: unknown[] = [];
+    for (const questionRow of questions) {
+      const payload = questionRow?.payload || {};
+      maps.push(payload.text, payload.options, payload.rows, payload.scaleMin, payload.scaleMax);
+    }
+    for (const sectionRow of sections) {
+      const payload = sectionRow?.payload || {};
+      maps.push(payload.name, payload.description);
+    }
+    return languagesFromMaps(...maps);
+  }, [questions, sections]);
+  const toggleLanguages = toggleLanguagesForSurvey(language, contentLanguages);
+  const previewNotice = previewMode
+    ? translations[chromeLng(language)]?.welcome?.previewBanner || translations.en.welcome.previewBanner
+    : undefined;
 
   const getLocalized = useCallback(
-    (q: any, lng: Lng) => {
+    (q: any, lng: string) => {
       const p = q?.payload ?? {};
-      const base = (p.baseLanguage || p.base_language || 'en') as Lng;
+      const base = (p.baseLanguage || p.base_language || 'en') as string;
       const textMap = p.text;
       const text =
         (textMap && typeof textMap === 'object' ? textMap[lng] || textMap[base] : null) ||
@@ -104,9 +118,9 @@ export default function SurveyFlow() {
     [tQuestions]
   );
 
-  const getLocalizedSection = useCallback((section: any, lng: Lng) => {
+  const getLocalizedSection = useCallback((section: any, lng: string) => {
     const p = section?.payload || {};
-    const base = (p.baseLanguage || p.base_language || 'en') as Lng;
+    const base = (p.baseLanguage || p.base_language || 'en') as string;
     const nameMap = p.name || p.text;
     const name =
       (nameMap && typeof nameMap === 'object' ? nameMap[lng] || nameMap[base] : null) ||
@@ -121,7 +135,7 @@ export default function SurveyFlow() {
   }, []);
 
   const ensureResponse = useCallback(
-    async (surveyId: string, lng: Lng) => {
+    async (surveyId: string, lng: string) => {
       const existing = resumeRid || getStoredResponseId(surveyId);
       if (existing) {
         setStoredResponseId(surveyId, existing);
@@ -139,13 +153,19 @@ export default function SurveyFlow() {
     try {
       const { data: surveyData, error: surveyError } = await supabase
         .from('surveys')
-        .select('status')
+        .select('status, owner_id')
         .eq('id', id)
         .single();
       if (surveyError) throw surveyError;
+      const wantsPreview =
+        isPreviewRequest(location.search) || Boolean((location.state as { preview?: boolean } | null)?.preview);
       if (surveyData?.status !== 'active') {
-        navigate(`/survey/${id}/closed`, { replace: true });
-        return;
+        const allowed = wantsPreview && (await canPreviewInactiveSurvey(id, surveyData?.owner_id));
+        if (!allowed) {
+          navigate(`/survey/${id}/closed`, { replace: true });
+          return;
+        }
+        setPreviewMode(true);
       }
 
       const { data, error } = await supabase
@@ -208,7 +228,7 @@ export default function SurveyFlow() {
     } catch {
       navigate(`/survey/${id}/closed`, { replace: true });
     }
-  }, [ensureResponse, id, navigate]);
+  }, [ensureResponse, id, location.search, location.state, navigate]);
 
   useEffect(() => {
     if (id) setStoredLanguage(id, language);
@@ -236,7 +256,7 @@ export default function SurveyFlow() {
             navigate(`/survey/${id}/closed`, { replace: true });
             return;
           }
-          if (data && isResponseCompleted(data)) {
+          if (data && isResponseCompleted(data) && !previewMode) {
             clearSurveyDraft(id);
             navigate(`/survey/${id}/thank-you`, { replace: true });
             return;
@@ -294,6 +314,7 @@ export default function SurveyFlow() {
     index = currentQuestion,
     persist = false
   ): Promise<string | null> => {
+    if (previewMode) return responseId;
     if (!id) return responseId;
     if (!completed && index <= 0 && !persist) return responseId;
 
@@ -354,7 +375,10 @@ export default function SurveyFlow() {
     [questions]
   );
   const totalQuestions = visibleQuestions.length;
-  const currentVisibleIndex = visibleQuestions.findIndex((q) => q.id === question?.id);
+  // A follow-up question is not counted on its own, so it keeps the number of the question that opened it.
+  let countedIndex = currentQuestion;
+  while (countedIndex > 0 && isBranchOnly(questions[countedIndex]?.id, countedIndex)) countedIndex--;
+  const currentVisibleIndex = visibleQuestions.findIndex((q) => q.id === questions[countedIndex]?.id);
   const progress = totalQuestions > 0 ? ((Math.max(0, currentVisibleIndex) + 1) / totalQuestions) * 100 : 0;
 
   const nextIndexAfter = (from: number) => {
@@ -403,23 +427,30 @@ export default function SurveyFlow() {
   const goToOptIn = async (finalAnswers: Answers) => {
     const rid = await saveProgress(finalAnswers, true);
     if (id) clearSurveyDraft(id);
-    navigate(`/survey/${id}/opt-in?lng=${encodeURIComponent(language)}&rid=${encodeURIComponent(rid || '')}`, {
-      state: { lng: language, language, responseId: rid },
-    });
+    navigate(
+      withPreviewParam(
+        `/survey/${id}/opt-in?lng=${encodeURIComponent(language)}&rid=${encodeURIComponent(rid || '')}`,
+        previewMode
+      ),
+      {
+        state: { lng: language, language, responseId: rid, preview: previewMode },
+      }
+    );
   };
 
-  const handleNext = async () => {
+  // Skip passes the answers it has just changed: the state update has not landed yet when it calls this.
+  const handleNext = async (current: Answers = answers) => {
     const matrixColumns = (localized.options || []).map((option: any) =>
       typeof option === 'object' ? String(option.__text || '') : String(option)
     );
     const matrixIncomplete =
       question?.type === 'matrix' &&
-      !isMatrixComplete(answers[question.id], localized.rows || [], matrixColumns);
+      !isMatrixComplete(current[question.id], localized.rows || [], matrixColumns);
     const unanswered =
       question?.type === 'matrix'
         ? matrixIncomplete
-        : answers[question?.id] === undefined ||
-          (Array.isArray(answers[question?.id]) && answers[question?.id].length === 0);
+        : current[question?.id] === undefined ||
+          (Array.isArray(current[question?.id]) && current[question?.id].length === 0);
     if (question?.required && unanswered) {
       setFormError(
         question.type === 'matrix'
@@ -438,7 +469,7 @@ export default function SurveyFlow() {
     setSaving(true);
     try {
       if (question?.conditional_logic?.length > 0) {
-        let answer = answers[question.id];
+        let answer = current[question.id];
         if (question.type === 'yes-no') answer = normalizeYesNoAnswer(answer);
         let logic = question.conditional_logic.find((l: any) => l.answer === answer);
         if (!logic && (question.type === 'single-choice' || question.type === 'multiple-choice')) {
@@ -450,13 +481,13 @@ export default function SurveyFlow() {
           }
         }
         if (logic?.end_survey) {
-          await goToOptIn(answers);
+          await goToOptIn(current);
           return;
         }
         if (logic?.next_question_id) {
           const nextQuestionIndex = questions.findIndex((q: any) => q.id === logic.next_question_id);
           if (nextQuestionIndex >= 0) {
-            await saveProgress(answers, false, nextQuestionIndex);
+            await saveProgress(current, false, nextQuestionIndex);
             setCurrentQuestion(nextQuestionIndex);
             if (id) setStoredQuestionIndex(id, nextQuestionIndex);
             return;
@@ -466,11 +497,11 @@ export default function SurveyFlow() {
 
       const nextIdx = nextIndexAfter(currentQuestion);
       if (nextIdx < questions.length) {
-        await saveProgress(answers, false, nextIdx);
+        await saveProgress(current, false, nextIdx);
         setCurrentQuestion(nextIdx);
         if (id) setStoredQuestionIndex(id, nextIdx);
       } else {
-        await goToOptIn(answers);
+        await goToOptIn(current);
       }
     } finally {
       setSaving(false);
@@ -525,12 +556,12 @@ export default function SurveyFlow() {
   const handleSkip = () => {
     const next = { ...answers, [question.id]: null };
     commitAnswers(next);
-    handleNext();
+    handleNext(next);
   };
 
   if (loading || !question) {
     return (
-      <SurveyShell language={language} onLanguageChange={setLanguage}>
+      <SurveyShell language={language} onLanguageChange={setLanguage} languages={toggleLanguages} notice={previewNotice}>
         <div className="sheet space-y-4 px-6 py-10" aria-busy="true" aria-live="polite">
           <div className="h-3 w-1/3 bg-canvas" />
           <div className="h-8 w-2/3 bg-canvas" />
@@ -558,6 +589,8 @@ export default function SurveyFlow() {
           setLanguage(lng);
           if (id) setStoredLanguage(id, lng);
         }}
+        languages={toggleLanguages}
+        notice={previewNotice}
       >
         <article className="sheet px-6 py-8 md:px-10 md:py-10">
           <h1 className="font-serif text-3xl font-semibold text-navy">{tQuestions.continueLaterTitle}</h1>
@@ -593,6 +626,8 @@ export default function SurveyFlow() {
         setLanguage(lng);
         if (id) setStoredLanguage(id, lng);
       }}
+      languages={toggleLanguages}
+      notice={previewNotice}
     >
       <div className="mb-6">
         <div className="mb-2 flex items-end justify-between gap-4 text-sm">
@@ -808,7 +843,7 @@ export default function SurveyFlow() {
               {tQuestions.skip || 'Skip'}
             </Button>
           )}
-          <Button onClick={handleNext} disabled={saving}>
+          <Button onClick={() => handleNext()} disabled={saving}>
             {finishNext ? t.finish : t.next}
             <ChevronRight className="size-4" aria-hidden="true" />
           </Button>

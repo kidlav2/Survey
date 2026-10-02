@@ -35,7 +35,7 @@ export const COLUMNS: Record<TableName, string[]> = {
     'section_id',
     'conditional_logic',
   ],
-  survey_sections: ['id', 'survey_id', 'name', 'description', 'order_index', 'created_at'],
+  survey_sections: ['id', 'survey_id', 'name', 'description', 'order_index', 'created_at', 'payload'],
   responses: [
     'id',
     'survey_id',

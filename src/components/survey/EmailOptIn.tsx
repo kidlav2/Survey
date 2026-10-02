@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { useNavigate, useParams, useLocation, useSearchParams } from 'react-router-dom';
 import { translations } from './translations';
 import { updateIgnoringUnknownColumns } from '../../lib/supabaseClient';
-import { isLng, type Lng } from '../../lib/cn';
+import { chromeLng, initialSurveyLanguage } from '../../lib/languages';
 import { getStoredLanguage, getStoredResponseId, setStoredLanguage } from '../../lib/surveySession';
 import SurveyShell from '../chrome/SurveyShell';
 import Button from '../chrome/Button';
 import Field from '../chrome/Field';
+import { isPreviewRequest, withPreviewParam } from '../../lib/surveyPreview';
 
 export default function EmailOptIn() {
   const navigate = useNavigate();
@@ -17,15 +18,14 @@ export default function EmailOptIn() {
   const lngFromQuery = searchParams.get('lng');
   const ridFromQuery = searchParams.get('rid');
   const persistedLng = id ? getStoredLanguage(id) : null;
-  const initialLng: Lng = isLng(lngFromQuery)
-    ? lngFromQuery
-    : isLng((location.state as { language?: string } | null)?.language)
-      ? ((location.state as { language: Lng }).language)
-      : isLng(persistedLng)
-        ? persistedLng
-        : 'en';
+  const initialLng = initialSurveyLanguage(
+    lngFromQuery || (location.state as { language?: string } | null)?.language,
+    persistedLng
+  );
 
-  const [language, setLanguage] = useState<Lng>(initialLng);
+  const [language, setLanguage] = useState(initialLng);
+  const previewMode =
+    isPreviewRequest(location.search) || Boolean((location.state as { preview?: boolean } | null)?.preview);
   const [optIn, setOptIn] = useState(false);
   const [email, setEmail] = useState('');
   const [emailError, setEmailError] = useState('');
@@ -35,17 +35,20 @@ export default function EmailOptIn() {
   const responseId =
     (location.state as { responseId?: string } | null)?.responseId || ridFromQuery || persistedRid || null;
 
-  const t = translations[language]?.optIn || translations.en.optIn;
+  const t = translations[chromeLng(language)]?.optIn || translations.en.optIn;
 
-  const goThankYou = (lng: Lng) => {
+  const goThankYou = (lng: string) => {
     const rid = responseId ? `&rid=${encodeURIComponent(responseId)}` : '';
-    navigate(`/survey/${id}/thank-you?lng=${encodeURIComponent(lng)}${rid}`, { state: { language: lng } });
+    navigate(
+      withPreviewParam(`/survey/${id}/thank-you?lng=${encodeURIComponent(lng)}${rid}`, previewMode),
+      { state: { language: lng, preview: previewMode } }
+    );
   };
 
   const handleSubmit = async () => {
     const trimmed = email.trim();
     if (optIn && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
-      setEmailError('Enter a valid email address.');
+      setEmailError(t.emailInvalid || 'Enter a valid email address.');
       return;
     }
 
@@ -53,7 +56,7 @@ export default function EmailOptIn() {
     setEmailError('');
 
     try {
-      if (responseId) {
+      if (responseId && !previewMode) {
         await updateIgnoringUnknownColumns(
           'responses',
           optIn && trimmed
@@ -77,14 +80,22 @@ export default function EmailOptIn() {
         setLanguage(lng);
         if (id) setStoredLanguage(id, lng);
         const rid = responseId ? `&rid=${encodeURIComponent(responseId)}` : '';
-        navigate(`/survey/${id}/opt-in?lng=${encodeURIComponent(lng)}${rid}`, {
-          replace: true,
-          state: { ...(location.state as object), language: lng },
-        });
+        navigate(
+          withPreviewParam(`/survey/${id}/opt-in?lng=${encodeURIComponent(lng)}${rid}`, previewMode),
+          {
+            replace: true,
+            state: { ...(location.state as object), language: lng, preview: previewMode },
+          }
+        );
       }}
+      notice={
+        previewMode
+          ? translations[chromeLng(language)]?.welcome?.previewBanner || translations.en.welcome.previewBanner
+          : undefined
+      }
     >
       <article className="sheet px-6 py-10 md:px-12 md:py-14">
-        <p className="text-xs font-bold uppercase tracking-[0.18em] text-ink-subtle">Optional</p>
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-ink-subtle">{t.optionalLabel || 'Optional'}</p>
         <h1 className="mt-3 font-serif text-4xl font-semibold text-navy">{t.title}</h1>
         <p className="mt-4 max-w-[60ch] text-base leading-relaxed text-ink-muted">{t.description}</p>
 

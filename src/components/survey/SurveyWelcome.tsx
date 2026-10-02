@@ -4,8 +4,16 @@ import { translations } from './translations';
 import { supabase } from '../../lib/supabaseClient';
 import SurveyShell from '../chrome/SurveyShell';
 import Button from '../chrome/Button';
-import { isLng, type Lng } from '../../lib/cn';
+import {
+  chromeLng,
+  initialSurveyLanguage,
+  languagesFromMaps,
+  parseLocalizedJson,
+  pickLocalizedText,
+  toggleLanguagesForSurvey,
+} from '../../lib/languages';
 import { getStoredLanguage, hasSurveyDraft, setStoredLanguage } from '../../lib/surveySession';
+import { canPreviewInactiveSurvey, isPreviewRequest, withPreviewParam } from '../../lib/surveyPreview';
 
 export default function SurveyWelcome() {
   const navigate = useNavigate();
@@ -16,18 +24,13 @@ export default function SurveyWelcome() {
   const stateLng = (location.state as { lng?: string; language?: string } | null)?.lng
     ?? (location.state as { language?: string } | null)?.language;
   const persistedLng = id ? getStoredLanguage(id) : null;
-  const initialLanguage: Lng = isLng(stateLng)
-    ? stateLng
-    : isLng(searchLng)
-      ? searchLng
-      : isLng(persistedLng)
-        ? persistedLng
-        : 'en';
+  const initialLanguage = initialSurveyLanguage(stateLng || searchLng, persistedLng);
 
-  const [language, setLanguage] = useState<Lng>(initialLanguage);
+  const [language, setLanguage] = useState(initialLanguage);
   const [survey, setSurvey] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [unavailable, setUnavailable] = useState(false);
+  const [previewMode, setPreviewMode] = useState(isPreviewRequest(location.search));
 
   useEffect(() => {
     if (!id) return;
@@ -37,16 +40,21 @@ export default function SurveyWelcome() {
       try {
         const { data, error } = await supabase
           .from('surveys')
-          .select('id, title, description, estimated_time, status, show_survey_info')
+          .select('id, title, description, estimated_time, status, show_survey_info, owner_id')
           .eq('id', id)
           .single();
 
         if (error) throw error;
         if (cancelled) return;
 
+        const wantsPreview = isPreviewRequest(location.search);
         if (data?.status !== 'active') {
-          navigate(`/survey/${id}/closed`, { replace: true });
-          return;
+          const allowed = wantsPreview && (await canPreviewInactiveSurvey(id, data?.owner_id));
+          if (!allowed) {
+            navigate(`/survey/${id}/closed`, { replace: true });
+            return;
+          }
+          if (!cancelled) setPreviewMode(true);
         }
 
         setSurvey(data);
@@ -60,29 +68,24 @@ export default function SurveyWelcome() {
     return () => {
       cancelled = true;
     };
-  }, [id, navigate]);
+  }, [id, location.search, navigate]);
 
-  const t = translations[language]?.welcome || translations.en.welcome;
+  const t = translations[chromeLng(language)]?.welcome || translations.en.welcome;
   const showInfo = survey?.show_survey_info !== false;
   const canContinue = Boolean(id && hasSurveyDraft(id));
+  const descriptionMap = parseLocalizedJson(survey?.description);
+  const contentLanguages = languagesFromMaps(descriptionMap);
+  const toggleLanguages = toggleLanguagesForSurvey(language, contentLanguages);
 
   const getDescriptionForLanguage = () => {
     if (!survey?.description) return t.description;
-    try {
-      const parsed = JSON.parse(survey.description);
-      if (parsed && typeof parsed === 'object') {
-        return parsed[language] || parsed.en || t.description;
-      }
-    } catch {
-      return survey.description;
-    }
-    return t.description;
+    return pickLocalizedText(survey.description, language, t.description);
   };
 
-  const handleLanguageChange = (lng: Lng) => {
+  const handleLanguageChange = (lng: string) => {
     setLanguage(lng);
     if (id) setStoredLanguage(id, lng);
-    navigate(`/survey/${id}/welcome?lng=${encodeURIComponent(lng)}`, {
+    navigate(withPreviewParam(`/survey/${id}/welcome?lng=${encodeURIComponent(lng)}`, previewMode), {
       replace: true,
       state: { lng, language: lng },
     });
@@ -90,8 +93,8 @@ export default function SurveyWelcome() {
 
   const handleStart = () => {
     if (id) setStoredLanguage(id, language);
-    navigate(`/survey/${id}/questions?lng=${encodeURIComponent(language)}`, {
-      state: { lng: language, language },
+    navigate(withPreviewParam(`/survey/${id}/questions?lng=${encodeURIComponent(language)}`, previewMode), {
+      state: { lng: language, language, preview: previewMode },
     });
   };
 
@@ -102,7 +105,12 @@ export default function SurveyWelcome() {
   if (unavailable) return null;
 
   return (
-    <SurveyShell language={language} onLanguageChange={handleLanguageChange}>
+    <SurveyShell
+      language={language}
+      onLanguageChange={handleLanguageChange}
+      languages={toggleLanguages}
+      notice={previewMode ? (t.previewBanner || t.previewLabel) : undefined}
+    >
       <article className="sheet px-6 py-10 md:px-12 md:py-14">
         {loading ? (
           <div className="space-y-4" aria-busy="true" aria-live="polite">

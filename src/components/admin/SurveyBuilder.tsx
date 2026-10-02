@@ -10,6 +10,7 @@ import { adminTranslations } from './adminTranslations';
 import ImportFromFile from './ImportFromFile';
 import MatrixEditor from './MatrixEditor';
 import { defaultMatrixColumns, defaultMatrixRows, readLocalizedList } from '../../lib/matrixQuestion';
+import { previewSurveyUrl } from '../../lib/surveyPreview';
 
 
 interface Question {
@@ -263,6 +264,33 @@ const translations = {
     activateModalDesc: 'Your questionnaire has been saved. To start collecting responses, activate the survey.',
     activateLater: 'Later',
     activateNow: 'Activate',
+    untitledQuestion: 'Untitled question',
+    typeSingle: 'Single choice',
+    typeMultiple: 'Multiple choice',
+    typeScale: 'Scale (1–5)',
+    typeText: 'Written answer',
+    typeYesNo: 'Yes / No',
+    scaleMinLabel: 'Label for 1 (minimum)',
+    scaleMaxLabel: 'Label for 5 (maximum)',
+    scaleMinPlaceholder: 'e.g. Not at all',
+    scaleMaxPlaceholder: 'e.g. Very much',
+    optionN: 'Option {n}',
+    optionPasted: 'Option pasted',
+    clipboardDenied: 'Could not read the clipboard. Allow clipboard access and try again.',
+    conditionalLogic: 'Conditional logic',
+    conditionalLogicNote: 'Questions that follow this condition appear after this question in the survey.',
+    ifAnswerEquals: 'If the answer is',
+    then: 'Then',
+    selectNextQuestion: 'Select the next question',
+    endSurvey: 'End survey',
+    addNewCondition: 'Add a condition',
+    addYesCondition: 'If Yes',
+    addNoCondition: 'If No',
+    addCondition: 'Add condition',
+    enterAnswerToMatch: 'Enter the answer to match:',
+    questionNumber: 'Question {n}',
+    requiredBadge: 'Required',
+    otherBadge: 'Other',
   },
   ru: {
     addOption: 'Добавить вариант',
@@ -321,6 +349,33 @@ const translations = {
     activateModalDesc: 'Ваш вопросник сохранен. Чтобы начать собирать ответы, активируйте опрос.',
     activateLater: 'Позже',
     activateNow: 'Активировать',
+    untitledQuestion: 'Вопрос без названия',
+    typeSingle: 'Один вариант',
+    typeMultiple: 'Несколько вариантов',
+    typeScale: 'Шкала (1–5)',
+    typeText: 'Свой ответ',
+    typeYesNo: 'Да / Нет',
+    scaleMinLabel: 'Подпись для 1 (минимум)',
+    scaleMaxLabel: 'Подпись для 5 (максимум)',
+    scaleMinPlaceholder: 'напр. Совсем нет',
+    scaleMaxPlaceholder: 'напр. Очень сильно',
+    optionN: 'Вариант {n}',
+    optionPasted: 'Вариант вставлен',
+    clipboardDenied: 'Не удалось прочитать буфер обмена. Разрешите доступ и попробуйте снова.',
+    conditionalLogic: 'Условная логика',
+    conditionalLogicNote: 'Вопросы по этому условию появятся в опросе сразу после этого вопроса.',
+    ifAnswerEquals: 'Если ответ',
+    then: 'Тогда',
+    selectNextQuestion: 'Выберите следующий вопрос',
+    endSurvey: 'Завершить опрос',
+    addNewCondition: 'Добавить условие',
+    addYesCondition: 'Если «Да»',
+    addNoCondition: 'Если «Нет»',
+    addCondition: 'Добавить условие',
+    enterAnswerToMatch: 'Введите ответ, с которым сравнивать:',
+    questionNumber: 'Вопрос {n}',
+    requiredBadge: 'Обязательный',
+    otherBadge: 'Другое',
   },
   fr: {
     addOption: 'Ajouter une option',
@@ -379,6 +434,33 @@ const translations = {
     activateModalDesc: 'Votre questionnaire a été enregistré. Pour commencer à collecter des réponses, activez l\'enquête.',
     activateLater: 'Plus tard',
     activateNow: 'Activer',
+    untitledQuestion: 'Question sans titre',
+    typeSingle: 'Choix unique',
+    typeMultiple: 'Choix multiple',
+    typeScale: 'Échelle (1–5)',
+    typeText: 'Réponse écrite',
+    typeYesNo: 'Oui / Non',
+    scaleMinLabel: 'Libellé pour 1 (minimum)',
+    scaleMaxLabel: 'Libellé pour 5 (maximum)',
+    scaleMinPlaceholder: 'ex. Pas du tout',
+    scaleMaxPlaceholder: 'ex. Énormément',
+    optionN: 'Option {n}',
+    optionPasted: 'Option collée',
+    clipboardDenied: 'Impossible de lire le presse-papiers. Autorisez l’accès et réessayez.',
+    conditionalLogic: 'Logique conditionnelle',
+    conditionalLogicNote: 'Les questions liées à cette condition apparaissent après cette question dans l’enquête.',
+    ifAnswerEquals: 'Si la réponse est',
+    then: 'Alors',
+    selectNextQuestion: 'Choisir la question suivante',
+    endSurvey: 'Terminer l’enquête',
+    addNewCondition: 'Ajouter une condition',
+    addYesCondition: 'Si Oui',
+    addNoCondition: 'Si Non',
+    addCondition: 'Ajouter une condition',
+    enterAnswerToMatch: 'Saisissez la réponse à comparer :',
+    questionNumber: 'Question {n}',
+    requiredBadge: 'Obligatoire',
+    otherBadge: 'Autre',
   },
   es: {
     addOption: 'Agregar opción',
@@ -437,6 +519,33 @@ const translations = {
     activateModalDesc: 'Su cuestionario ha sido guardado. Para comenzar a recopilar respuestas, active la encuesta.',
     activateLater: 'Más tarde',
     activateNow: 'Activar',
+    untitledQuestion: 'Pregunta sin título',
+    typeSingle: 'Opción única',
+    typeMultiple: 'Varias opciones',
+    typeScale: 'Escala (1–5)',
+    typeText: 'Respuesta escrita',
+    typeYesNo: 'Sí / No',
+    scaleMinLabel: 'Etiqueta para 1 (mínimo)',
+    scaleMaxLabel: 'Etiqueta para 5 (máximo)',
+    scaleMinPlaceholder: 'p. ej. Nada',
+    scaleMaxPlaceholder: 'p. ej. Muchísimo',
+    optionN: 'Opción {n}',
+    optionPasted: 'Opción pegada',
+    clipboardDenied: 'No se pudo leer el portapapeles. Permita el acceso e inténtelo de nuevo.',
+    conditionalLogic: 'Lógica condicional',
+    conditionalLogicNote: 'Las preguntas de esta condición aparecen después de esta pregunta en la encuesta.',
+    ifAnswerEquals: 'Si la respuesta es',
+    then: 'Entonces',
+    selectNextQuestion: 'Elija la siguiente pregunta',
+    endSurvey: 'Terminar encuesta',
+    addNewCondition: 'Añadir condición',
+    addYesCondition: 'Si es Sí',
+    addNoCondition: 'Si es No',
+    addCondition: 'Añadir condición',
+    enterAnswerToMatch: 'Escriba la respuesta con la que comparar:',
+    questionNumber: 'Pregunta {n}',
+    requiredBadge: 'Obligatoria',
+    otherBadge: 'Otro',
   },
 };
 
@@ -506,6 +615,16 @@ export default function SurveyBuilder() {
 
   const t = translations[language];
   const adminT = adminTranslations[language];
+  const optionN = (n: number) => t.optionN.replace('{n}', String(n));
+  const typeLabel = (type: Question['type']) => {
+    if (type === 'single-choice') return t.typeSingle;
+    if (type === 'multiple-choice') return t.typeMultiple;
+    if (type === 'scale') return t.typeScale;
+    if (type === 'text') return t.typeText;
+    if (type === 'yes-no') return t.typeYesNo;
+    if (type === 'matrix') return t.typeMatrix;
+    return type;
+  };
   const presenceArea = surveyInfoExpanded ? 'info' : sectionsExpanded ? 'sections' : expandedQuestion ? 'question' : 'builder';
   const peers = useSurveyPresence({
     surveyId: id,
@@ -717,7 +836,7 @@ export default function SurveyBuilder() {
       id: makeTempId(),
       type: 'single-choice',
       text: '',
-      options: ['Option 1', 'Option 2'],
+      options: [optionN(1), optionN(2)],
       required: false,
       hasOtherOption: false,
       allowComment: false,
@@ -834,7 +953,7 @@ export default function SurveyBuilder() {
       const trimmedText = clipboardText.trim();
       
       if (!trimmedText) {
-        setToast({ message: 'Clipboard is empty', type: 'error' });
+        setToast({ message: adminT.clipboardEmpty, type: 'error' });
         return;
       }
 
@@ -844,10 +963,10 @@ export default function SurveyBuilder() {
       // Add the pasted text as a new option
       const newOptions = [...(question.options || []), trimmedText];
       updateQuestion(questionId, 'options', newOptions);
-      setToast({ message: 'Option pasted successfully', type: 'success' });
+      setToast({ message: t.optionPasted, type: 'success' });
     } catch (error) {
       // Handle errors (permission denied, no clipboard access, etc.)
-      setToast({ message: 'Failed to read clipboard. Please allow clipboard access.', type: 'error' });
+      setToast({ message: t.clipboardDenied, type: 'error' });
       console.error('Clipboard error:', error);
     }
   };
@@ -875,7 +994,7 @@ export default function SurveyBuilder() {
             updatedQ.hasOtherOption = false;
           } else {
             if (!updatedQ.options || updatedQ.options.length === 0) {
-              updatedQ.options = ['Option 1', 'Option 2'];
+              updatedQ.options = [optionN(1), optionN(2)];
             }
           }
           
@@ -890,7 +1009,7 @@ export default function SurveyBuilder() {
   };
 
   const handlePreview = () => {
-    window.open(`${window.location.origin}/survey/${id}`, '_blank', 'noopener,noreferrer');
+    window.open(previewSurveyUrl(id as string), '_blank', 'noopener,noreferrer');
   };
 
   // Helper function to get payload - NO translations on save, translations happen when user takes survey
@@ -1235,12 +1354,12 @@ export default function SurveyBuilder() {
       // Check if this is a translation rate limit error
       if (error instanceof TranslationLimitError || error?.name === 'TranslationLimitError') {
         setToast({ 
-          message: '⚠️ ' + (error.message || 'Translation service limit reached. Please try again tomorrow.'), 
+          message: '⚠️ ' + (error.message || adminT.translationLimit), 
           type: 'error' 
         });
       } else if (error?.message?.includes('Quotum exceeded') || error?.message?.includes('limit') || error?.message?.includes('exceeded')) {
         setToast({ 
-          message: '⚠️ Translation service limit reached. Please try again tomorrow.', 
+          message: '⚠️ ' + adminT.translationLimit, 
           type: 'error' 
         });
       } else {
@@ -1314,12 +1433,12 @@ export default function SurveyBuilder() {
       
       if (error instanceof TranslationLimitError) {
         setToast({ 
-          message: '⚠️ Translation service limit still reached. Please try again later.', 
+          message: adminT.translationLimit, 
           type: 'error' 
         });
       } else {
         setToast({ 
-          message: 'Error during translation retry. Please try again.', 
+          message: t.failed_toast, 
           type: 'error' 
         });
       }
@@ -1395,13 +1514,13 @@ export default function SurveyBuilder() {
 
       if (error) {
         console.error('Supabase error:', error);
-        throw new Error(error.message || 'Failed to save survey info');
+        throw new Error(error.message || adminT.failedToSaveInfo);
       }
       
-      setToast({ message: 'Survey info saved successfully', type: 'success' });
+      setToast({ message: adminT.surveyInfoSaved, type: 'success' });
     } catch (error: any) {
       console.error('Error saving survey info:', error);
-      const errorMsg = error?.message || 'Failed to save survey info';
+      const errorMsg = error?.message || adminT.failedToSaveInfo;
       setToast({ message: errorMsg, type: 'error' });
     } finally {
       setSurveyInfoLoading(false);
@@ -1410,7 +1529,7 @@ export default function SurveyBuilder() {
 
   const addSection = async () => {
     if (!newSectionName.trim()) {
-      setToast({ message: 'Section name is required', type: 'error' });
+      setToast({ message: adminT.sectionNameRequired, type: 'error' });
       return;
     }
 
@@ -1427,10 +1546,10 @@ export default function SurveyBuilder() {
       setSections([...sections, data]);
       setNewSectionName('');
       setNewSectionDesc('');
-      setToast({ message: 'Section added successfully', type: 'success' });
+      setToast({ message: adminT.sectionAdded, type: 'success' });
     } catch (error: any) {
       console.error('Error adding section:', error);
-      setToast({ message: error.message || 'Failed to add section', type: 'error' });
+      setToast({ message: error.message || adminT.failedToAddSection, type: 'error' });
     } finally {
       setSectionsLoading(false);
     }
@@ -1438,7 +1557,7 @@ export default function SurveyBuilder() {
 
   const addSectionWithName = async (name: string, description: string = '') => {
     if (!name.trim()) {
-      setToast({ message: 'Section name is required', type: 'error' });
+      setToast({ message: adminT.sectionNameRequired, type: 'error' });
       return;
     }
 
@@ -1455,10 +1574,10 @@ export default function SurveyBuilder() {
       });
       
       setSections([...sections, data]);
-      setToast({ message: 'Section added successfully', type: 'success' });
+      setToast({ message: adminT.sectionAdded, type: 'success' });
     } catch (error: any) {
       console.error('Error adding section:', error);
-      setToast({ message: error.message || 'Failed to add section', type: 'error' });
+      setToast({ message: error.message || adminT.failedToAddSection, type: 'error' });
     } finally {
       setSectionsLoading(false);
     }
@@ -1479,10 +1598,10 @@ export default function SurveyBuilder() {
       if (selectedSectionId === sectionId) {
         setSelectedSectionId(null);
       }
-      setToast({ message: 'Section deleted successfully', type: 'success' });
+      setToast({ message: adminT.sectionDeleted, type: 'success' });
     } catch (error: any) {
       console.error('Error deleting section:', error);
-      setToast({ message: error.message || 'Failed to delete section', type: 'error' });
+      setToast({ message: error.message || adminT.failedToDeleteSection, type: 'error' });
     } finally {
       setSectionsLoading(false);
     }
@@ -1491,21 +1610,30 @@ export default function SurveyBuilder() {
   const updateSection = async (sectionId: string, name: string, description: string) => {
     try {
       setSectionsLoading(true);
-      
+
+      // Stored translations belong to the old text. Without them the survey shows the new name.
+      const current = sections.find(s => s.id === sectionId);
+      const payload = current?.payload ? { ...current.payload } : null;
+      if (payload && current.name !== name) {
+        delete payload.name;
+        delete payload.text;
+      }
+      if (payload && (current.description || '') !== description) delete payload.description;
+
       await updateIgnoringUnknownColumns(
         'survey_sections',
-        { name, description },
+        { name, description, payload },
         sectionId
       );
-      
-      setSections(sections.map(s => 
-        s.id === sectionId ? { ...s, name, description } : s
+
+      setSections(sections.map(s =>
+        s.id === sectionId ? { ...s, name, description, payload } : s
       ));
       setEditingSectionId(null);
-      setToast({ message: 'Section updated successfully', type: 'success' });
+      setToast({ message: adminT.sectionUpdated, type: 'success' });
     } catch (error: any) {
       console.error('Error updating section:', error);
-      setToast({ message: error.message || 'Failed to update section', type: 'error' });
+      setToast({ message: error.message || adminT.failedToUpdateSection, type: 'error' });
     } finally {
       setSectionsLoading(false);
     }
@@ -1552,7 +1680,7 @@ export default function SurveyBuilder() {
       console.log('Section order updated successfully');
     } catch (error) {
       console.error('Error updating section order:', error);
-      setToast({ message: 'Failed to update section order', type: 'error' });
+      setToast({ message: adminT.failedToUpdateOrder, type: 'error' });
       // Reload sections to restore original order
       const { data: sectionsData } = await supabase
         .from('survey_sections')
@@ -1593,7 +1721,7 @@ export default function SurveyBuilder() {
         return;
       }
       
-      const successMessage = newStatus ? t.statusUpdated : `Survey set to draft`;
+      const successMessage = newStatus ? t.statusUpdated : adminT.draftStatus;
       setToast({ message: successMessage, type: 'success' });
       setLoadingSurveyStatus(false);
     } catch (error) {
@@ -1665,7 +1793,7 @@ export default function SurveyBuilder() {
                   className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg font-medium transition-colors"
                 >
                   <Upload className="w-4 h-4" />
-                  Import file
+                  {adminT.importFile}
                 </button>
                 <button 
                   onClick={handleSave}
@@ -1686,11 +1814,13 @@ export default function SurveyBuilder() {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-sm font-medium text-gray-700">{t.surveyState}</span>
+                <span className="text-sm font-medium text-gray-700">
+                  {surveyIsActive ? adminT.acceptingResponses : adminT.notAcceptingResponses}
+                </span>
                 <button
                   onClick={toggleSurveyStatus}
                   disabled={loadingSurveyStatus}
-                  title={surveyIsActive ? 'Click to disable survey' : 'Click to enable survey'}
+                  title={surveyIsActive ? adminT.disableSurvey : adminT.enableSurvey}
                   className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
                     surveyIsActive ? 'bg-green-600' : 'bg-gray-300'
                   } ${loadingSurveyStatus ? 'opacity-70 cursor-wait' : 'cursor-pointer'}`}
@@ -1703,6 +1833,9 @@ export default function SurveyBuilder() {
                 </button>
               </div>
             </div>
+            {!surveyIsActive && (
+              <p className="text-sm leading-relaxed text-amber-800">{adminT.surveyOffPageHint}</p>
+            )}
             {/* Retry Translation Button - On its own row */}
             <div className="flex items-center gap-3">
               <button 
@@ -1719,9 +1852,9 @@ export default function SurveyBuilder() {
                   color: retryTranslationStatus === 'success' || questions.length === 0 ? '#fff' : '#1f2937'
                 }}
                 className="px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap"
-                title="Fill missing translations. Use this if translations were incomplete due to API limits."
+                title={adminT.retryTranslationsHint}
               >
-                {retryTranslationStatus === 'success' ? '✓ Done' : retryTranslationStatus === 'retrying' ? 'Retrying...' : 'Retry Translations'}
+                {retryTranslationStatus === 'success' ? `✓ ${adminT.translationsDone}` : retryTranslationStatus === 'retrying' ? adminT.retryingTranslations : adminT.retryTranslations}
               </button>
             </div>
           </div>
@@ -1783,7 +1916,7 @@ export default function SurveyBuilder() {
                 disabled={surveyInfoLoading}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg 
                          focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-vertical disabled:bg-gray-50 disabled:text-gray-500"
-                placeholder={`Survey description in ${descriptionLanguage.toUpperCase()} shown to respondents at the start...`}
+                placeholder={adminT.descriptionInLang.replace('{lang}', descriptionLanguage.toUpperCase())}
               />
             </div>
             
@@ -1805,7 +1938,7 @@ export default function SurveyBuilder() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Estimated Time (minutes)
+                  {adminT.estimatedMinutes}
                 </label>
                 <input
                   type="number"
@@ -1826,7 +1959,7 @@ export default function SurveyBuilder() {
                   disabled={surveyInfoLoading}
                   className="w-full px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                 >
-                  {surveyInfoLoading ? 'Saving...' : 'Save Info'}
+                  {surveyInfoLoading ? adminT.savingInfo : adminT.saveInfo}
                 </button>
               </div>
             </div>
@@ -1844,7 +1977,7 @@ export default function SurveyBuilder() {
                 className="w-4 h-4 rounded"
               />
               <label htmlFor="show-survey-info" className="text-sm font-medium text-gray-700">
-                Show survey information to respondents (description, time estimate)
+                {adminT.showSurveyInfoLabel}
               </label>
             </div>
               </div>
@@ -1859,7 +1992,7 @@ export default function SurveyBuilder() {
             onClick={() => setSectionsExpanded(!sectionsExpanded)}
             className="w-full flex items-center justify-between p-6 hover:bg-purple-100 transition-colors cursor-pointer"
           >
-            <h3 className="text-lg font-semibold text-gray-900">{t.section}s</h3>
+            <h3 className="text-lg font-semibold text-gray-900">{adminT.sectionsTitle}</h3>
             <ChevronDown 
               className={`w-5 h-5 text-gray-600 transition-transform ${sectionsExpanded ? 'rotate-180' : ''}`}
             />
@@ -1949,14 +2082,14 @@ export default function SurveyBuilder() {
                               value={editingSectionName}
                               onChange={(e) => setEditingSectionName(e.target.value)}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                              placeholder="Section name"
+                              placeholder={adminT.sectionName}
                             />
                             <textarea
                               value={editingSectionDesc}
                               onChange={(e) => setEditingSectionDesc(e.target.value)}
                               rows={2}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
-                              placeholder="Section description"
+                              placeholder={adminT.sectionDescription}
                             />
                             <div className="flex gap-2">
                               <button
@@ -1966,14 +2099,14 @@ export default function SurveyBuilder() {
                                 disabled={sectionsLoading}
                                 className="px-3 py-1.5 text-sm bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-50"
                               >
-                                Save
+                                {adminT.save}
                               </button>
                               <button
                                 onClick={() => setEditingSectionId(null)}
                                 disabled={sectionsLoading}
                                 className="px-3 py-1.5 text-sm bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition-colors disabled:opacity-50"
                               >
-                                Cancel
+                                {adminT.cancel}
                               </button>
                             </div>
                           </div>
@@ -2059,21 +2192,21 @@ export default function SurveyBuilder() {
                               />
                               <div className="flex-1">
                                 <p className="font-medium text-gray-900">
-                                  <span className="text-gray-500 font-normal">Q{actualIndex + 1}. </span>
-                                  {question.text || 'Untitled question'}
+                                  <span className="text-gray-500 font-normal">{t.questionNumber.replace('{n}', String(actualIndex + 1))}. </span>
+                                  {question.text || t.untitledQuestion}
                                 </p>
                                 <div className="flex items-center gap-2 mt-1">
                                   <span className="text-xs px-2 py-0.5 bg-gray-200 text-gray-600 rounded">
-                                    {question.type}
+                                    {typeLabel(question.type)}
                                   </span>
                                   {question.required && (
                                     <span className="text-xs px-2 py-0.5 bg-red-100 text-red-600 rounded">
-                                      Required
+                                      {t.requiredBadge}
                                     </span>
                                   )}
                                   {question.hasOtherOption && (
                                     <span className="text-xs px-2 py-0.5 bg-purple-100 text-purple-600 rounded">
-                                      + Other
+                                      + {t.otherBadge}
                                     </span>
                                   )}
                                   {here.map((peer) => (
@@ -2141,11 +2274,11 @@ export default function SurveyBuilder() {
                                       onChange={(e) => updateQuestion(question.id, 'type', e.target.value as any)}
                                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                     >
-                                      <option value="single-choice">Single Choice (Radio)</option>
-                                      <option value="multiple-choice">Multiple Choice (Checkboxes)</option>
-                                      <option value="scale">Scale (1-5)</option>
-                                      <option value="text">Text Input</option>
-                                      <option value="yes-no">Yes/No</option>
+                                      <option value="single-choice">{t.typeSingle}</option>
+                                      <option value="multiple-choice">{t.typeMultiple}</option>
+                                      <option value="scale">{t.typeScale}</option>
+                                      <option value="text">{t.typeText}</option>
+                                      <option value="yes-no">{t.typeYesNo}</option>
                                       <option value="matrix">{t.typeMatrix}</option>
                                     </select>
                                   </div>
@@ -2206,7 +2339,7 @@ export default function SurveyBuilder() {
                                                     updateQuestion(question.id, 'options', newOptions);
                                                   }}
                                                   className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                                  placeholder={`Option ${optIndex + 1}`}
+                                                  placeholder={optionN(optIndex + 1)}
                                                 />
                                                 <button
                                                   onClick={() => {
@@ -2251,7 +2384,7 @@ export default function SurveyBuilder() {
                                             <div className="flex flex-wrap gap-2 pt-2">
                                               <button
                                                 onClick={() => {
-                                                  const newOptions = [...(question.options || []), `Option ${(question.options?.length || 0) + 1}`];
+                                      const newOptions = [...(question.options || []), optionN((question.options?.length || 0) + 1)];
                                                   updateQuestion(question.id, 'options', newOptions);
                                                 }}
                                                 className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
@@ -2286,26 +2419,26 @@ export default function SurveyBuilder() {
                                     <div className="grid grid-cols-2 gap-4">
                                       <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                                          Description for 1 (Minimum)
+                                          {t.scaleMinLabel}
                                         </label>
                                         <input
                                           type="text"
                                           value={question.scaleMin || ''}
                                           onChange={(e) => updateQuestion(question.id, 'scaleMin', e.target.value)}
                                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                          placeholder="e.g., Not at all"
+                                          placeholder={t.scaleMinPlaceholder}
                                         />
                                       </div>
                                       <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                                          Description for 5 (Maximum)
+                                          {t.scaleMaxLabel}
                                         </label>
                                         <input
                                           type="text"
                                           value={question.scaleMax || ''}
                                           onChange={(e) => updateQuestion(question.id, 'scaleMax', e.target.value)}
                                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                          placeholder="e.g., Very much"
+                                          placeholder={t.scaleMaxPlaceholder}
                                         />
                                       </div>
                                     </div>
@@ -2345,13 +2478,13 @@ export default function SurveyBuilder() {
                                   {(question.type === 'yes-no' || question.type === 'single-choice') && (
                                     <div className="pt-3 border-t border-gray-200">
                                       <label className="block text-sm font-medium text-gray-700 mb-3">
-                                        Conditional Logic (Branch this question)
+                                        {t.conditionalLogic}
                                       </label>
                                       
                                       {/* Info Alert */}
                                       <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                                         <p className="text-sm text-blue-800">
-                                          <strong>Note:</strong> When you create conditional logic, the questions that follow this condition will appear <strong>after</strong> this question in the survey flow.
+                                          <strong>{t.conditionalLogic}:</strong> {t.conditionalLogicNote}
                                         </p>
                                       </div>
                                       
@@ -2359,7 +2492,7 @@ export default function SurveyBuilder() {
                                         {(question.conditional_logic || []).map((logic, idx) => (
                                           <div key={idx} className="p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
                                             <div className="flex items-center justify-between">
-                                              <span className="text-sm font-medium text-gray-700">If answer = <strong>{logic.answer}</strong></span>
+                                              <span className="text-sm font-medium text-gray-700">{t.ifAnswerEquals} <strong>{logic.answer}</strong></span>
                                               <button
                                                 onClick={() => {
                                                   const newLogic = (question.conditional_logic || []).filter((_, i) => i !== idx);
@@ -2371,7 +2504,7 @@ export default function SurveyBuilder() {
                                               </button>
                                             </div>
                                             <div className="space-y-2">
-                                              <label className="text-xs text-gray-600 mb-2 block font-medium">Then:</label>
+                                              <label className="text-xs text-gray-600 mb-2 block font-medium">{t.then}:</label>
                                               <div className="flex gap-2">
                                                 <select
                                                   value={logic.end_survey ? '' : (logic.next_question_id || '')}
@@ -2386,13 +2519,13 @@ export default function SurveyBuilder() {
                                                   disabled={logic.end_survey}
                                                   className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
                                                 >
-                                                  <option value="">-- Select next question --</option>
+                                                  <option value="">{t.selectNextQuestion}</option>
                                                   {questions
                                                     .filter((q: any) => q.id !== question.id && q.order > question.order)
                                                     .sort((a: any, b: any) => a.order - b.order)
                                                     .map((q: any) => (
                                                       <option key={q.id} value={q.id}>
-                                                        Q{q.order}: {q.text.substring(0, 50)}...
+                                                        {t.questionNumber.replace('{n}', String(q.order + 1))}: {q.text.substring(0, 50)}...
                                                       </option>
                                                     ))}
                                                 </select>
@@ -2414,14 +2547,14 @@ export default function SurveyBuilder() {
                                                       : 'bg-red-100 hover:bg-red-200 text-red-700'
                                                   }`}
                                                 >
-                                                  {logic.end_survey ? 'End Survey' : 'End Survey'}
+                                                  {logic.end_survey ? t.endSurvey : t.endSurvey}
                                                 </button>
                                               </div>
                                             </div>
                                           </div>
                                         ))}
                                         <div className="flex flex-col gap-2">
-                                          <p className="text-xs text-gray-600 font-medium">Add new condition:</p>
+                                          <p className="text-xs text-gray-600 font-medium">{t.addNewCondition}:</p>
                                           <div className="flex gap-2">
                                             {question.type === 'yes-no' && (
                                               <>
@@ -2433,7 +2566,7 @@ export default function SurveyBuilder() {
                                                     }}
                                                     className="text-sm px-2 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded"
                                                   >
-                                                    + Add Yes condition
+                                                    + {t.addYesCondition}
                                                   </button>
                                                 )}
                                                 {!(question.conditional_logic || []).some(l => l.answer === 'No') && (
@@ -2444,7 +2577,7 @@ export default function SurveyBuilder() {
                                                     }}
                                                     className="text-sm px-2 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded"
                                                   >
-                                                    + Add No condition
+                                                    + {t.addNoCondition}
                                                   </button>
                                                 )}
                                               </>
@@ -2452,7 +2585,7 @@ export default function SurveyBuilder() {
                                             {question.type === 'single-choice' && (
                                               <button
                                                 onClick={() => {
-                                                  const answer = prompt('Enter the answer value to match:');
+                                                  const answer = prompt(t.enterAnswerToMatch);
                                                   if (answer && !(question.conditional_logic || []).some(l => l.answer === answer)) {
                                                     const newLogic = [...(question.conditional_logic || []), { condition_type: 'answer_equals' as const, answer }];
                                                     updateQuestion(question.id, 'conditional_logic', newLogic);
@@ -2460,7 +2593,7 @@ export default function SurveyBuilder() {
                                                 }}
                                                 className="text-sm px-2 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded"
                                               >
-                                                + Add condition
+                                                + {t.addCondition}
                                               </button>
                                             )}
                                           </div>
@@ -2479,7 +2612,7 @@ export default function SurveyBuilder() {
                                       className="w-max flex items-center justify-center gap-2 mt-4 px-3 py-2 text-sm bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-colors border border-blue-200"
                                     >
                                       <Plus className="w-4 h-4" />
-                                      Add after this
+                                      {adminT.addAfterThis}
                                     </button>
                                   </div>
                                 </div>
@@ -2496,9 +2629,9 @@ export default function SurveyBuilder() {
                       <div className="mt-4 pt-4 border-t border-green-100">
                         <button
                           onClick={() => {
-                            const sectionName = prompt('Enter section name:');
+                            const sectionName = prompt(adminT.enterSectionName);
                             if (sectionName && sectionName.trim()) {
-                              const sectionDesc = prompt('Enter section description (optional):') || '';
+                              const sectionDesc = prompt(adminT.enterSectionDescOptional) || '';
                               addSectionWithName(sectionName, sectionDesc);
                             }
                           }}
@@ -2506,10 +2639,10 @@ export default function SurveyBuilder() {
                           className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm bg-green-100 hover:bg-green-200 text-green-700 rounded-lg transition-colors border border-green-200 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <Plus className="w-4 h-4" />
-                          Add Section
+                          {t.addSection}
                         </button>
                         {questions.filter(q => !q.section_id).length === 0 && (
-                          <p className="text-sm text-gray-500 italic text-center py-3 mt-3">All questions are assigned to sections. Add more questions above.</p>
+                          <p className="text-sm text-gray-500 italic text-center py-3 mt-3">{adminT.allQuestionsAssigned}</p>
                         )}
                       </div>
                     )}
@@ -2573,18 +2706,18 @@ export default function SurveyBuilder() {
                   <GripVertical className="w-5 h-5 text-gray-400 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-medium text-gray-900">Question {actualIndex + 1}</span>
+                      <span className="text-sm font-medium text-gray-900">{t.questionNumber.replace('{n}', String(actualIndex + 1))}</span>
                       <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded">
-                        {question.type === 'single-choice' ? 'Single Choice' : question.type === 'multiple-choice' ? 'Multiple' : question.type}
+                        {typeLabel(question.type)}
                       </span>
                       {question.required && (
                         <span className="text-xs px-2 py-0.5 bg-red-100 text-red-600 rounded">
-                          Required
+                          {t.requiredBadge}
                         </span>
                       )}
                       {question.hasOtherOption && (
                         <span className="text-xs px-2 py-0.5 bg-purple-100 text-purple-600 rounded">
-                          + Other
+                          + {t.otherBadge}
                         </span>
                       )}
                       {here.map((peer) => (
@@ -2593,7 +2726,7 @@ export default function SurveyBuilder() {
                         </span>
                       ))}
                     </div>
-                    <p className="text-sm text-gray-700 truncate">{question.text || 'Untitled question'}</p>
+                    <p className="text-sm text-gray-700 truncate">{question.text || t.untitledQuestion}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <Copy 
@@ -2658,11 +2791,11 @@ export default function SurveyBuilder() {
                           onChange={(e) => updateQuestion(question.id, 'type', e.target.value as any)}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         >
-                          <option value="single-choice">Single Choice (Radio)</option>
-                          <option value="multiple-choice">Multiple Choice (Checkboxes)</option>
-                          <option value="scale">Scale (1-5)</option>
-                          <option value="text">Text Input</option>
-                          <option value="yes-no">Yes/No</option>
+                          <option value="single-choice">{t.typeSingle}</option>
+                          <option value="multiple-choice">{t.typeMultiple}</option>
+                          <option value="scale">{t.typeScale}</option>
+                          <option value="text">{t.typeText}</option>
+                          <option value="yes-no">{t.typeYesNo}</option>
                           <option value="matrix">{t.typeMatrix}</option>
                         </select>
                       </div>
@@ -2725,7 +2858,7 @@ export default function SurveyBuilder() {
                                         updateQuestion(question.id, 'options', newOptions);
                                       }}
                                       className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                      placeholder={`Option ${optIndex + 1}`}
+                                      placeholder={optionN(optIndex + 1)}
                                     />
                                     <button
                                       onClick={() => {
@@ -2762,7 +2895,7 @@ export default function SurveyBuilder() {
                                 <div className="flex gap-2 pt-2">
                                   <button
                                     onClick={() => {
-                                      const newOptions = [...(question.options || []), `Option ${(question.options?.length || 0) + 1}`];
+                                      const newOptions = [...(question.options || []), optionN((question.options?.length || 0) + 1)];
                                       updateQuestion(question.id, 'options', newOptions);
                                     }}
                                     className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
@@ -2838,13 +2971,13 @@ export default function SurveyBuilder() {
                       {(question.type === 'yes-no' || question.type === 'single-choice') && (
                         <div className="pt-4 border-t border-gray-200">
                           <label className="block text-sm font-medium text-gray-700 mb-3">
-                            Conditional Logic (Branch this question)
+                            {t.conditionalLogic}
                           </label>
                           
                           {/* Info Alert */}
                           <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                             <p className="text-sm text-blue-800">
-                              <strong>Note:</strong> When you create conditional logic, the questions that follow this condition will appear <strong>after</strong> this question in the survey flow.
+                              <strong>{t.conditionalLogic}:</strong> {t.conditionalLogicNote}
                             </p>
                           </div>
                           
@@ -2852,7 +2985,7 @@ export default function SurveyBuilder() {
                             {(question.conditional_logic || []).map((logic, idx) => (
                               <div key={idx} className="p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
                                 <div className="flex items-center justify-between">
-                                  <span className="text-sm font-medium text-gray-700">If answer = <strong>{logic.answer}</strong></span>
+                                  <span className="text-sm font-medium text-gray-700">{t.ifAnswerEquals} <strong>{logic.answer}</strong></span>
                                   <button
                                     onClick={() => {
                                       const newLogic = (question.conditional_logic || []).filter((_, i) => i !== idx);
@@ -2864,7 +2997,7 @@ export default function SurveyBuilder() {
                                   </button>
                                 </div>
                                 <div className="space-y-2">
-                                  <label className="text-xs text-gray-600 mb-2 block font-medium">Then:</label>
+                                  <label className="text-xs text-gray-600 mb-2 block font-medium">{t.then}:</label>
                                   <div className="flex gap-2">
                                     <select
                                       value={logic.end_survey ? '' : (logic.next_question_id || '')}
@@ -2879,13 +3012,13 @@ export default function SurveyBuilder() {
                                       disabled={logic.end_survey}
                                       className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
                                     >
-                                      <option value="">-- Select next question --</option>
+                                      <option value="">{t.selectNextQuestion}</option>
                                       {questions
                                         .filter((q: any) => q.id !== question.id && q.order > question.order)
                                         .sort((a: any, b: any) => a.order - b.order)
                                         .map((q: any) => (
                                           <option key={q.id} value={q.id}>
-                                            Q{q.order}: {q.text.substring(0, 50)}...
+                                            {t.questionNumber.replace('{n}', String(q.order + 1))}: {q.text.substring(0, 50)}...
                                           </option>
                                         ))}
                                     </select>
@@ -2907,7 +3040,7 @@ export default function SurveyBuilder() {
                                           : 'bg-red-100 hover:bg-red-200 text-red-700'
                                       }`}
                                     >
-                                      {logic.end_survey ? 'End Survey' : 'End Survey'}
+                                      {logic.end_survey ? t.endSurvey : t.endSurvey}
                                     </button>
                                   </div>
                                 </div>
@@ -2924,7 +3057,7 @@ export default function SurveyBuilder() {
                                       }}
                                       className="text-sm px-2 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded"
                                     >
-                                      + Add Yes condition
+                                      + {t.addYesCondition}
                                     </button>
                                   )}
                                   {!(question.conditional_logic || []).some(l => l.answer === 'No') && (
@@ -2935,7 +3068,7 @@ export default function SurveyBuilder() {
                                       }}
                                       className="text-sm px-2 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded"
                                     >
-                                      + Add No condition
+                                      + {t.addNoCondition}
                                     </button>
                                   )}
                                 </>
@@ -2943,7 +3076,7 @@ export default function SurveyBuilder() {
                               {question.type === 'single-choice' && (
                                 <button
                                   onClick={() => {
-                                    const answer = prompt('Enter the answer value to match:');
+                                    const answer = prompt(t.enterAnswerToMatch);
                                     if (answer && !(question.conditional_logic || []).some(l => l.answer === answer)) {
                                       const newLogic = [...(question.conditional_logic || []), { condition_type: 'answer_equals' as const, answer, next_question_id: '' }];
                                       updateQuestion(question.id, 'conditional_logic', newLogic);
@@ -2951,7 +3084,7 @@ export default function SurveyBuilder() {
                                   }}
                                   className="text-sm px-2 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded"
                                 >
-                                  + Add condition
+                                  + {t.addCondition}
                                 </button>
                               )}
                             </div>
@@ -3090,8 +3223,8 @@ export default function SurveyBuilder() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4">
           <div className="sheet flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden">
             <div className="flex items-center justify-between border-b border-line px-6 py-4">
-              <h2 className="font-serif text-2xl font-semibold text-navy">Import questions</h2>
-              <button type="button" onClick={() => setIsImportOpen(false)} className="min-h-10 min-w-10" aria-label="Close">
+              <h2 className="font-serif text-2xl font-semibold text-navy">{adminT.importQuestions}</h2>
+              <button type="button" onClick={() => setIsImportOpen(false)} className="min-h-10 min-w-10" aria-label={adminT.close}>
                 <X className="mx-auto size-5" />
               </button>
             </div>
@@ -3101,7 +3234,7 @@ export default function SurveyBuilder() {
                 surveyId={id}
                 onImported={() => {
                   setIsImportOpen(false);
-                  setToast({ message: 'Questions imported', type: 'success' });
+                  setToast({ message: adminT.questionsImported, type: 'success' });
                   loadQuestions();
                 }}
               />

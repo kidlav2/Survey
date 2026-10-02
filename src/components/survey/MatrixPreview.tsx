@@ -4,7 +4,7 @@ import SurveyShell from '../chrome/SurveyShell';
 import Button from '../chrome/Button';
 import MatrixQuestion from './MatrixQuestion';
 import { isMatrixComplete, remainingMatrixRows } from '../../lib/matrixQuestion';
-import type { Lng } from '../../lib/cn';
+import { browserUiLanguage } from '../../lib/languages';
 
 const COLUMNS = ['Not difficult', 'Somewhat', 'Very difficult', 'Not applicable'];
 const ROWS = [
@@ -21,7 +21,7 @@ const optionClass = (selected: boolean) =>
   }`;
 
 export default function MatrixPreview() {
-  const [language, setLanguage] = useState<Lng>('en');
+  const [language, setLanguage] = useState(browserUiLanguage());
   const [step, setStep] = useState(0);
   const [frequency, setFrequency] = useState('');
   const [matrix, setMatrix] = useState<Record<string, number>>({});

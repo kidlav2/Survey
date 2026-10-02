@@ -6,7 +6,8 @@ import { authTranslations } from './authTranslations';
 import AuthShell from '../chrome/AuthShell';
 import Button from '../chrome/Button';
 import Field from '../chrome/Field';
-import { isLng, type Lng } from '../../lib/cn';
+import { type Lng } from '../../lib/cn';
+import { preferredUiLanguage } from '../../lib/languages';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -17,10 +18,7 @@ export default function Register() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [language, setLanguage] = useState<Lng>(() => {
-    const stored = localStorage.getItem('ui_lng');
-    return isLng(stored) ? stored : 'en';
-  });
+  const [language, setLanguage] = useState<Lng>(() => preferredUiLanguage());
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const t = authTranslations[language];
@@ -40,7 +38,7 @@ export default function Register() {
       return;
     }
     if (password.length < 8) {
-      setErrorMsg('Password must be at least 8 characters.');
+      setErrorMsg(t.passwordMinLength);
       return;
     }
     try {
@@ -103,7 +101,7 @@ export default function Register() {
               <button
                 type="button"
                 className="min-h-12 min-w-12 text-ink-muted"
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                aria-label={showPassword ? t.hidePassword : t.showPassword}
                 onClick={() => setShowPassword((v) => !v)}
               >
                 {showPassword ? <EyeOff className="mx-auto size-5" /> : <Eye className="mx-auto size-5" />}
@@ -126,7 +124,7 @@ export default function Register() {
               <button
                 type="button"
                 className="min-h-12 min-w-12 text-ink-muted"
-                aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                aria-label={showConfirmPassword ? t.hidePassword : t.showPassword}
                 onClick={() => setShowConfirmPassword((v) => !v)}
               >
                 {showConfirmPassword ? <EyeOff className="mx-auto size-5" /> : <Eye className="mx-auto size-5" />}

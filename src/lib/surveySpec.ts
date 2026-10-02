@@ -1,8 +1,10 @@
-export type QuestionType = 'single-choice' | 'multiple-choice' | 'scale' | 'text' | 'yes-no' | 'matrix';
-export type SupportedLng = 'en' | 'ru' | 'fr' | 'es';
+import { languageLabel, normalizeLang, uniqueLanguages } from './languages';
 
-export type Localized = string | Partial<Record<SupportedLng, string>>;
-export type LocalizedList = string[] | Partial<Record<SupportedLng, string[]>>;
+export type QuestionType = 'single-choice' | 'multiple-choice' | 'scale' | 'text' | 'yes-no' | 'matrix';
+export type SupportedLng = string;
+
+export type Localized = string | Record<string, string>;
+export type LocalizedList = string[] | Record<string, string[]>;
 
 export type SurveyQuestionSpec = {
   text: Localized;
@@ -13,6 +15,7 @@ export type SurveyQuestionSpec = {
   rows?: LocalizedList;
   scaleMin?: Localized;
   scaleMax?: Localized;
+  showIfPreviousAnswer?: string[];
 };
 
 export type SurveySectionSpec = {
@@ -25,7 +28,8 @@ export type SurveySpec = {
   title: Localized;
   description?: Localized;
   estimatedTime?: number;
-  baseLanguage?: SupportedLng;
+  baseLanguage?: string;
+  languages?: string[];
   translate?: boolean;
   sections?: SurveySectionSpec[];
   questions?: SurveyQuestionSpec[];
@@ -141,30 +145,105 @@ A few facts so we can group answers.
 - [optional] Anything else we should know? (text)
 `;
 
-export const AI_SURVEY_PROMPT = `You are helping me build a professional survey.
+export function buildAiSurveyPrompt(opts: { sourceLanguage: string; extraLanguages?: string[] }): string {
+  const source = normalizeLang(opts.sourceLanguage) || 'en';
+  const extra = uniqueLanguages(opts.extraLanguages || []).filter((code) => code !== source);
+  const sourceName = languageLabel(source);
+  const extraList = extra.map((code) => `${languageLabel(code)} (${code})`).join(', ');
+  const translate = extra.length > 0;
+  const languageRules = translate
+    ? `- Write the entire survey in ${sourceName} only. Set "baseLanguage" to "${source}".\n- Set "translate": true. After upload the app will add these languages: ${extraList}. Do not write those languages yourself.\n- The app translates every string separately by machine. Write short, literal text: no idioms, no slang, and the same word for the same thing everywhere.`
+    : `- Write the entire survey in ${sourceName} only. Set "baseLanguage" to "${source}".\n- Set "translate": false. Do not add other languages. This survey is only for ${sourceName}.`;
+
+  return `You are a senior survey methodologist. Design a professional survey for the brief at the end of this message.
 
 Write the full survey as ONE JSON file. Do not wrap it in markdown fences. Do not add commentary.
+The survey must be ready to send as it is: no placeholders, no notes to me.
+If the brief does not say what the survey is for or who will answer it, ask me up to 5 short questions in one message, in the language of my brief, and wait. Otherwise ask nothing: make sensible assumptions and write the JSON.
 
-Rules:
-- Put related questions into sections.
-- Mark each question required: true or required: false. Use required only when the answer is essential.
-- Use exactly these types: "single-choice", "multiple-choice", "scale", "text", "yes-no", "matrix".
-- single-choice and multiple-choice MUST have an "options" array of short answers.
-- Set hasOtherOption: true only when "Other, please specify" is useful.
-- For scale questions, add scaleMin (meaning of 1) and scaleMax (meaning of 5).
-- Use type "matrix" when one stem rates several items on the same scale. matrix MUST have "options" (2–7 short column labels) and "rows" (the items to rate). Include a "Not applicable" column when some items may not apply.
-- Keep wording plain, one idea per question, no leading numbers like "1.".
-- Write the survey in the source language I specify. Set "baseLanguage" to en, ru, fr, or es.
-- Set "translate": true so the app can fill the other three languages after upload.
-- estimatedTime is minutes, integer.
+How the app shows the survey:
+- One question per screen, usually on a phone. Every question must make sense on its own. Never write "as above", "the previous question" or "if yes".
+- A question has no help text. Everything the respondent needs must be in the question and its options.
+- Respondents see the section name above each question. They never see the section description: it is a note for the survey owner.
+- A question with required: true cannot be passed without an answer. Only a question with required: false shows a Skip button.
+- The welcome screen shows the title, the description, the estimated time and the app's own privacy note.
+- After the last question the app has its own optional contact step. Do not ask for a name, email or phone number unless the brief says so.
+
+Plan first (do not output the plan):
+- List what the brief needs to learn. Every question must serve one of these needs. Cut questions that are only interesting, and never ask the same thing twice.
+- Do not ask what the brief says is already known.
+- Fit the time limit in the brief. If there is none, stay under 10 minutes. Count every question, follow-ups included: 20 seconds per choice question, 10 per yes-no or scale question, 10 per matrix row, 60 per text question, 20 for the optional closing question. Add 50% when the audience is not used to online forms. If the total is over the limit, cut the least important questions. Set estimatedTime to the total in minutes, rounded up.
+
+Order:
+- Start with easy factual questions and go from general to specific.
+- One topic per section, about 3 to 7 questions each. Never make a section for a single question, unless that question is a matrix: put it into a related section. Section names are 1 to 4 words.
+- Put sensitive and personal questions near the end.
+- Finish with one optional text question that invites anything else.
+
+Wording:
+- Use the words the audience uses. No jargon, no abbreviations.
+- Keep each question to one short sentence.
+- One idea per question. If a question joins two things with "and" or "or", split it.
+- Stay neutral: no leading or loaded wording, no double negatives.
+- Ask about facts and what people actually did before asking for opinions. Ask about plans only when the brief needs them.
+- Name the time frame ("in the last 12 months") instead of "recently" or "usually".
+- No leading numbers like "1.".
+
+Answer options:
+- single-choice and multiple-choice MUST have an "options" array of short answers, parallel in form, in a logical order.
+- Options cover every realistic answer, including "None of these" when that can happen. Aim for 3 to 7 options before the opt-out.
+- single-choice options must not overlap in meaning. Number ranges cover every possible value, with no gaps, no overlaps and open ends: "Under 18", "18–34", "35–54", "55 or older".
+- Use multiple-choice when more than one answer can be true.
+- Rating labels are symmetric: the same number of negative and positive steps, for example "Very bad", "Bad", "Good", "Very good".
+- Name brands, products or services only when you are sure they fit the audience. If you are not sure, list fewer and set hasOtherOption: true.
+- Set hasOtherOption: true only when the list cannot be complete. The app then adds "Other, please specify" with a text box, so never write an option that means other yourself ("Other", "Other services", "Something else").
+
+Opt-outs instead of skipping:
+- Nobody is forced to guess and nobody skips silently: a question with answer options is passed by choosing an opt-out, not by a Skip button.
+- Every single-choice, multiple-choice and matrix question is required: true and ends with one opt-out as its last option or column, written in the survey language. Pick the one that fits: "Don't know" for facts, "Not decided yet" for plans, "Not sure" for opinions, "Not applicable" when the question may not apply to someone, "Prefer not to say" for sensitive topics.
+- yes-no and scale have no room for an opt-out. Use them only when every respondent can answer, with required: true. yes-no is for plain facts ("Do you have a car?"). For intentions, interest and opinions ("Would you...?", "Are you interested...?") use single-choice with graded answers and an opt-out.
+- text is the only type that may be optional, because it has no options to choose from. Use required: false for it unless the survey is useless without that answer.
+- Always write "required" explicitly.
+
+Question types (use exactly these):
+- "single-choice", "multiple-choice": see above.
+- "yes-no": no options.
+- "scale": always 1 to 5. Add scaleMin (meaning of 1) and scaleMax (meaning of 5). 1 is the low or negative end.
+- "matrix": use when one stem rates several items on the same scale. The stem is a short question that fits every row, and all rows have the same grammatical form. matrix MUST have "options" (2–7 short column labels, the opt-out included) and "rows" (2–6 items to rate). Order the columns from the low or negative end to the high or positive end, then the opt-out. Prefer 5 columns or fewer: on a phone every row lists all of them. When an item may not apply to someone, use "Not applicable" as the opt-out column instead of asking a filter question first.
+- "text": for answers that options cannot cover. Keep these few: typing is slow.
+
+Follow-up logic:
+- A question can be shown only to people who gave certain answers to the question right before it. Add "showIfPreviousAnswer": ["answer", ...] to the follow-up question.
+- The question right before it must be single-choice or yes-no and sit in the same section. Copy the answers exactly from its options. For a yes-no question use "Yes" or "No".
+- Only one follow-up per question. A follow-up may have its own follow-up.
+- Use it only when a question makes no sense for part of the respondents. The follow-up still makes sense on its own and follows every rule above.
+- Anything more complex (the question depends on a multiple-choice answer, on an earlier question, or needs several follow-ups) cannot use logic. Then write the question so everyone can answer it, with "Not applicable" as the opt-out, or merge both questions into one.
+- Never ask a question whose only job is to set up the next one, unless the next one uses showIfPreviousAnswer.
+
+Language:
+${languageRules}
+
+Title and description:
+- title: short and specific.
+- description: 1 to 3 sentences on what the survey is for and how the answers will be used. Never say that answers are anonymous or confidential: the app shows its own privacy note.
+
+Check before you answer:
+- The JSON is valid and uses only the fields shown below.
+- Every single-choice, multiple-choice and matrix question is required and ends with an opt-out. Only text questions are optional. Every question has "required".
+- Every showIfPreviousAnswer value is an exact copy of an option of the question right before it.
+- Number ranges have no gaps and no overlaps. Rating labels are symmetric. No option means other.
+- The last question is an optional text question. No section holds one lone question, except a matrix.
+- The description says nothing about anonymity or confidentiality.
+- estimatedTime is an integer number of minutes and fits the limit.
+- Read the survey once as a respondent from the audience: no question forces a guess, repeats another one or needs the previous one to make sense.
 
 JSON shape:
 {
   "title": "...",
   "description": "...",
   "estimatedTime": 6,
-  "baseLanguage": "en",
-  "translate": true,
+  "baseLanguage": "${source}",
+  "translate": ${translate},
   "sections": [
     {
       "name": "...",
@@ -175,15 +254,48 @@ JSON shape:
           "type": "single-choice",
           "required": true,
           "hasOtherOption": false,
-          "options": ["...", "..."]
-        }
+          "options": ["...", "...", "<opt-out>"]
+        },
+        {
+          "text": "...",
+          "type": "multiple-choice",
+          "required": true,
+          "hasOtherOption": true,
+          "showIfPreviousAnswer": ["<an option of the question right before>"],
+          "options": ["...", "...", "<opt-out>"]
+        },
+        {
+          "text": "...",
+          "type": "matrix",
+          "required": true,
+          "options": ["...", "...", "...", "<opt-out>"],
+          "rows": ["...", "..."]
+        },
+        {
+          "text": "...",
+          "type": "scale",
+          "required": true,
+          "scaleMin": "...",
+          "scaleMax": "..."
+        },
+        { "text": "...", "type": "yes-no", "required": true },
+        { "text": "...", "type": "text", "required": false }
       ]
     }
   ]
 }
 
-Topic / audience / what I need to learn:
+Brief:
+Goal (what will you decide with the answers):
+Audience (who answers, how well they know the topic):
+What I need to learn:
+What I already know (do not ask this):
+Time limit in minutes:
+Topics to avoid:
 `;
+}
+
+export const AI_SURVEY_PROMPT = buildAiSurveyPrompt({ sourceLanguage: 'en' });
 
 const LANGS: SupportedLng[] = ['en', 'ru', 'fr', 'es'];
 
@@ -253,7 +365,9 @@ function collectJsonCandidates(raw: string): string[] {
 }
 
 function parseRelaxedJson(candidate: string): unknown | null {
+  // Valid JSON goes first: the relaxed pass rewrites curly quotes, which breaks text that contains them.
   const attempts = [
+    candidate,
     relaxJson(candidate),
     relaxJson(candidate.replace(/\bTrue\b/g, 'true').replace(/\bFalse\b/g, 'false').replace(/\bNone\b/g, 'null')),
   ];
@@ -315,11 +429,19 @@ function normalizeType(value?: string): QuestionType {
 function asText(value: Localized | undefined): string {
   if (!value) return '';
   if (typeof value === 'string') return value.trim();
-  return (value.en || value.ru || value.fr || value.es || '').trim();
+  for (const lang of LANGS) {
+    const text = value[lang];
+    if (typeof text === 'string' && text.trim()) return text.trim();
+  }
+  for (const text of Object.values(value)) {
+    if (typeof text === 'string' && text.trim()) return text.trim();
+  }
+  return '';
 }
 
 function inferBaseLanguage(spec: SurveySpec): SupportedLng {
-  if (spec.baseLanguage && LANGS.includes(spec.baseLanguage)) return spec.baseLanguage;
+  const specified = normalizeLang(spec.baseLanguage);
+  if (specified) return specified;
   const sample = [asText(spec.title), asText(spec.description)].join(' ');
   return /[А-Яа-яЁё]/.test(sample) ? 'ru' : 'en';
 }
@@ -390,6 +512,7 @@ function normalizeSection(input: any): SurveySectionSpec {
 
 function normalizeQuestion(input: any): SurveyQuestionSpec {
   const required = input?.required ?? input?.isRequired ?? input?.is_required;
+  const showIf = input?.showIfPreviousAnswer ?? input?.show_if_previous_answer;
   return {
     text: input?.text || input?.question || '',
     type: normalizeType(input?.type),
@@ -399,6 +522,9 @@ function normalizeQuestion(input: any): SurveyQuestionSpec {
     rows: input?.rows || input?.items || input?.statements || [],
     scaleMin: input?.scaleMin || input?.scale_min || input?.minLabel,
     scaleMax: input?.scaleMax || input?.scale_max || input?.maxLabel,
+    showIfPreviousAnswer: (Array.isArray(showIf) ? showIf : showIf == null ? [] : [showIf])
+      .map((answer: unknown) => String(answer ?? '').trim())
+      .filter(Boolean),
   };
 }
 
@@ -567,23 +693,42 @@ function parseMarkdownSurvey(source: string): SurveySpec {
 function optionCount(options?: LocalizedList) {
   if (!options) return 0;
   if (Array.isArray(options)) return options.length;
-  return Math.max(...LANGS.map((lng) => options[lng]?.length || 0), 0);
+  return Math.max(0, ...Object.values(options).map((list) => (Array.isArray(list) ? list.length : 0)));
 }
 
 export function localizedString(value: Localized | undefined, lang: SupportedLng): string {
   if (!value) return '';
   if (typeof value === 'string') return value;
-  return (value[lang] || value.en || value.ru || value.fr || value.es || '').trim();
+  if (typeof value[lang] === 'string' && value[lang].trim()) return value[lang].trim();
+  for (const code of LANGS) {
+    if (typeof value[code] === 'string' && value[code].trim()) return value[code].trim();
+  }
+  for (const text of Object.values(value)) {
+    if (typeof text === 'string' && text.trim()) return text.trim();
+  }
+  return '';
 }
 
 export function localizedOptions(value: LocalizedList | undefined, lang: SupportedLng): string[] {
   if (!value) return [];
   if (Array.isArray(value)) return value.map((item) => String(item));
-  return (value[lang] || value.en || value.ru || value.fr || value.es || []).map((item) => String(item));
+  if (Array.isArray(value[lang]) && value[lang].length) return value[lang].map((item) => String(item));
+  for (const code of LANGS) {
+    if (Array.isArray(value[code]) && value[code].length) return value[code].map((item) => String(item));
+  }
+  for (const list of Object.values(value)) {
+    if (Array.isArray(list) && list.length) return list.map((item) => String(item));
+  }
+  return [];
 }
 
-export function hasFullLocalization(value: Localized | undefined): value is Partial<Record<SupportedLng, string>> {
-  return Boolean(value && typeof value === 'object' && !Array.isArray(value) && (value.en || value.ru || value.fr || value.es));
+export function hasFullLocalization(value: Localized | undefined): value is Record<string, string> {
+  return Boolean(
+    value &&
+      typeof value === 'object' &&
+      !Array.isArray(value) &&
+      Object.values(value).some((text) => typeof text === 'string' && text.trim())
+  );
 }
 
 export { flattenQuestions };

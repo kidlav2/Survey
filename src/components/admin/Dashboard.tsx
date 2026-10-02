@@ -9,6 +9,7 @@ import SkeletonDashboard from '../common/SkeletonDashboard';
 import { adminTranslations } from './adminTranslations';
 import { AdminLanguageContext } from './AdminLayout';
 import { isCountableResponse, type ResponseRow } from '../../lib/responseFormat';
+import InactiveSurveyCopyModal from './InactiveSurveyCopyModal';
 
 interface DashboardMetrics {
   totalResponses: number;
@@ -20,6 +21,7 @@ interface ActiveSurvey {
   id: string;
   title: string;
   responses_count: number;
+  status: 'active' | 'draft';
 }
 
 export default function Dashboard() {
@@ -29,9 +31,10 @@ export default function Dashboard() {
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [isQRModalOpen, setIsQRModalOpen] = React.useState(false);
   const [toast, setToast] = React.useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
-  const [metrics, setMetrics] = useState<DashboardMetrics>({ totalResponses: 0, emailsCollected: 0, lastActivity: 'No activity' });
+  const [metrics, setMetrics] = useState<DashboardMetrics>({ totalResponses: 0, emailsCollected: 0, lastActivity: '' });
   const [activeSurvey, setActiveSurvey] = useState<ActiveSurvey | null>(null);
   const [loading, setLoading] = useState(true);
+  const [copyWarningOpen, setCopyWarningOpen] = React.useState(false);
   const [languageCounts, setLanguageCounts] = useState<Record<string, number>>({});
   const [recentActivity, setRecentActivity] = useState<Array<{ label: string; when: string; tone: 'primary' | 'muted'; surveyId?: string }>>([]);
 
@@ -131,12 +134,13 @@ export default function Dashboard() {
           id: survey.id,
           title: survey.title,
           responses_count: surveyResponseCount,
+          status: survey.status === 'active' ? 'active' : 'draft',
         });
 
         setMetrics({
           totalResponses: totalResponsesCount,
           emailsCollected: totalEmailsCount,
-          lastActivity: relativeTime(lastResponseAt),
+          lastActivity: relativeTime(lastResponseAt) || t.noActivity,
         });
 
         const activity: Array<{ label: string; when: string; tone: 'primary' | 'muted'; surveyId?: string }> = [];
@@ -160,7 +164,7 @@ export default function Dashboard() {
       setLoading(false);
     } catch (error: any) {
       console.error('Error loading dashboard data:', error);
-      const msg = error?.message || error?.error_description || 'Failed to load dashboard data';
+      const msg = error?.message || error?.error_description || t.failedToLoadDashboard;
       setToast({ message: msg, type: 'error' });
       setLoading(false);
     }
@@ -181,16 +185,16 @@ export default function Dashboard() {
     ];
 
     const total = items.reduce((sum, i) => sum + i.count, 0);
-    if (total === 0) return 'No responses yet';
+    if (total === 0) return t.noResponsesYet;
 
     return items
       .filter(i => i.count > 0)
       .map(i => `${i.label}: ${i.count}`)
-      .join('  ');
+      .join(' · ');
   };
 
   const relativeTime = (iso?: string | null) => {
-    if (!iso) return 'No activity';
+    if (!iso) return t.noActivity;
     const then = new Date(iso).getTime();
     const now = Date.now();
     const diffSec = Math.max(0, Math.round((now - then) / 1000));
@@ -211,14 +215,32 @@ export default function Dashboard() {
 
   const surveyLink = activeSurvey ? `${window.location.origin}/survey/${activeSurvey.id}` : '';
 
-  const copyToClipboard = async () => {
+  const copyLink = async () => {
     try {
       await navigator.clipboard.writeText(surveyLink);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      setToast({ message: 'Could not copy link. Please copy it manually.', type: 'error' });
+      setToast({ message: t.couldNotCopyLink, type: 'error' });
     }
+  };
+
+  const copyToClipboard = async () => {
+    if (activeSurvey && activeSurvey.status !== 'active') {
+      setCopyWarningOpen(true);
+      return;
+    }
+    await copyLink();
+  };
+
+  const enableAndCopy = async () => {
+    if (!activeSurvey) return;
+    const { error } = await supabase.from('surveys').update({ status: 'active' }).eq('id', activeSurvey.id);
+    if (!error) {
+      setActiveSurvey({ ...activeSurvey, status: 'active' });
+    }
+    await copyLink();
+    setCopyWarningOpen(false);
   };
 
   const downloadQRCode = () => {
@@ -246,7 +268,7 @@ export default function Dashboard() {
   };
 
   const handleCreateSurvey = (surveyData: { id: string }) => {
-    setToast({ message: 'Survey created successfully', type: 'success' });
+    setToast({ message: t.surveyCreatedSuccess, type: 'success' });
     setIsModalOpen(false);
     loadDashboardData(); // Refresh data
     navigate(`/admin/surveys/${surveyData.id}/builder`);
@@ -256,7 +278,7 @@ export default function Dashboard() {
     return (
       <main className="flex-1">
         <header className="bg-white border-b border-gray-200 px-4 md:px-8 py-4">
-          <h2 className="text-xl md:text-2xl font-semibold text-gray-900">Dashboard</h2>
+          <h2 className="text-xl md:text-2xl font-semibold text-gray-900">{t.dashboard}</h2>
         </header>
         <div className="p-4 md:p-8">
           <SkeletonDashboard />
@@ -326,6 +348,14 @@ export default function Dashboard() {
                 <p className="text-lg md:text-xl font-semibold text-gray-900">
                   {activeSurvey.title}
                 </p>
+                <span
+                  className={`mt-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    activeSurvey.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                  }`}
+                >
+                  <span className={`mr-2 size-2 rounded-full ${activeSurvey.status === 'active' ? 'bg-green-600' : 'bg-red-600'}`} />
+                  {activeSurvey.status === 'active' ? t.statusOn : t.statusOff}
+                </span>
               </div>
 
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
@@ -337,7 +367,7 @@ export default function Dashboard() {
                   <button
                     onClick={copyToClipboard}
                     className="p-2.5 border border-gray-300 hover:bg-white rounded-lg transition-colors self-center sm:self-auto"
-                    title="Copy link"
+                    title={t.copyLink}
                   >
                     {copied ? (
                       <CheckCircle className="w-5 h-5 text-green-600" />
@@ -348,13 +378,16 @@ export default function Dashboard() {
                   <button
                     onClick={() => setIsQRModalOpen(true)}
                     className="p-2.5 border border-gray-300 hover:bg-white rounded-lg transition-colors self-center sm:self-auto"
-                    title="View QR Code"
+                    title={t.viewQr}
                   >
                     <QrCode className="w-5 h-5 text-gray-600" />
                   </button>
                 </div>
                 {copied && (
                   <p className="text-sm text-green-600 mt-2">{t.linkCopied}</p>
+                )}
+                {activeSurvey.status !== 'active' && (
+                  <p className="mt-2 text-xs leading-relaxed text-amber-800">{t.surveyOffPageHint}</p>
                 )}
               </div>
 
@@ -375,13 +408,13 @@ export default function Dashboard() {
                   onClick={() => navigate(`/admin/surveys/${activeSurvey.id}`)}
                   className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors"
                 >
-                  Manage Survey
+                  {t.manageSurvey}
                 </button>
                 <button
                   onClick={() => navigate('/admin/responses')}
                   className="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg text-sm font-medium transition-colors"
                 >
-                  View Responses
+                  {t.viewResponses}
                 </button>
               </div>
             </div>
@@ -441,7 +474,7 @@ export default function Dashboard() {
         <div className="fixed inset-0 flex items-center justify-center p-6 z-50" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
           <div className="bg-white rounded-lg shadow-lg max-w-sm w-full">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">QR Code</h2>
+              <h2 className="text-lg font-semibold text-gray-900">{t.qrSharing}</h2>
               <button
                 onClick={() => setIsQRModalOpen(false)}
                 className="p-1 hover:bg-gray-100 rounded transition-colors"
@@ -466,13 +499,13 @@ export default function Dashboard() {
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors font-medium"
                 >
                   <Download className="w-4 h-4" />
-                  Download
+                  {t.downloadPng}
                 </button>
                 <button
                   onClick={() => setIsQRModalOpen(false)}
                   className="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium"
                 >
-                  Close
+                  {t.close}
                 </button>
               </div>
             </div>
@@ -489,6 +522,18 @@ export default function Dashboard() {
           onClose={() => setToast(null)}
         />
       )}
+      <InactiveSurveyCopyModal
+        open={copyWarningOpen}
+        language={language}
+        onCancel={() => setCopyWarningOpen(false)}
+        onCopyAnyway={() => {
+          void copyLink();
+          setCopyWarningOpen(false);
+        }}
+        onCopyAndEnable={() => {
+          void enableAndCopy();
+        }}
+      />
     </main>
   );
 }

@@ -155,7 +155,7 @@ export default function Contacts() {
       if (error && typeof error === 'object') {
         try { console.error('Error loading contacts (details):', JSON.stringify(error, null, 2)); } catch {}
       }
-      setToast({ message: 'Failed to load contacts', type: 'error' });
+      setToast({ message: t.failedToLoadContacts, type: 'error' });
       setLoading(false);
     }
   };
@@ -186,10 +186,10 @@ export default function Contacts() {
       a.click();
       window.URL.revokeObjectURL(url);
 
-      setToast({ message: 'Contacts exported successfully', type: 'success' });
+      setToast({ message: t.contactsExported, type: 'success' });
     } catch (error) {
       console.error('Error exporting contacts:', error);
-      setToast({ message: 'Failed to export contacts', type: 'error' });
+      setToast({ message: t.failedToExportContacts, type: 'error' });
     }
   };
 

@@ -92,7 +92,7 @@ export default function Surveys() {
       setErrorMsg(null);
     } catch (error) {
       console.error('Error loading surveys:', error);
-      setErrorMsg('Failed to load surveys');
+      setErrorMsg(t.failedToLoadSurveys);
     } finally {
       setIsLoading(false);
     }
@@ -111,7 +111,7 @@ export default function Surveys() {
     } catch (error) {
       console.error('Error after survey creation:', error);
       setToast({ 
-        message: 'Survey created but failed to refresh list', 
+        message: t.surveyCreatedRefreshFailed, 
         type: 'warning' 
       });
     }
@@ -135,13 +135,13 @@ export default function Surveys() {
       setSelectedSurvey(null);
 
       setToast({
-        message: 'Survey deleted successfully',
+        message: t.surveyDeleted,
         type: 'success'
       });
     } catch (error) {
       console.error('Error deleting survey:', error);
       setToast({
-        message: 'Failed to delete survey',
+        message: t.failedToDeleteSurvey,
         type: 'error'
       });
     } finally {
@@ -209,7 +209,7 @@ export default function Surveys() {
     return (
       <main className="flex-1">
         <header className="bg-white border-b border-gray-200 px-4 md:px-8 py-4">
-          <h2 className="text-xl md:text-2xl font-semibold text-gray-900">Surveys</h2>
+          <h2 className="text-xl md:text-2xl font-semibold text-gray-900">{t.surveys}</h2>
         </header>
         <div className="p-4 md:p-8">
           <SkeletonDashboard />
@@ -353,7 +353,7 @@ export default function Surveys() {
                 survey={{
                   id: survey.id,
                   title: survey.title,
-                  status: survey.status === 'active' ? 'Active' : 'Disabled',
+                  status: survey.status === 'active' ? 'active' : 'draft',
                   responses: survey.responses_count || 0,
                   lastActivity: new Date(survey.created_at).toLocaleDateString(),
                   link: `${window.location.origin}/survey/${survey.id}`,

@@ -1,4 +1,5 @@
-import { insertIgnoringUnknownColumns, supabase } from './supabaseClient';
+import { insertIgnoringUnknownColumns, supabase, updateIgnoringUnknownColumns } from './supabaseClient';
+import { uniqueLanguages } from './languages';
 import {
   EXAMPLE_SURVEY_JSON,
   flattenQuestions,
@@ -12,9 +13,7 @@ import {
   type SupportedLng,
 } from './surveySpec';
 
-const LANGS: SupportedLng[] = ['en', 'ru', 'fr', 'es'];
-
-async function translateMyMemory(text: string, from: SupportedLng, to: SupportedLng) {
+async function translateMyMemory(text: string, from: string, to: string) {
   const trimmed = (text || '').trim();
   if (!trimmed) return '';
   const params = new URLSearchParams({ q: trimmed, langpair: `${from}|${to}` });
@@ -25,22 +24,25 @@ async function translateMyMemory(text: string, from: SupportedLng, to: Supported
 }
 
 async function fillLangMap(
-  source: string | Partial<Record<SupportedLng, string>> | undefined,
-  base: SupportedLng,
-  translate: boolean
-): Promise<Record<SupportedLng, string>> {
-  const map: Record<SupportedLng, string> = { en: '', ru: '', fr: '', es: '' };
+  source: string | Record<string, string> | undefined,
+  base: string,
+  targets: string[]
+): Promise<Record<string, string>> {
+  const langs = uniqueLanguages([base, ...targets]);
+  const map: Record<string, string> = {};
   if (hasFullLocalization(source)) {
-    for (const lng of LANGS) map[lng] = source[lng] || '';
+    for (const lng of langs) map[lng] = source[lng] || '';
+    for (const [key, value] of Object.entries(source)) {
+      if (typeof value === 'string' && value.trim() && !map[key]) map[key] = value;
+    }
   } else {
     map[base] = typeof source === 'string' ? source.trim() : localizedString(source, base);
   }
-  if (!translate) {
-    for (const lng of LANGS) if (!map[lng]) map[lng] = map[base];
-    return map;
+  if (!targets.length) {
+    return { [base]: map[base] || '' };
   }
-  for (const lng of LANGS) {
-    if (map[lng] || !map[base]) continue;
+  for (const lng of langs) {
+    if (lng === base || map[lng] || !map[base]) continue;
     map[lng] = await translateMyMemory(map[base], base, lng);
   }
   return map;
@@ -48,21 +50,24 @@ async function fillLangMap(
 
 async function fillOptionsMap(
   source: SurveyQuestionSpec['options'],
-  base: SupportedLng,
-  translate: boolean
-): Promise<Record<SupportedLng, string[]>> {
-  const map: Record<SupportedLng, string[]> = { en: [], ru: [], fr: [], es: [] };
+  base: string,
+  targets: string[]
+): Promise<Record<string, string[]>> {
+  const langs = uniqueLanguages([base, ...targets]);
+  const map: Record<string, string[]> = {};
   if (source && !Array.isArray(source)) {
-    for (const lng of LANGS) map[lng] = source[lng] || [];
+    for (const lng of langs) map[lng] = source[lng] || [];
+    for (const [key, value] of Object.entries(source)) {
+      if (Array.isArray(value) && value.length && !map[key]?.length) map[key] = value.map(String);
+    }
   } else {
     map[base] = Array.isArray(source) ? source.map(String) : [];
   }
-  if (!translate) {
-    for (const lng of LANGS) if (!map[lng].length) map[lng] = map[base];
-    return map;
+  if (!targets.length) {
+    return { [base]: map[base] || [] };
   }
-  for (const lng of LANGS) {
-    if (map[lng].length || !map[base].length) continue;
+  for (const lng of langs) {
+    if (lng === base || (map[lng] && map[lng].length) || !map[base]?.length) continue;
     const translated: string[] = [];
     for (const option of map[base]) {
       translated.push(await translateMyMemory(option, base, lng));
@@ -73,18 +78,20 @@ async function fillOptionsMap(
 }
 
 function detectBase(spec: SurveySpec, fallback: SupportedLng = 'en'): SupportedLng {
-  if (spec.baseLanguage && LANGS.includes(spec.baseLanguage)) return spec.baseLanguage;
+  const specified = String(spec.baseLanguage || '').trim().toLowerCase();
+  if (/^[a-z]{2}$/.test(specified)) return specified;
   const sample = `${localizedString(spec.title, fallback)} ${localizedString(spec.description, fallback)}`;
   return /[А-Яа-яЁё]/.test(sample) ? 'ru' : fallback;
 }
 
-async function questionPayload(question: SurveyQuestionSpec, base: SupportedLng, translate: boolean) {
+async function questionPayload(question: SurveyQuestionSpec, base: SupportedLng, targets: string[]) {
   const type = (question.type as QuestionType) || 'single-choice';
-  const text = await fillLangMap(question.text, base, translate);
-  const options = await fillOptionsMap(question.options, base, translate);
-  const rows = await fillOptionsMap(question.rows, base, translate);
-  const scaleMin = await fillLangMap(question.scaleMin, base, translate);
-  const scaleMax = await fillLangMap(question.scaleMax, base, translate);
+  const text = await fillLangMap(question.text, base, targets);
+  const options = await fillOptionsMap(question.options, base, targets);
+  const rows = await fillOptionsMap(question.rows, base, targets);
+  const scaleMin = await fillLangMap(question.scaleMin, base, targets);
+  const scaleMax = await fillLangMap(question.scaleMax, base, targets);
+  const extra = uniqueLanguages([base, ...targets]).filter((lng) => lng !== base);
   return {
     baseLanguage: base,
     type,
@@ -96,9 +103,47 @@ async function questionPayload(question: SurveyQuestionSpec, base: SupportedLng,
     scaleMin,
     scaleMax,
     translations: Object.fromEntries(
-      LANGS.filter((lng) => lng !== base).map((lng) => [lng, { text: text[lng], options: options[lng], rows: rows[lng] }])
+      extra.map((lng) => [lng, { text: text[lng], options: options[lng], rows: rows[lng] }])
     ),
   };
+}
+
+type BranchRule = { condition_type: 'answer_equals'; answer: string; next_question_id: string };
+type ImportedQuestion = { id: string; type: string; options: Record<string, string[]> };
+
+const YES_ANSWERS = new Set(['yes', 'да', 'oui', 'sí', 'si', 'true']);
+const NO_ANSWERS = new Set(['no', 'нет', 'non', 'false']);
+const answerKey = (value: unknown) => String(value ?? '').trim().toLowerCase();
+
+// Turns "show this question only after these answers to the previous one" into the rules the builder writes.
+export function followUpRules(parent: ImportedQuestion, followUpId: string, wanted: string[]): BranchRule[] {
+  const answers = new Set<string>();
+  const lists = Object.values(parent.options || {}).filter((list) => Array.isArray(list) && list.length);
+  for (const raw of wanted) {
+    const value = answerKey(raw);
+    if (parent.type === 'yes-no') {
+      if (YES_ANSWERS.has(value)) answers.add('Yes');
+      if (NO_ANSWERS.has(value)) answers.add('No');
+      continue;
+    }
+    if (parent.type !== 'single-choice') continue;
+    let index = -1;
+    for (const list of lists) {
+      index = list.findIndex((option) => answerKey(option) === value);
+      if (index >= 0) break;
+    }
+    if (index < 0) continue;
+    // The survey screen matches the answer by its text, so every language needs its own rule.
+    for (const list of lists) {
+      const text = list[index];
+      if (!text) continue;
+      const namesAnotherOption = lists.some((other) =>
+        other.some((option, i) => i !== index && answerKey(option) === answerKey(text))
+      );
+      if (!namesAnotherOption) answers.add(text);
+    }
+  }
+  return [...answers].map((answer) => ({ condition_type: 'answer_equals', answer, next_question_id: followUpId }));
 }
 
 export type ImportProgress = (message: string) => void;
@@ -107,18 +152,19 @@ export async function importSurveySpec(args: {
   spec: SurveySpec;
   ownerId: string;
   surveyId?: string;
+  languages?: string[];
   translate?: boolean;
   onProgress?: ImportProgress;
 }): Promise<{ surveyId: string; questionCount: number; sectionCount: number }> {
   const base = detectBase(args.spec);
-  const translate = args.translate ?? args.spec.translate !== false;
+  const targets = uniqueLanguages(args.languages || []).filter((lng) => lng !== base);
   const spec = args.spec;
   args.onProgress?.('Saving survey…');
 
   let surveyId = args.surveyId;
   const createdNewSurvey = !surveyId;
   const title = localizedString(spec.title, base) || 'Untitled survey';
-  const descriptionMap = await fillLangMap(spec.description, base, translate);
+  const descriptionMap = await fillLangMap(spec.description, base, targets);
   const description = JSON.stringify(descriptionMap);
   const estimatedTime = spec.estimatedTime || 5;
 
@@ -147,6 +193,7 @@ export async function importSurveySpec(args: {
   let sortOrder = 0;
   let nextSectionOrder = 0;
   const totalQuestions = flattenQuestions(spec);
+  const branchRules = new Map<string, BranchRule[]>();
 
   if (args.surveyId) {
     const { data: lastQuestion } = await supabase
@@ -171,8 +218,8 @@ export async function importSurveySpec(args: {
       const sectionName = localizedString(section.name, base);
       if (sectionName) {
         args.onProgress?.(`Section ${sectionIndex + 1}: ${sectionName}`);
-        const nameMap = await fillLangMap(section.name, base, translate);
-        const descMap = await fillLangMap(section.description, base, translate);
+        const nameMap = await fillLangMap(section.name, base, targets);
+        const descMap = await fillLangMap(section.description, base, targets);
         const payload = { baseLanguage: base, name: nameMap, description: descMap };
         const data = await insertIgnoringUnknownColumns('survey_sections', {
           survey_id: surveyId,
@@ -186,13 +233,14 @@ export async function importSurveySpec(args: {
         nextSectionOrder += 1;
       }
 
+      let previous: ImportedQuestion | null = null;
       for (const question of section.questions || []) {
         questionCount += 1;
         const text = localizedString(question.text, base);
         args.onProgress?.(`Question ${questionCount} of ${totalQuestions}: ${text.slice(0, 48)}`);
         const type = (question.type as QuestionType) || 'single-choice';
-        const payload = await questionPayload(question, base, translate);
-        await insertIgnoringUnknownColumns('questions', {
+        const payload = await questionPayload(question, base, targets);
+        const row = await insertIgnoringUnknownColumns('questions', {
           survey_id: surveyId,
           type,
           text,
@@ -203,8 +251,18 @@ export async function importSurveySpec(args: {
           payload,
           section_id: sectionId,
         });
+        if (previous && question.showIfPreviousAnswer?.length) {
+          const rules = followUpRules(previous, row.id, question.showIfPreviousAnswer);
+          if (rules.length) branchRules.set(previous.id, [...(branchRules.get(previous.id) || []), ...rules]);
+        }
+        previous = { id: row.id, type, options: payload.options };
         sortOrder += 1;
       }
+    }
+
+    if (branchRules.size) args.onProgress?.('Linking follow-up questions…');
+    for (const [questionId, rules] of branchRules) {
+      await updateIgnoringUnknownColumns('questions', { conditional_logic: JSON.stringify(rules) }, questionId);
     }
   } catch (error) {
     if (createdNewSurvey && surveyId) {

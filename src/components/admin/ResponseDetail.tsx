@@ -134,7 +134,7 @@ export default function ResponseDetail() {
             type="button"
             onClick={() => setShowDeleteConfirm(true)}
             className="min-h-11 min-w-11 text-danger hover:bg-danger-soft"
-            aria-label="Delete this response"
+            aria-label={t.deleteThisResponse}
           >
             <Trash2 className="mx-auto size-5" />
           </button>

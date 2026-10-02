@@ -58,7 +58,7 @@ export default function Sidebar({ isOpen, onClose, isDesktopVisible = true, onDe
 
   const Lang = ({ onPick }: { onPick?: () => void }) => (
     <div className="border-t border-sidebar-border p-3">
-      <div role="group" aria-label="Language" className="grid grid-cols-4 gap-1">
+      <div role="group" aria-label={t.language} className="grid grid-cols-4 gap-1">
         {LANGUAGES.map((lang) => (
           <button
             key={lang.code}
@@ -94,7 +94,7 @@ export default function Sidebar({ isOpen, onClose, isDesktopVisible = true, onDe
               type="button"
               onClick={onDesktopToggle}
               className="min-h-10 min-w-10 text-sidebar-foreground/70 hover:text-surface"
-              aria-label="Hide sidebar"
+              aria-label={t.hideSidebar}
             >
               <ChevronLeft className="mx-auto size-5" />
             </button>
@@ -114,7 +114,7 @@ export default function Sidebar({ isOpen, onClose, isDesktopVisible = true, onDe
             type="button"
             onClick={() => onDesktopToggle?.()}
             className="min-h-11 min-w-11 text-surface"
-            aria-label="Open sidebar"
+            aria-label={t.openSidebar}
           >
             <Menu className="mx-auto size-5" />
           </button>
@@ -132,7 +132,7 @@ export default function Sidebar({ isOpen, onClose, isDesktopVisible = true, onDe
             <p className="font-serif text-xl font-semibold">{t.surveyResearch}</p>
             <p className="mt-1 text-xs text-sidebar-foreground/60">{t.adminPortal}</p>
           </div>
-          <button type="button" onClick={onClose} className="min-h-10 min-w-10" aria-label="Close menu">
+          <button type="button" onClick={onClose} className="min-h-10 min-w-10" aria-label={t.closeMenu}>
             <X className="mx-auto size-5" />
           </button>
         </div>

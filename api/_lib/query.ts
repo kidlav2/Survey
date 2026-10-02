@@ -36,6 +36,22 @@ function encodeValue(col: string, value: unknown) {
   return value;
 }
 
+let sectionPayloadColumn: Promise<unknown> | null = null;
+
+// Databases created before section translations have no survey_sections.payload yet.
+function ensureSectionPayloadColumn() {
+  if (!sectionPayloadColumn) {
+    const db = sql();
+    sectionPayloadColumn = Promise.resolve(db`ALTER TABLE survey_sections ADD COLUMN IF NOT EXISTS payload jsonb`).catch(
+      (error) => {
+        sectionPayloadColumn = null;
+        throw error;
+      }
+    );
+  }
+  return sectionPayloadColumn;
+}
+
 async function isActiveSurvey(id: string) {
   const db = sql();
   const rows = await db`SELECT status FROM surveys WHERE id = ${id} LIMIT 1`;
@@ -158,6 +174,7 @@ async function assertAccess(user: AuthUser | null, table: TableName, op: QueryBo
 export async function runQuery(body: QueryBody, user: AuthUser | null) {
   if (!isTable(body.table)) throw new Error('Unknown table');
   const table = body.table;
+  if (table === 'survey_sections') await ensureSectionPayloadColumn();
   const filters = [...(body.filters || [])];
   if (user && table === 'surveys' && body.op === 'select') {
     const ownerEq = filters.find((filter) => filter.type === 'eq' && filter.col === 'owner_id' && filter.val === user.id);

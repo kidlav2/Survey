@@ -2,6 +2,9 @@ import { createRoot } from 'react-dom/client';
 import { Analytics } from '@vercel/analytics/react';
 import App from './App.tsx';
 import './styles/globals.css';
+import { applyDocumentLanguage, preferredUiLanguage } from './lib/languages';
+
+applyDocumentLanguage(preferredUiLanguage());
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Missing #root');

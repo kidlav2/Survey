@@ -75,7 +75,7 @@ if (existsSync(dumpPath)) {
   );
   const sections = await insertRows(
     'survey_sections',
-    ['id', 'survey_id', 'name', 'description', 'order_index', 'created_at'],
+    ['id', 'survey_id', 'name', 'description', 'order_index', 'created_at', 'payload'],
     dump.survey_sections || []
   );
   const questions = await insertRows(
